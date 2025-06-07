@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-ASSISTANT_ID = os.getenv("ASSISTANT_ID")
+ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID")
 
 # Enhanced memory system (from Celeste)
 user_conversations = {}  # user_id -> thread_id
@@ -38,7 +38,7 @@ def add_to_context(user_id, message_content, is_user=True):
     if user_id not in conversation_context:
         conversation_context[user_id] = []
     
-    role = "User" if is_user else "Vivian"
+    role = "User" if is_user else "Rose"
     timestamp = datetime.now().strftime("%H:%M")
     
     conversation_context[user_id].append({
@@ -892,7 +892,7 @@ def should_give_detailed_response(user_message):
     
     return any(trigger in user_message.lower() for trigger in detail_triggers)
 
-def format_for_discord_vivian(response):
+def format_for_discord_rose(response):
     """Format response specifically for Vivian's PR/communications focus"""
     
     # Remove excessive formatting for readability
@@ -1039,7 +1039,7 @@ CRITICAL INSTRUCTIONS:
             add_to_context(user_id, response, is_user=False)
             
             # Apply Discord formatting and return
-            return format_for_discord_vivian(response)
+            return format_for_discord_rose(response)
         
         return "⚠️ No assistant response found."
         

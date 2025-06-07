@@ -13,10 +13,10 @@ load_dotenv()
 # TEMPORARY: Run assistant fix on startup
 async def run_assistant_fix():
     """Run the assistant fix script on startup"""
-    print("🔧 Running Vivian assistant fix...")
+    print("🔧 Running Rose assistant fix...")
     try:
         import subprocess
-        result = subprocess.run(['python3', 'fix_vivian_assistant.py'], 
+        result = subprocess.run(['python3', 'fix_rose_assistant.py'], 
                               capture_output=True, text=True, timeout=30)
         
         print("📋 Fix script output:")
@@ -38,7 +38,7 @@ async def run_assistant_fix():
     
     print("🚀 Continuing with bot startup...")
 
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_TOKEN = os.getenv("ROSE_DISCORD_TOKEN")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 
 # Configure Discord intents
@@ -49,9 +49,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 # Allowed channels for Vivian
-ALLOWED_CHANNELS = ['productivity', 'calendar', 'email-management', 'general']
+ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
-print("🚀 Starting Enhanced Vivian - Unified Productivity Assistant...")
+print("🚀 Starting Rose Ashcombe - Executive Planning Assistant...")
 
 # ============================================================================
 # WEB SEARCH FUNCTIONS (from Celeste)
@@ -136,7 +136,7 @@ async def ping(ctx):
     latency = round(bot.latency * 1000)
     embed = discord.Embed(
         title="🏓 Pong!",
-        description="Vivian is online and ready to help with productivity!",
+        description="Rose Ashcombe is online and ready to help with productivity!",
         color=0x51cf66
     )
     embed.add_field(name="Latency", value=f"{latency}ms", inline=True)
@@ -148,7 +148,7 @@ async def status(ctx):
     """Show comprehensive bot status"""
     latency = round(bot.latency * 1000)
     embed = discord.Embed(
-        title="🤖 Vivian Status - Productivity Assistant",
+        title="🤖 Rose Status - Productivity Assistant",
         description="Calendar + Email + Research + Memory",
         color=0x4dabf7
     )
@@ -293,7 +293,7 @@ async def show_context_command(ctx):
 async def help_command(ctx):
     """Show comprehensive help"""
     embed = discord.Embed(
-        title="🤖 Vivian - Your Productivity Assistant",
+        title="🤖 Rose Ashcombe - Your Executive Assistant",
         description="Calendar + Email + Research + Memory",
         color=0x4dabf7
     )
@@ -350,14 +350,14 @@ async def help_command(ctx):
 
 @bot.event
 async def on_ready():
-    print(f"🤖 Enhanced Vivian is online as {bot.user}")
+    print(f"🤖 Rose Ashcombe is online as {bot.user}")
     print(f"🔗 Connected to {len(bot.guilds)} guild(s)")
     print(f"👀 Monitoring channels: {', '.join(ALLOWED_CHANNELS)}")
     print(f"📅 Calendar: {'✅' if os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON') else '❌'}")
     print(f"📧 Gmail: {'✅' if os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON') else '❌'}")
     print(f"🔍 Research: {'✅' if BRAVE_API_KEY else '❌'}")
     print(f"🧠 Memory: ✅ Enhanced with context tracking")
-    print(f"🚀 Enhanced Vivian: Your complete productivity assistant!")
+    print(f"🚀 Rose Ashcombe: Your complete productivity assistant!")
 
 @bot.event
 async def on_message(message):
@@ -474,7 +474,7 @@ if __name__ == "__main__":
         print("❌ DISCORD_TOKEN not found in environment variables")
         exit(1)
     
-    print("🚀 Starting Enhanced Vivian with unified capabilities...")
+    print("🚀 Starting Rose Ashcombe with unified capabilities...")
     
     # Run the assistant fix before starting the bot
     async def startup():
