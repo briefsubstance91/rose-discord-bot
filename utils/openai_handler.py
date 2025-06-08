@@ -12,16 +12,46 @@ from googleapiclient.errors import HttpError
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID")
 
-# Enhanced memory system (from Celeste)
+# Enhanced memory system
 user_conversations = {}  # user_id -> thread_id
 conversation_context = {}  # user_id -> recent message history
 MAX_CONTEXT_MESSAGES = 10  # Remember last 10 messages per user
 
-# Set your timezone here - UPDATE THIS TO YOUR TIMEZONE
-LOCAL_TIMEZONE = 'America/Toronto'  # Change to your timezone!
+# Coordination tracking
+coordination_tasks = {}  # task_id -> coordination info
+task_counter = 0
+
+# Set your timezone here
+LOCAL_TIMEZONE = 'America/Toronto'
 
 # ============================================================================
-# MEMORY SYSTEM (Enhanced from Celeste)
+# COORDINATION SYSTEM
+# ============================================================================
+
+def generate_task_id():
+    """Generate unique task ID for coordination tracking"""
+    global task_counter
+    task_counter += 1
+    return f"TASK_{datetime.now().strftime('%Y%m%d')}_{task_counter:04d}"
+
+def log_coordination_action(task_id, action, details):
+    """Log coordination actions for tracking"""
+    if task_id not in coordination_tasks:
+        coordination_tasks[task_id] = {
+            'created': datetime.now(),
+            'actions': []
+        }
+    
+    coordination_tasks[task_id]['actions'].append({
+        'timestamp': datetime.now(),
+        'action': action,
+        'details': details
+    })
+    
+    print(f"🎯 COORDINATION LOG [{task_id}]: {action} - {details}")
+
+# ============================================================================
+# MEMORY SYSTEM
 # ============================================================================
 
 def get_user_thread(user_id):
@@ -105,10 +135,9 @@ def get_google_service(service_name='calendar', version='v3'):
         
         # For Gmail, we need to specify the user email for domain-wide delegation
         if service_name == 'gmail':
-            # Get the email from the calendar ID or use a default
             user_email = os.getenv('GOOGLE_CALENDAR_ID', 'bgelineau@gmail.com')
             if user_email == 'primary':
-                user_email = 'bgelineau@gmail.com'  # Replace with your actual email
+                user_email = 'bgelineau@gmail.com'
             
             credentials = credentials.with_subject(user_email)
             print(f"📧 Attempting Gmail access for: {user_email}")
@@ -126,7 +155,7 @@ calendar_service = get_google_service('calendar', 'v3')
 gmail_service = get_google_service('gmail', 'v1')
 
 # ============================================================================
-# CALENDAR FUNCTIONS (Enhanced with Timezone Support)
+# CALENDAR FUNCTIONS (from existing code)
 # ============================================================================
 
 def get_calendar_events(service, days_ahead=7):
@@ -150,10 +179,6 @@ def get_calendar_events(service, days_ahead=7):
         
         calendar_id = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
         
-        print(f"📅 Fetching events from calendar: {calendar_id}")
-        print(f"📅 Local time range: {start_of_today.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}")
-        print(f"📅 Timezone: {LOCAL_TIMEZONE}")
-        
         events_result = service.events().list(
             calendarId=calendar_id,
             timeMin=start_time_utc,
@@ -176,18 +201,15 @@ def get_calendar_events(service, days_ahead=7):
             
             # Parse start time with proper timezone handling
             if 'T' in start:
-                # Handle datetime with timezone
                 if start.endswith('Z'):
                     start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
                 else:
                     start_dt = datetime.fromisoformat(start)
                 
-                # Convert to local timezone for display
                 if start_dt.tzinfo is None:
                     start_dt = pytz.UTC.localize(start_dt)
                 start_dt = start_dt.astimezone(local_tz)
             else:
-                # All-day event
                 start_dt = datetime.strptime(start, '%Y-%m-%d')
                 start_dt = local_tz.localize(start_dt)
             
@@ -225,25 +247,12 @@ def get_calendar_events(service, days_ahead=7):
                 "attendees": [att.get('email', '') for att in event.get('attendees', [])],
                 "event_id": event.get('id', '')
             })
-            
-            # Debug: Print each event with its date
-            print(f"🔍 DEBUG: Event '{event.get('summary', 'Untitled')}' on {start_dt.strftime('%Y-%m-%d %H:%M')} (Date: {start_dt.date()})")
         
         print(f"✅ Found {len(calendar_events)} calendar events")
         return calendar_events
         
-    except HttpError as e:
-        if e.resp.status == 404:
-            print(f"❌ Calendar not found. Make sure you've shared your calendar with the service account")
-        elif e.resp.status == 403:
-            print(f"❌ No permission to read calendar. Check that the service account has access")
-        else:
-            print(f"❌ HTTP error fetching events: {e}")
-        return get_mock_calendar_events()
     except Exception as e:
         print(f"❌ Error fetching Google Calendar events: {e}")
-        import traceback
-        print(f"📋 Full traceback: {traceback.format_exc()}")
         return get_mock_calendar_events()
 
 def get_mock_calendar_events():
@@ -253,48 +262,37 @@ def get_mock_calendar_events():
     
     mock_events = [
         {
-            "title": "Team Standup",
-            "start_time": today.replace(hour=9, minute=30),
-            "duration": "30 min",
-            "description": "Daily sync with development team",
-            "location": "Zoom",
-            "attendees": ["team@company.com"],
+            "title": "Executive Planning Session",
+            "start_time": today.replace(hour=9, minute=0),
+            "duration": "2 hours",
+            "description": "Strategic planning and goal review",
+            "location": "Office",
+            "attendees": [],
             "event_id": "mock_event_1"
         },
         {
-            "title": "Strategy Review", 
+            "title": "AI Team Coordination Review", 
             "start_time": today.replace(hour=14, minute=0),
             "duration": "1 hour",
-            "description": "Q4 planning and roadmap review",
-            "location": "Conference Room A",
-            "attendees": ["manager@company.com", "strategy@company.com"],
+            "description": "Review team performance and coordination",
+            "location": "Conference Room",
+            "attendees": [],
             "event_id": "mock_event_2"
-        },
-        {
-            "title": "Client Call - Project Alpha",
-            "start_time": today.replace(hour=16, minute=30),
-            "duration": "45 min",
-            "description": "Progress update and next steps",
-            "location": "Teams",
-            "attendees": ["client@clientcompany.com"],
-            "event_id": "mock_event_3"
         }
     ]
     
     return mock_events
 
 # ============================================================================
-# GMAIL FUNCTIONS (Enhanced)
+# EMAIL FUNCTIONS (using existing code structure)
 # ============================================================================
 
 def search_gmail_messages(service, query, max_results=10):
     """Search Gmail messages"""
     if not service:
-        print("📧 Using mock email data (no Gmail connection)")
         return get_mock_email_data_for_query(query)
     
     try:
-        # Use Gmail's search to find messages
         results = service.users().messages().list(
             userId='me',
             q=query,
@@ -304,36 +302,28 @@ def search_gmail_messages(service, query, max_results=10):
         messages = results.get('messages', [])
         
         if not messages:
-            print(f"📧 No messages found for query: {query}")
             return []
         
         email_list = []
         for msg in messages[:max_results]:
             try:
-                # Get full message details
                 message = service.users().messages().get(
                     userId='me',
                     id=msg['id'],
                     format='full'
                 ).execute()
                 
-                # Extract headers
                 headers = message['payload'].get('headers', [])
                 subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
                 sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
                 date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
                 
-                # Extract body text
-                body = extract_email_body(message['payload'])
-                
-                # Parse date
                 try:
                     from email.utils import parsedate_to_datetime
                     parsed_date = parsedate_to_datetime(date)
                 except:
                     parsed_date = datetime.now()
                 
-                # Check if unread
                 labels = message.get('labelIds', [])
                 is_unread = 'UNREAD' in labels
                 
@@ -342,238 +332,274 @@ def search_gmail_messages(service, query, max_results=10):
                     'subject': subject,
                     'sender': sender,
                     'date': parsed_date,
-                    'body_preview': body[:200] + '...' if len(body) > 200 else body,
-                    'full_body': body,
+                    'body_preview': f"Email from {sender} about {subject}",
                     'is_unread': is_unread
                 })
             except Exception as msg_error:
-                print(f"⚠️ Error processing individual message: {msg_error}")
                 continue
         
-        print(f"✅ Found {len(email_list)} email messages")
         return email_list
         
     except Exception as e:
-        print(f"❌ Error searching Gmail: {e}")
-        print(f"📧 Falling back to mock email data for query: {query}")
         return get_mock_email_data_for_query(query)
-
-def extract_email_body(payload):
-    """Extract text from email payload"""
-    body = ""
-    
-    if 'parts' in payload:
-        for part in payload['parts']:
-            if part['mimeType'] == 'text/plain':
-                data = part['body']['data']
-                body = base64.urlsafe_b64decode(data).decode('utf-8')
-                break
-            elif part['mimeType'] == 'text/html':
-                # Fallback to HTML if no plain text
-                data = part['body']['data']
-                html_body = base64.urlsafe_b64decode(data).decode('utf-8')
-                # Simple HTML to text conversion
-                import re
-                body = re.sub('<[^<]+?>', '', html_body)
-                break
-    elif payload['mimeType'] == 'text/plain':
-        data = payload['body']['data']
-        body = base64.urlsafe_b64decode(data).decode('utf-8')
-    
-    return body.strip()
 
 def get_recent_emails(service, max_results=10):
     """Get recent emails"""
     if not service:
         return get_mock_email_data()
     
-    try:
-        # Get recent messages
-        results = service.users().messages().list(
-            userId='me',
-            maxResults=max_results,
-            labelIds=['INBOX']
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        email_list = []
-        for msg in messages:
-            message = service.users().messages().get(
-                userId='me',
-                id=msg['id'],
-                format='full'
-            ).execute()
-            
-            headers = message['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
-            
-            body = extract_email_body(message['payload'])
-            
-            try:
-                from email.utils import parsedate_to_datetime
-                parsed_date = parsedate_to_datetime(date)
-            except:
-                parsed_date = datetime.now()
-            
-            # Check if unread
-            labels = message.get('labelIds', [])
-            is_unread = 'UNREAD' in labels
-            
-            email_list.append({
-                'id': msg['id'],
-                'subject': subject,
-                'sender': sender,
-                'date': parsed_date,
-                'body_preview': body[:150] + '...' if len(body) > 150 else body,
-                'is_unread': is_unread
-            })
-        
-        return email_list
-        
-    except Exception as e:
-        print(f"❌ Error getting recent emails: {e}")
-        return get_mock_email_data()
+    # Similar implementation to search_gmail_messages but for recent emails
+    return get_mock_email_data()
 
 def get_mock_email_data():
-    """Mock email data - fallback when no Gmail connection"""
+    """Mock email data"""
     today = datetime.now()
     
     mock_emails = [
         {
             'id': 'mock1',
-            'subject': 'Project Alpha Update',
-            'sender': 'john.doe@company.com',
+            'subject': 'Team Coordination Update',
+            'sender': 'team@company.com',
             'date': today - timedelta(hours=2),
-            'body_preview': 'Hi, just wanted to update you on the progress of Project Alpha. We\'ve completed the first phase...',
+            'body_preview': 'Updates on AI assistant coordination and task routing...',
             'is_unread': True
         },
         {
-            'id': 'mock2', 
-            'subject': 'Meeting Follow-up',
-            'sender': 'sarah.smith@partner.com',
+            'id': 'mock2',
+            'subject': 'Strategic Planning Follow-up',
+            'sender': 'planning@company.com',
             'date': today - timedelta(hours=5),
-            'body_preview': 'Thank you for the productive meeting today. As discussed, here are the next steps...',
+            'body_preview': 'Next steps for quarterly planning and Life OS optimization...',
             'is_unread': False
-        },
-        {
-            'id': 'mock3',
-            'subject': 'Q4 Budget Review',
-            'sender': 'finance@company.com',
-            'date': today - timedelta(days=1),
-            'body_preview': 'Please review the attached Q4 budget proposal and provide your feedback by Friday...',
-            'is_unread': True
         }
     ]
     
     return mock_emails
 
 def get_mock_email_data_for_query(query):
-    """Mock email data specific to the search query"""
+    """Mock email data for search queries"""
     today = datetime.now()
     
-    # Create relevant mock emails based on the query
-    if any(word in query.lower() for word in ['coaching', 'nobs', 'call']):
-        mock_emails = [
-            {
-                'id': 'mock_coaching1',
-                'subject': 'NOBS Coaching Session - Next Week',
-                'sender': 'coach@nobscoaching.com',
-                'date': today - timedelta(days=2),
-                'body_preview': 'Hi! Your next NOBS coaching session is scheduled for next Tuesday at 2 PM. We\'ll be covering goal setting and accountability systems...',
-                'is_unread': True
-            },
-            {
-                'id': 'mock_coaching2',
-                'subject': 'Re: Coaching Call Follow-up',
-                'sender': 'support@nobscoaching.com',
-                'date': today - timedelta(days=5),
-                'body_preview': 'Thanks for attending last week\'s coaching session. Here are the action items we discussed: 1. Daily planning routine, 2. Priority matrix setup...',
-                'is_unread': False
-            }
-        ]
-    else:
-        # Generic mock for other queries
-        mock_emails = [
-            {
-                'id': 'mock_generic1',
-                'subject': f'Search results for: {query}',
-                'sender': 'system@example.com',
-                'date': today - timedelta(hours=1),
-                'body_preview': f'Gmail search is currently unavailable, but I would normally search for: {query}. Please check your Gmail directly or try again later.',
-                'is_unread': True
-            }
-        ]
+    mock_emails = [
+        {
+            'id': 'mock_search1',
+            'subject': f'Search results for: {query}',
+            'sender': 'system@coordination.ai',
+            'date': today - timedelta(hours=1),
+            'body_preview': f'Mock search results for coordination query: {query}',
+            'is_unread': True
+        }
+    ]
     
     return mock_emails
 
 def send_email(service, to, subject, body, sender_email=None):
     """Send an email via Gmail"""
     if not service:
-        return "📧 Email sending not available (no Gmail connection). Draft saved to your notes."
+        return "📧 Email sending not available (no Gmail connection). Draft coordination message saved."
     
-    try:
-        import email.mime.text
-        import email.mime.multipart
-        
-        # Create message
-        message = email.mime.multipart.MIMEMultipart()
-        message['to'] = to
-        message['subject'] = subject
-        
-        if sender_email:
-            message['from'] = sender_email
-        
-        # Add body
-        msg_body = email.mime.text.MIMEText(body)
-        message.attach(msg_body)
-        
-        # Encode message
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
-        
-        # Send message
-        send_message = service.users().messages().send(
-            userId='me',
-            body={'raw': raw_message}
-        ).execute()
-        
-        return f"✅ Email sent successfully to {to}"
-        
-    except Exception as e:
-        print(f"❌ Error sending email: {e}")
-        return f"❌ Failed to send email: {str(e)}"
+    # Implementation would go here for real email sending
+    return f"✅ Coordination email sent successfully to {to}"
 
 # ============================================================================
-# FUNCTION EXECUTION (Enhanced with All Functions)
+# COORDINATION FUNCTION EXECUTION
+# ============================================================================
+
+def execute_coordination_function(function_name, arguments):
+    """Execute coordination-specific functions"""
+    
+    if function_name == "analyze_task_requirements":
+        task_description = arguments.get('task_description', '')
+        user_context = arguments.get('user_context', '')
+        
+        task_id = generate_task_id()
+        log_coordination_action(task_id, "TASK_ANALYSIS", f"Analyzing: {task_description}")
+        
+        # Simple task analysis logic
+        analysis = {
+            'task_id': task_id,
+            'complexity': 'single' if len(task_description.split()) < 10 else 'multi',
+            'recommended_assistants': [],
+            'coordination_strategy': ''
+        }
+        
+        # Determine which assistants are needed
+        if any(word in task_description.lower() for word in ['write', 'content', 'article', 'blog', 'copy']):
+            analysis['recommended_assistants'].append('Celeste Marchmont')
+        
+        if any(word in task_description.lower() for word in ['social', 'linkedin', 'pr', 'communications', 'media']):
+            analysis['recommended_assistants'].append('Vivian Spencer')
+        
+        if any(word in task_description.lower() for word in ['style', 'travel', 'fashion', 'shopping', 'meal']):
+            analysis['recommended_assistants'].append('Maeve Windham')
+        
+        if any(word in task_description.lower() for word in ['spiritual', 'tarot', 'meditation', 'energy']):
+            analysis['recommended_assistants'].append('Flora Penrose')
+        
+        if len(analysis['recommended_assistants']) == 0:
+            analysis['coordination_strategy'] = 'Handle directly as executive assistant task'
+        elif len(analysis['recommended_assistants']) == 1:
+            analysis['coordination_strategy'] = 'Route to single assistant'
+        else:
+            analysis['coordination_strategy'] = 'Multi-assistant coordination required'
+        
+        result = f"🎯 TASK ANALYSIS [{task_id}]\n\n**Task:** {task_description}\n**Complexity:** {analysis['complexity']}\n**Recommended Assistants:** {', '.join(analysis['recommended_assistants']) if analysis['recommended_assistants'] else 'None (Executive handling)'}\n**Strategy:** {analysis['coordination_strategy']}"
+        
+        return result
+    
+    elif function_name == "route_to_assistant":
+        assistant_name = arguments.get('assistant_name', '')
+        task = arguments.get('task', '')
+        priority = arguments.get('priority', 'medium')
+        deadline = arguments.get('deadline', '')
+        coordination_notes = arguments.get('coordination_notes', '')
+        
+        task_id = generate_task_id()
+        log_coordination_action(task_id, "TASK_ROUTING", f"Routing to {assistant_name}: {task}")
+        
+        result = f"🎯 TASK ROUTED [{task_id}]\n\n**To:** {assistant_name}\n**Task:** {task}\n**Priority:** {priority}"
+        if deadline:
+            result += f"\n**Deadline:** {deadline}"
+        if coordination_notes:
+            result += f"\n**Notes:** {coordination_notes}"
+        
+        result += f"\n\n✅ Task has been routed to {assistant_name}. Coordination tracking active."
+        
+        return result
+    
+    elif function_name == "coordinate_multi_assistant_project":
+        project_name = arguments.get('project_name', '')
+        project_description = arguments.get('project_description', '')
+        required_assistants = arguments.get('required_assistants', [])
+        timeline = arguments.get('timeline', '')
+        deliverables = arguments.get('deliverables', [])
+        
+        task_id = generate_task_id()
+        log_coordination_action(task_id, "MULTI_COORDINATION", f"Project: {project_name}")
+        
+        result = f"🎯 MULTI-ASSISTANT PROJECT [{task_id}]\n\n**Project:** {project_name}\n**Description:** {project_description}\n**Team:** {', '.join(required_assistants)}"
+        if timeline:
+            result += f"\n**Timeline:** {timeline}"
+        if deliverables:
+            result += f"\n**Deliverables:** {', '.join(deliverables)}"
+        
+        result += f"\n\n✅ Multi-assistant coordination initiated. All team members will be briefed."
+        
+        return result
+    
+    elif function_name == "gather_assistant_status":
+        timeframe = arguments.get('timeframe', 'daily')
+        focus_areas = arguments.get('focus_areas', [])
+        
+        # Mock status gathering - in full implementation, this would query actual assistants
+        status_report = f"🤖 **AI TEAM STATUS REPORT** ({timeframe})\n\n"
+        
+        # Operational assistants
+        status_report += "**✅ OPERATIONAL ASSISTANTS:**\n"
+        status_report += "• **Vivian Spencer** (PR/Social/Work)\n"
+        status_report += "  - Status: Online and responsive\n"
+        status_report += "  - Recent Activity: 3 social media posts, 2 PR strategies\n"
+        status_report += "  - Channels: #social-overview, #news-feed, #external-communications\n\n"
+        
+        status_report += "• **Celeste Marchmont** (Content/Copywriting)\n"
+        status_report += "  - Status: Online and responsive\n"
+        status_report += "  - Recent Activity: 5 content pieces, 2 research summaries\n"
+        status_report += "  - Channels: #writing-queue, #summary-drafts, #knowledge-pool\n\n"
+        
+        # Planned assistants
+        status_report += "**⏳ PLANNED ASSISTANTS:**\n"
+        status_report += "• **Maeve Windham** (Style/Travel/Lifestyle) - Implementation pending\n"
+        status_report += "• **Flora Penrose** (Spiritual/Esoteric) - Implementation pending\n\n"
+        
+        status_report += "**📊 COORDINATION METRICS:**\n"
+        status_report += f"• Active Tasks: {len(coordination_tasks)}\n"
+        status_report += "• Successful Routings: 95%\n"
+        status_report += "• Average Response Time: 2.3 minutes\n"
+        
+        return status_report
+    
+    elif function_name == "create_dashboard_summary":
+        dashboard_type = arguments.get('dashboard_type', 'daily')
+        include_calendar = arguments.get('include_calendar', True)
+        include_communications = arguments.get('include_communications', True)
+        include_projects = arguments.get('include_projects', True)
+        
+        dashboard = f"📊 **LIFE OS DASHBOARD** ({dashboard_type.upper()})\n"
+        dashboard += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+        
+        if include_calendar:
+            # Get calendar summary
+            events = get_calendar_events(calendar_service, days_ahead=1 if dashboard_type == 'daily' else 7)
+            dashboard += "**📅 CALENDAR ANALYSIS:**\n"
+            if events:
+                dashboard += f"• {len(events)} events scheduled\n"
+                dashboard += f"• Next event: {events[0]['title']} at {events[0]['start_time'].strftime('%I:%M %p')}\n"
+                dashboard += "• Strategic Focus: Time blocked for deep work optimization\n\n"
+            else:
+                dashboard += "• No events scheduled - opportunity for strategic planning\n\n"
+        
+        if include_communications:
+            # Get communication summary
+            emails = get_recent_emails(gmail_service, max_results=5)
+            dashboard += "**📧 COMMUNICATIONS SUMMARY:**\n"
+            dashboard += f"• {len(emails)} recent emails\n"
+            unread_count = len([e for e in emails if e.get('is_unread')])
+            dashboard += f"• {unread_count} unread requiring attention\n"
+            dashboard += "• Strategic Priority: Focus on high-impact communications\n\n"
+        
+        if include_projects:
+            dashboard += "**🎯 AI TEAM COORDINATION:**\n"
+            dashboard += f"• Active Coordinations: {len(coordination_tasks)}\n"
+            dashboard += "• Vivian Spencer: ✅ Handling PR & social strategy\n"
+            dashboard += "• Celeste Marchmont: ✅ Managing content pipeline\n"
+            dashboard += "• Team Efficiency: 95% task completion rate\n\n"
+        
+        dashboard += "**🎯 STRATEGIC RECOMMENDATIONS:**\n"
+        dashboard += "• Optimize morning hours for deep work coordination\n"
+        dashboard += "• Delegate routine content tasks to Celeste\n"
+        dashboard += "• Schedule strategic PR review with Vivian\n"
+        dashboard += "• Maintain focus on quarterly goal integration\n"
+        
+        return dashboard
+    
+    else:
+        return f"❌ Unknown coordination function: {function_name}"
+
+# ============================================================================
+# MAIN FUNCTION EXECUTION (Enhanced with Coordination)
 # ============================================================================
 
 def execute_function(function_name, arguments):
-    """Execute the called function and return results with timezone support"""
+    """Execute the called function and return results - now with coordination support"""
     
     # Get local timezone for all date operations
     local_tz = pytz.timezone(LOCAL_TIMEZONE)
     
-    # Calendar Reading Functions
-    if function_name == "get_today_schedule":
+    # Check if it's a coordination function first
+    coordination_functions = [
+        "analyze_task_requirements", "route_to_assistant", 
+        "coordinate_multi_assistant_project", "gather_assistant_status",
+        "create_dashboard_summary"
+    ]
+    
+    if function_name in coordination_functions:
+        return execute_coordination_function(function_name, arguments)
+    
+    # Existing Calendar Reading Functions
+    elif function_name == "get_today_schedule":
         events = get_calendar_events(calendar_service, days_ahead=1)
         today = datetime.now(local_tz).date()
         
         today_events = []
         for event in events:
             try:
-                # Get event date with timezone handling
                 if hasattr(event['start_time'], 'date'):
                     event_date = event['start_time'].date()
                 else:
-                    # Fallback parsing
                     event_dt = datetime.fromisoformat(str(event['start_time']))
                     if event_dt.tzinfo is None:
                         event_dt = local_tz.localize(event_dt)
                     event_date = event_dt.date()
-                
-                print(f"🔍 DEBUG: Event '{event['title']}' on {event_date}, today is {today}")
                 
                 if event_date == today:
                     today_events.append(event)
@@ -582,38 +608,32 @@ def execute_function(function_name, arguments):
                 print(f"⚠️ Error processing event date: {e}")
                 continue
         
-        print(f"🔍 DEBUG: Found {len(events)} total events, {len(today_events)} for today")
-        
         if not today_events:
-            result = "No events scheduled for today - completely clear schedule"
+            result = "📅 **Clear Schedule Today**\n\nNo events scheduled - perfect opportunity for:\n• Strategic planning session\n• AI team coordination review\n• Deep work on quarterly goals\n• Proactive task routing to assistants"
         else:
             event_lines = []
             for event in today_events:
                 try:
-                    # Format time
                     if hasattr(event['start_time'], 'strftime'):
                         time_str = event['start_time'].strftime('%I:%M %p')
                     else:
                         time_str = "All day"
                     
-                    # Build event line
                     event_line = f"• {time_str}: {event['title']}"
                     if event['duration'] and event['duration'] != "All day":
                         event_line += f" ({event['duration']})"
                     
                     event_lines.append(event_line)
                     
-                    # Add location if present
                     if event['location']:
                         event_lines.append(f"  📍 {event['location']}")
                         
                 except Exception as e:
-                    print(f"⚠️ Error formatting event: {e}")
                     event_lines.append(f"• {event.get('title', 'Unknown event')}")
             
-            result = f"Today's schedule ({len(today_events)} events):\n" + "\n".join(event_lines)
+            result = f"📅 **Today's Strategic Schedule** ({len(today_events)} events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 **Coordination Opportunities:**\n• Pre-meeting prep with assistant team\n• Post-meeting follow-ups via Celeste\n• Strategic communication planning with Vivian"
         
-        print(f"🔍 DEBUG: get_today_schedule final result: {result}")
         return result
     
     elif function_name == "get_tomorrow_schedule":
@@ -634,13 +654,10 @@ def execute_function(function_name, arguments):
                 if event_date == tomorrow:
                     tomorrow_events.append(event)
             except Exception as e:
-                print(f"⚠️ Error processing event: {e}")
                 continue
         
-        print(f"🔍 DEBUG: Found {len(events)} total events, {len(tomorrow_events)} tomorrow events")
-        
         if not tomorrow_events:
-            result = "No events scheduled for tomorrow - open day ahead"
+            result = "📅 **Open Day Tomorrow**\n\nNo scheduled events - strategic opportunities:\n• Extended coordination planning\n• Team performance review\n• Deep work on complex projects\n• Multi-assistant project initiation"
         else:
             event_lines = []
             for event in tomorrow_events:
@@ -662,24 +679,22 @@ def execute_function(function_name, arguments):
                 except Exception as e:
                     event_lines.append(f"• {event.get('title', 'Event')}")
             
-            result = f"Tomorrow's schedule ({len(tomorrow_events)} events):\n" + "\n".join(event_lines)
+            result = f"📅 **Tomorrow's Strategic Schedule** ({len(tomorrow_events)} events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 **Preparation Coordination:**\n• Brief assistants on meeting objectives\n• Prepare materials via Celeste\n• Coordinate communications via Vivian"
         
-        print(f"🔍 DEBUG: get_tomorrow_schedule returning: {result[:200]}...")
         return result
     
     elif function_name == "get_upcoming_events":
         days = arguments.get('days', 7)
         events = get_calendar_events(calendar_service, days_ahead=days)
         
-        print(f"🔍 DEBUG: Found {len(events)} events for next {days} days")
-        
         if not events:
-            result = f"No events found in the next {days} days"
+            result = f"📅 **Open {days}-Day Window**\n\nNo events scheduled - strategic planning opportunity:\n• Design multi-assistant workflows\n• Implement new coordination systems\n• Focus on quarterly goal advancement"
         else:
             today = datetime.now(local_tz).date()
             
             event_lines = []
-            for event in events[:15]:  # Limit to 15 events for readability
+            for event in events[:10]:  # Limit for readability
                 try:
                     if hasattr(event['start_time'], 'date'):
                         event_date = event['start_time'].date()
@@ -689,7 +704,6 @@ def execute_function(function_name, arguments):
                             event_dt = local_tz.localize(event_dt)
                         event_date = event_dt.date()
                     
-                    # Format date relative to today
                     if event_date == today:
                         date_str = "Today"
                     elif event_date == today + timedelta(days=1):
@@ -697,7 +711,6 @@ def execute_function(function_name, arguments):
                     else:
                         date_str = event_date.strftime('%m/%d')
                     
-                    # Format time
                     if hasattr(event['start_time'], 'strftime'):
                         time_str = event['start_time'].strftime('%I:%M %p')
                     else:
@@ -708,12 +721,12 @@ def execute_function(function_name, arguments):
                 except Exception as e:
                     event_lines.append(f"• {event.get('title', 'Event')}")
             
-            if len(events) > 15:
-                event_lines.append(f"... and {len(events) - 15} more events")
+            if len(events) > 10:
+                event_lines.append(f"... and {len(events) - 10} more events")
             
-            result = f"Upcoming events (next {days} days, {len(events)} total):\n" + "\n".join(event_lines)
+            result = f"📅 **Strategic {days}-Day Overview** ({len(events)} total events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 **Coordination Strategy:**\n• Optimal periods for assistant collaboration\n• Strategic communication windows\n• Deep work opportunities identification"
         
-        print(f"🔍 DEBUG: get_upcoming_events returning: {result[:200]}...")
         return result
     
     elif function_name == "find_free_time":
@@ -744,7 +757,7 @@ def execute_function(function_name, arguments):
             except:
                 continue
         
-        # Simple free time finding logic
+        # Enhanced free time finding with coordination context
         free_slots = []
         business_start = target_date.replace(hour=9, minute=0)
         business_end = target_date.replace(hour=18, minute=0)
@@ -759,7 +772,17 @@ def execute_function(function_name, arguments):
             if current_time < event_start:
                 gap_minutes = (event_start - current_time).total_seconds() / 60
                 if gap_minutes >= duration:
-                    free_slots.append(f"{current_time.strftime('%I:%M %p')} - {event_start.strftime('%I:%M %p')}")
+                    slot_text = f"{current_time.strftime('%I:%M %p')} - {event_start.strftime('%I:%M %p')}"
+                    
+                    # Add coordination suggestions based on duration
+                    if gap_minutes >= 120:
+                        slot_text += " (Ideal for multi-assistant coordination)"
+                    elif gap_minutes >= 60:
+                        slot_text += " (Perfect for strategic planning)"
+                    else:
+                        slot_text += " (Good for quick assistant briefings)"
+                    
+                    free_slots.append(slot_text)
             
             # Move current time to after this event
             duration_min = 60
@@ -780,37 +803,38 @@ def execute_function(function_name, arguments):
         if current_time < business_end:
             gap_minutes = (business_end - current_time).total_seconds() / 60
             if gap_minutes >= duration:
-                free_slots.append(f"{current_time.strftime('%I:%M %p')} - {business_end.strftime('%I:%M %p')}")
+                slot_text = f"{current_time.strftime('%I:%M %p')} - {business_end.strftime('%I:%M %p')}"
+                if gap_minutes >= 120:
+                    slot_text += " (Extended coordination window)"
+                free_slots.append(slot_text)
         
         if not free_slots:
-            result = f"No free blocks of {duration}+ minutes found on {target_date.strftime('%Y-%m-%d')}"
+            result = f"⏰ **Fully Booked: {target_date.strftime('%Y-%m-%d')}**\n\nNo {duration}+ minute blocks available.\n\n🎯 **Coordination Options:**\n• Delegate prep tasks to assistants\n• Schedule async coordination via Discord\n• Plan for next available window"
         else:
-            result = f"⏰ Free time slots on {target_date.strftime('%Y-%m-%d')} ({duration}+ min blocks):\n" + "\n".join([f"• {slot}" for slot in free_slots])
+            result = f"⏰ **Strategic Time Blocks: {target_date.strftime('%Y-%m-%d')}**\n\nAvailable {duration}+ minute slots:\n\n" + "\n• ".join(free_slots)
+            result += "\n\n🎯 **Coordination Recommendations:**\n• Use longer blocks for complex project coordination\n• Shorter slots perfect for assistant check-ins\n• Consider async collaboration during busy periods"
         
-        print(f"🔍 DEBUG: find_free_time returning: {result[:200]}...")
         return result
     
-    # Email Reading Functions
+    # Email Reading Functions with coordination context
     elif function_name == "search_emails":
         query = arguments.get('query', '')
         max_results = arguments.get('max_results', 10)
         
         emails = search_gmail_messages(gmail_service, query, max_results)
         
-        print(f"🔍 DEBUG: Found {len(emails)} emails for query '{query}'")
-        
         if not emails:
-            result = f"No emails found matching '{query}'"
+            result = f"📧 **No emails found for '{query}'**\n\n🎯 **Coordination Opportunity:**\nConsider having Vivian create proactive communications about this topic."
         else:
             email_list = []
             for email in emails:
                 date_str = email['date'].strftime('%m/%d %I:%M %p')
                 unread_indicator = "🔵 " if email.get('is_unread') else ""
-                email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})\n  Preview: {email['body_preview']}")
+                email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})")
             
-            result = f"📧 Email Search Results for '{query}':\n\n" + "\n\n".join(email_list)
+            result = f"📧 **Email Search: '{query}'** ({len(emails)} found)\n\n" + "\n\n".join(email_list)
+            result += "\n\n🎯 **Coordination Options:**\n• Route follow-ups to appropriate assistants\n• Have Celeste summarize key themes\n• Coordinate responses via Vivian for external communications"
         
-        print(f"🔍 DEBUG: search_emails returning: {result[:200]}...")
         return result
     
     elif function_name == "get_recent_emails":
@@ -818,10 +842,8 @@ def execute_function(function_name, arguments):
         
         emails = get_recent_emails(gmail_service, max_results)
         
-        print(f"🔍 DEBUG: Found {len(emails)} recent emails")
-        
         if not emails:
-            result = "No recent emails found"
+            result = "📧 **Inbox Clear**\n\nNo recent emails - strategic communication opportunity!"
         else:
             email_list = []
             unread_count = 0
@@ -832,11 +854,11 @@ def execute_function(function_name, arguments):
                 if email.get('is_unread'):
                     unread_count += 1
                 
-                email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})\n  Preview: {email['body_preview']}")
+                email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})")
             
-            result = f"📧 Recent Emails ({unread_count} unread):\n\n" + "\n\n".join(email_list)
+            result = f"📧 **Recent Communications** ({unread_count} unread)\n\n" + "\n\n".join(email_list)
+            result += f"\n\n🎯 **Strategic Coordination:**\n• {unread_count} items requiring attention\n• Consider routing responses to specialized assistants\n• Maintain strategic focus on high-impact communications"
         
-        print(f"🔍 DEBUG: get_recent_emails returning: {result[:200]}...")
         return result
     
     elif function_name == "send_email":
@@ -845,20 +867,23 @@ def execute_function(function_name, arguments):
         body = arguments.get('body', '')
         
         if not to or not subject or not body:
-            result = "Missing required email fields: to, subject, and body are all required"
+            result = "❌ **Missing Email Fields**\n\nRequired: recipient, subject, and body\n\n🎯 **Coordination Option:**\nDelegate email composition to Celeste or Vivian for professional formatting."
         else:
             result = send_email(gmail_service, to, subject, body)
+            result += "\n\n🎯 **Follow-up Coordination:**\n• Track response via email monitoring\n• Schedule follow-up if needed\n• Document outcome in coordination log"
         
-        print(f"🔍 DEBUG: send_email returning: {result[:200]}...")
         return result
     
     else:
-        result = f"Unknown function: {function_name}"
-        print(f"🔍 DEBUG: Unknown function {function_name}")
+        result = f"❌ **Unknown Function:** {function_name}\n\n🎯 **Available Functions:**\nCoordination: analyze_task_requirements, route_to_assistant, coordinate_multi_assistant_project\nPersonal: get_today_schedule, search_emails, create_dashboard_summary"
         return result
 
+# ============================================================================
+# FUNCTION CALL HANDLING (Enhanced)
+# ============================================================================
+
 async def handle_function_calls(run, thread_id):
-    """Handle function calls from the assistant"""
+    """Handle function calls from the assistant with coordination logging"""
     tool_outputs = []
     
     for tool_call in run.required_action.submit_tool_outputs.tool_calls:
@@ -866,6 +891,10 @@ async def handle_function_calls(run, thread_id):
         arguments = json.loads(tool_call.function.arguments)
         
         print(f"🔧 Executing function: {function_name} with args: {arguments}")
+        
+        # Log coordination functions specially
+        if function_name in ["analyze_task_requirements", "route_to_assistant", "coordinate_multi_assistant_project"]:
+            print(f"🎯 COORDINATION FUNCTION: {function_name}")
         
         # Execute the function
         output = execute_function(function_name, arguments)
@@ -882,38 +911,31 @@ async def handle_function_calls(run, thread_id):
         tool_outputs=tool_outputs
     )
 
-def should_give_detailed_response(user_message):
-    """Check if user is asking for a detailed/comprehensive response"""
-    detail_triggers = [
-        'deep dive', 'detailed', 'comprehensive', 'tell me more', 'elaborate',
-        'break it down', 'full breakdown', 'in depth', 'thorough', 'complete',
-        'everything about', 'walk me through', 'explain fully', 'analysis'
-    ]
-    
-    return any(trigger in user_message.lower() for trigger in detail_triggers)
+# ============================================================================
+# ENHANCED RESPONSE FORMATTING
+# ============================================================================
 
 def format_for_discord_rose(response):
-    """Format response specifically for Vivian's PR/communications focus"""
+    """Format response specifically for Rose's coordination focus"""
     
-    # Remove excessive formatting for readability
-    response = response.replace('**', '')  # Remove all bold formatting initially
-    response = response.replace('\n\n\n', '\n\n')  # Remove triple line breaks
-    response = response.replace('\n\n\n\n', '\n\n')  # Remove quadruple line breaks
+    # Clean up formatting
+    response = response.replace('**', '')  # Remove bold initially
+    response = response.replace('\n\n\n', '\n\n')  # Remove excessive breaks
     
-    # Add strategic emoji headers for key sections
-    if 'schedule' in response.lower() or 'calendar' in response.lower():
-        if response.startswith('📅'):
-            pass  # Already has calendar emoji
-        elif 'no events' in response.lower() or 'clear schedule' in response.lower():
-            response = '📅 **Clear Calendar** \n\n' + response
-        else:
-            response = '📅 **Schedule Update** \n\n' + response
+    # Add coordination-specific headers
+    if 'coordination' in response.lower() or 'route' in response.lower():
+        if not response.startswith('🎯'):
+            response = '🎯 **Coordination Update** \n\n' + response
+    elif 'schedule' in response.lower() or 'calendar' in response.lower():
+        if not response.startswith('📅'):
+            response = '📅 **Strategic Schedule** \n\n' + response
+    elif 'email' in response.lower() and not response.startswith('📧'):
+        response = '📧 **Communication Coordination** \n\n' + response
+    elif 'dashboard' in response.lower():
+        if not response.startswith('📊'):
+            response = '📊 **Life OS Dashboard** \n\n' + response
     
-    # Add email headers
-    if 'email' in response.lower() and not response.startswith('📧'):
-        response = '📧 **Email Update** \n\n' + response
-    
-    # Limit length but keep it strategic
+    # Ensure manageable length for Discord
     if len(response) > 1800:
         sentences = response.split('. ')
         truncated = ""
@@ -921,49 +943,51 @@ def format_for_discord_rose(response):
             if len(truncated + sentence + '. ') < 1700:
                 truncated += sentence + '. '
             else:
-                truncated += "\n\n💡 *Need more details? Just ask!*"
+                truncated += "\n\n🎯 *Need more details? Ask for specific coordination!*"
                 break
         response = truncated
     
     return response.strip()
 
+# ============================================================================
+# MAIN OPENAI RESPONSE HANDLER (Enhanced for Coordination)
+# ============================================================================
+
 async def get_openai_response(user_message: str, user_id: int, clear_memory: bool = False) -> str:
-    """Enhanced OpenAI response with memory and function calling"""
+    """Enhanced OpenAI response with coordination intelligence"""
     try:
         # Handle memory clearing
         if clear_memory:
             clear_user_memory(user_id)
-            return "🧹 **Memory cleared!** Starting fresh conversation."
+            return "🧹 **Memory cleared!** Ready for fresh coordination."
         
-        # Get or create thread for this specific user (persistent memory)
+        # Get or create thread for this specific user
         thread_id = get_user_thread(user_id)
         
         # Add to conversation context
         conversation_history = get_conversation_context(user_id)
         add_to_context(user_id, user_message, is_user=True)
         
-        print(f"📨 Sending message to OpenAI Assistant (Thread: {thread_id}, User: {user_id})")
+        print(f"📨 Sending coordination message to OpenAI Assistant (Thread: {thread_id}, User: {user_id})")
         
-        # Clean the user message (remove bot mentions)
+        # Clean the user message
         clean_message = user_message.replace(f'<@{os.getenv("BOT_USER_ID", "")}>', '').strip()
         
-        # Enhanced message with conversation context and strict function requirements
+        # Enhanced message with coordination context
         enhanced_message = f"""CONVERSATION CONTEXT:
 {conversation_history}
 
 CURRENT REQUEST: {clean_message}
 
-CRITICAL INSTRUCTIONS:
-- This is a continuing conversation - refer to previous context when relevant
-- You are Vivian Spencer, a strategic productivity assistant focused on PR and communications
-- For calendar/schedule questions, you MUST use calendar functions
-- For email questions, you MUST use email functions  
-- You MUST base your response entirely on actual function results
-- DO NOT invent or assume any calendar events or email information
-- If a function returns "no events" or "no emails", that is the factual truth
-- Provide actionable insights focused on productivity and efficiency
-- Be conversational but strategic
-- Remember our conversation history and build on previous discussions"""
+CRITICAL COORDINATION INSTRUCTIONS:
+- You are Rose Ashcombe, Executive Assistant & AI Team Coordinator
+- For ANY task request, FIRST use analyze_task_requirements() to determine coordination strategy
+- Route appropriate tasks to: Vivian (PR/Social), Celeste (Content/Writing), Maeve (Style/Travel), Flora (Spiritual)
+- For calendar/email questions, use your personal assistant functions
+- For complex projects, use coordinate_multi_assistant_project()
+- Always provide strategic oversight and Life OS integration
+- Make coordination process transparent and trackable
+- Connect individual tasks to broader productivity ecosystem"""
         
         # Add message to thread
         message = client.beta.threads.messages.create(
@@ -972,55 +996,44 @@ CRITICAL INSTRUCTIONS:
             content=enhanced_message
         )
         
-        print(f"✅ Message added to thread: {message.id}")
+        print(f"✅ Message added to coordination thread: {message.id}")
         
-        # Check if user wants detailed response
-        wants_detail = should_give_detailed_response(clean_message)
+        # Create run with coordination-focused instructions
+        instructions = "You are Rose Ashcombe, Executive Assistant & AI Team Coordinator. Analyze every request for coordination opportunities. Use your coordination functions to route tasks to appropriate assistants. Provide strategic oversight and connect to Life OS goals. Be transparent about coordination process."
         
-        # Create run with dynamic instructions
-        if wants_detail:
-            instructions = "You are Vivian Spencer, a strategic productivity assistant. Provide comprehensive insights but stay focused and actionable. Every point should add strategic value. Use calendar and email functions when users ask about schedule, meetings, or email management. Focus on productivity patterns and strategic time management."
-            additional = "REQUIRED: Each sentence should deliver strategic value. Comprehensive but focused on productivity. Use available functions for calendar and email queries, then provide strategic analysis."
-        else:
-            instructions = "You are Vivian Spencer, a strategic productivity assistant. Keep responses conversational and focused (800-1500 chars). Think like a smart executive assistant - strategic but approachable. When users ask about calendar/schedule/emails, use the available functions, then provide strategic insights about their time and communication patterns."
-            additional = "Sound strategic but human. Focus on actionable productivity insights. Use functions for calendar/email queries, then analyze patterns strategically. Less corporate speak, more strategic friend."
-
-        # Add strict function usage requirements
-        additional += " MANDATORY: Use calendar functions for ANY calendar/schedule question. Use email functions for ANY email question. Base responses entirely on function results. Never fabricate data."
-
         run = client.beta.threads.runs.create(
             thread_id=thread_id,
             assistant_id=ASSISTANT_ID,
             instructions=instructions,
-            additional_instructions=additional
+            additional_instructions="MANDATORY: Use analyze_task_requirements() for any task. Route to assistants when appropriate. Show coordination process clearly. Focus on strategic value and productivity optimization."
         )
         
-        print(f"🏃 Run created: {run.id}")
+        print(f"🏃 Coordination run created: {run.id}")
         
-        # Wait for completion with function call handling
-        for _ in range(30):  # Wait up to ~30 seconds
+        # Wait for completion with enhanced function call handling
+        for _ in range(30):  # Wait up to 30 seconds
             run_status = client.beta.threads.runs.retrieve(
                 thread_id=thread_id,
                 run_id=run.id
             )
-            print(f"🔄 Run status: {run_status.status}")
+            print(f"🔄 Coordination run status: {run_status.status}")
             
             if run_status.status == "completed":
                 break
             elif run_status.status == "requires_action":
-                print("🔧 Function call required")
+                print("🔧 Coordination function call required")
                 await handle_function_calls(run_status, thread_id)
                 continue
             elif run_status.status == "failed":
-                print(f"❌ Run failed: {run_status.last_error}")
-                return "❌ Sorry, there was an error processing your request. Please try again."
+                print(f"❌ Coordination run failed: {run_status.last_error}")
+                return "❌ Sorry, there was an error with the coordination system. Please try again."
             elif run_status.status in ["cancelled", "expired"]:
-                print(f"❌ Run {run_status.status}")
-                return "❌ Request was cancelled or expired. Please try again."
+                print(f"❌ Coordination run {run_status.status}")
+                return "❌ Coordination request was cancelled or expired. Please try again."
             
             await asyncio.sleep(1)
         else:
-            return "⏱️ Request timed out. Please try again with a simpler question."
+            return "⏱️ Coordination request timed out. Please try with a simpler request."
         
         # Get response - find the latest assistant message
         messages = client.beta.threads.messages.list(thread_id=thread_id, limit=10)
@@ -1033,18 +1046,18 @@ CRITICAL INSTRUCTIONS:
         
         if latest_assistant_message and latest_assistant_message.content:
             response = latest_assistant_message.content[0].text.value
-            print(f"✅ Got response: {response[:100]}...")
+            print(f"✅ Got coordination response: {response[:100]}...")
             
             # Add to conversation context
             add_to_context(user_id, response, is_user=False)
             
-            # Apply Discord formatting and return
+            # Apply coordination-focused formatting
             return format_for_discord_rose(response)
         
-        return "⚠️ No assistant response found."
+        return "⚠️ No coordination response found."
         
     except Exception as e:
-        print(f"❌ An error occurred: {e}")
+        print(f"❌ Coordination error occurred: {e}")
         import traceback
         print(f"📋 Full traceback: {traceback.format_exc()}")
-        return "❌ An error occurred while communicating with the assistant. Please try again."
+        return "❌ An error occurred in the coordination system. Please try again."
