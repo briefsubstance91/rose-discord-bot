@@ -443,7 +443,7 @@ def execute_coordination_function(function_name, arguments):
         else:
             analysis['coordination_strategy'] = 'Multi-assistant coordination required'
         
-        result = f"🎯 TASK ANALYSIS [{task_id}]\n\n**Task:** {task_description}\n**Complexity:** {analysis['complexity']}\n**Recommended Assistants:** {', '.join(analysis['recommended_assistants']) if analysis['recommended_assistants'] else 'None (Executive handling)'}\n**Strategy:** {analysis['coordination_strategy']}"
+        result = f"🎯 TASK ANALYSIS [{task_id}]\n\nTask: {task_description}\nComplexity: {analysis['complexity']}\nRecommended Assistants: {', '.join(analysis['recommended_assistants']) if analysis['recommended_assistants'] else 'None (Executive handling)'}\nStrategy: {analysis['coordination_strategy']}"
         
         return result
     
@@ -457,11 +457,11 @@ def execute_coordination_function(function_name, arguments):
         task_id = generate_task_id()
         log_coordination_action(task_id, "TASK_ROUTING", f"Routing to {assistant_name}: {task}")
         
-        result = f"🎯 TASK ROUTED [{task_id}]\n\n**To:** {assistant_name}\n**Task:** {task}\n**Priority:** {priority}"
+        result = f"🎯 TASK ROUTED [{task_id}]\n\nTo: {assistant_name}\nTask: {task}\nPriority: {priority}"
         if deadline:
-            result += f"\n**Deadline:** {deadline}"
+            result += f"\nDeadline: {deadline}"
         if coordination_notes:
-            result += f"\n**Notes:** {coordination_notes}"
+            result += f"\nNotes: {coordination_notes}"
         
         result += f"\n\n✅ Task has been routed to {assistant_name}. Coordination tracking active."
         
@@ -477,11 +477,11 @@ def execute_coordination_function(function_name, arguments):
         task_id = generate_task_id()
         log_coordination_action(task_id, "MULTI_COORDINATION", f"Project: {project_name}")
         
-        result = f"🎯 MULTI-ASSISTANT PROJECT [{task_id}]\n\n**Project:** {project_name}\n**Description:** {project_description}\n**Team:** {', '.join(required_assistants)}"
+        result = f"🎯 MULTI-ASSISTANT PROJECT [{task_id}]\n\nProject: {project_name}\nDescription: {project_description}\nTeam: {', '.join(required_assistants)}"
         if timeline:
-            result += f"\n**Timeline:** {timeline}"
+            result += f"\nTimeline: {timeline}"
         if deliverables:
-            result += f"\n**Deliverables:** {', '.join(deliverables)}"
+            result += f"\nDeliverables: {', '.join(deliverables)}"
         
         result += f"\n\n✅ Multi-assistant coordination initiated. All team members will be briefed."
         
@@ -492,26 +492,26 @@ def execute_coordination_function(function_name, arguments):
         focus_areas = arguments.get('focus_areas', [])
         
         # Mock status gathering - in full implementation, this would query actual assistants
-        status_report = f"🤖 **AI TEAM STATUS REPORT** ({timeframe})\n\n"
+        status_report = f"🤖 AI TEAM STATUS REPORT ({timeframe})\n\n"
         
         # Operational assistants
-        status_report += "**✅ OPERATIONAL ASSISTANTS:**\n"
-        status_report += "• **Vivian Spencer** (PR/Social/Work)\n"
+        status_report += "OPERATIONAL ASSISTANTS:\n"
+        status_report += "• Vivian Spencer (PR/Social/Work)\n"
         status_report += "  - Status: Online and responsive\n"
         status_report += "  - Recent Activity: 3 social media posts, 2 PR strategies\n"
         status_report += "  - Channels: #social-overview, #news-feed, #external-communications\n\n"
         
-        status_report += "• **Celeste Marchmont** (Content/Copywriting)\n"
+        status_report += "• Celeste Marchmont (Content/Copywriting)\n"
         status_report += "  - Status: Online and responsive\n"
         status_report += "  - Recent Activity: 5 content pieces, 2 research summaries\n"
         status_report += "  - Channels: #writing-queue, #summary-drafts, #knowledge-pool\n\n"
         
         # Planned assistants
-        status_report += "**⏳ PLANNED ASSISTANTS:**\n"
-        status_report += "• **Maeve Windham** (Style/Travel/Lifestyle) - Implementation pending\n"
-        status_report += "• **Flora Penrose** (Spiritual/Esoteric) - Implementation pending\n\n"
+        status_report += "PLANNED ASSISTANTS:\n"
+        status_report += "• Maeve Windham (Style/Travel/Lifestyle) - Implementation pending\n"
+        status_report += "• Flora Penrose (Spiritual/Esoteric) - Implementation pending\n\n"
         
-        status_report += "**📊 COORDINATION METRICS:**\n"
+        status_report += "COORDINATION METRICS:\n"
         status_report += f"• Active Tasks: {len(coordination_tasks)}\n"
         status_report += "• Successful Routings: 95%\n"
         status_report += "• Average Response Time: 2.3 minutes\n"
@@ -524,13 +524,13 @@ def execute_coordination_function(function_name, arguments):
         include_communications = arguments.get('include_communications', True)
         include_projects = arguments.get('include_projects', True)
         
-        dashboard = f"📊 **LIFE OS DASHBOARD** ({dashboard_type.upper()})\n"
+        dashboard = f"📊 LIFE OS DASHBOARD ({dashboard_type.upper()})\n"
         dashboard += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
         
         if include_calendar:
             # Get calendar summary
             events = get_calendar_events(calendar_service, days_ahead=1 if dashboard_type == 'daily' else 7)
-            dashboard += "**📅 CALENDAR ANALYSIS:**\n"
+            dashboard += "CALENDAR ANALYSIS:\n"
             if events:
                 dashboard += f"• {len(events)} events scheduled\n"
                 dashboard += f"• Next event: {events[0]['title']} at {events[0]['start_time'].strftime('%I:%M %p')}\n"
@@ -541,20 +541,20 @@ def execute_coordination_function(function_name, arguments):
         if include_communications:
             # Get communication summary
             emails = get_recent_emails(gmail_service, max_results=5)
-            dashboard += "**📧 COMMUNICATIONS SUMMARY:**\n"
+            dashboard += "COMMUNICATIONS SUMMARY:\n"
             dashboard += f"• {len(emails)} recent emails\n"
             unread_count = len([e for e in emails if e.get('is_unread')])
             dashboard += f"• {unread_count} unread requiring attention\n"
             dashboard += "• Strategic Priority: Focus on high-impact communications\n\n"
         
         if include_projects:
-            dashboard += "**🎯 AI TEAM COORDINATION:**\n"
+            dashboard += "AI TEAM COORDINATION:\n"
             dashboard += f"• Active Coordinations: {len(coordination_tasks)}\n"
             dashboard += "• Vivian Spencer: ✅ Handling PR & social strategy\n"
             dashboard += "• Celeste Marchmont: ✅ Managing content pipeline\n"
             dashboard += "• Team Efficiency: 95% task completion rate\n\n"
         
-        dashboard += "**🎯 STRATEGIC RECOMMENDATIONS:**\n"
+        dashboard += "STRATEGIC RECOMMENDATIONS:\n"
         dashboard += "• Optimize morning hours for deep work coordination\n"
         dashboard += "• Delegate routine content tasks to Celeste\n"
         dashboard += "• Schedule strategic PR review with Vivian\n"
@@ -609,7 +609,7 @@ def execute_function(function_name, arguments):
                 continue
         
         if not today_events:
-            result = "📅 **Clear Schedule Today**\n\nNo events scheduled - perfect opportunity for:\n• Strategic planning session\n• AI team coordination review\n• Deep work on quarterly goals\n• Proactive task routing to assistants"
+            result = "📅 Clear Schedule Today\n\nNo events scheduled - perfect opportunity for:\n• Strategic planning session\n• AI team coordination review\n• Deep work on quarterly goals\n• Proactive task routing to assistants"
         else:
             event_lines = []
             for event in today_events:
@@ -631,8 +631,8 @@ def execute_function(function_name, arguments):
                 except Exception as e:
                     event_lines.append(f"• {event.get('title', 'Unknown event')}")
             
-            result = f"📅 **Today's Strategic Schedule** ({len(today_events)} events)\n\n" + "\n".join(event_lines)
-            result += "\n\n🎯 **Coordination Opportunities:**\n• Pre-meeting prep with assistant team\n• Post-meeting follow-ups via Celeste\n• Strategic communication planning with Vivian"
+            result = f"📅 Today's Strategic Schedule ({len(today_events)} events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 Coordination Opportunities:\n• Pre-meeting prep with assistant team\n• Post-meeting follow-ups via Celeste\n• Strategic communication planning with Vivian"
         
         return result
     
@@ -657,7 +657,7 @@ def execute_function(function_name, arguments):
                 continue
         
         if not tomorrow_events:
-            result = "📅 **Open Day Tomorrow**\n\nNo scheduled events - strategic opportunities:\n• Extended coordination planning\n• Team performance review\n• Deep work on complex projects\n• Multi-assistant project initiation"
+            result = "📅 Open Day Tomorrow\n\nNo scheduled events - strategic opportunities:\n• Extended coordination planning\n• Team performance review\n• Deep work on complex projects\n• Multi-assistant project initiation"
         else:
             event_lines = []
             for event in tomorrow_events:
@@ -679,8 +679,8 @@ def execute_function(function_name, arguments):
                 except Exception as e:
                     event_lines.append(f"• {event.get('title', 'Event')}")
             
-            result = f"📅 **Tomorrow's Strategic Schedule** ({len(tomorrow_events)} events)\n\n" + "\n".join(event_lines)
-            result += "\n\n🎯 **Preparation Coordination:**\n• Brief assistants on meeting objectives\n• Prepare materials via Celeste\n• Coordinate communications via Vivian"
+            result = f"📅 Tomorrow's Strategic Schedule ({len(tomorrow_events)} events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 Preparation Coordination:\n• Brief assistants on meeting objectives\n• Prepare materials via Celeste\n• Coordinate communications via Vivian"
         
         return result
     
@@ -689,7 +689,7 @@ def execute_function(function_name, arguments):
         events = get_calendar_events(calendar_service, days_ahead=days)
         
         if not events:
-            result = f"📅 **Open {days}-Day Window**\n\nNo events scheduled - strategic planning opportunity:\n• Design multi-assistant workflows\n• Implement new coordination systems\n• Focus on quarterly goal advancement"
+            result = f"📅 Open {days}-Day Window\n\nNo events scheduled - strategic planning opportunity:\n• Design multi-assistant workflows\n• Implement new coordination systems\n• Focus on quarterly goal advancement"
         else:
             today = datetime.now(local_tz).date()
             
@@ -724,8 +724,8 @@ def execute_function(function_name, arguments):
             if len(events) > 10:
                 event_lines.append(f"... and {len(events) - 10} more events")
             
-            result = f"📅 **Strategic {days}-Day Overview** ({len(events)} total events)\n\n" + "\n".join(event_lines)
-            result += "\n\n🎯 **Coordination Strategy:**\n• Optimal periods for assistant collaboration\n• Strategic communication windows\n• Deep work opportunities identification"
+            result = f"📅 Strategic {days}-Day Overview ({len(events)} total events)\n\n" + "\n".join(event_lines)
+            result += "\n\n🎯 Coordination Strategy:\n• Optimal periods for assistant collaboration\n• Strategic communication windows\n• Deep work opportunities identification"
         
         return result
     
@@ -809,10 +809,10 @@ def execute_function(function_name, arguments):
                 free_slots.append(slot_text)
         
         if not free_slots:
-            result = f"⏰ **Fully Booked: {target_date.strftime('%Y-%m-%d')}**\n\nNo {duration}+ minute blocks available.\n\n🎯 **Coordination Options:**\n• Delegate prep tasks to assistants\n• Schedule async coordination via Discord\n• Plan for next available window"
+            result = f"⏰ Fully Booked: {target_date.strftime('%Y-%m-%d')}\n\nNo {duration}+ minute blocks available.\n\n🎯 Coordination Options:\n• Delegate prep tasks to assistants\n• Schedule async coordination via Discord\n• Plan for next available window"
         else:
-            result = f"⏰ **Strategic Time Blocks: {target_date.strftime('%Y-%m-%d')}**\n\nAvailable {duration}+ minute slots:\n\n" + "\n• ".join(free_slots)
-            result += "\n\n🎯 **Coordination Recommendations:**\n• Use longer blocks for complex project coordination\n• Shorter slots perfect for assistant check-ins\n• Consider async collaboration during busy periods"
+            result = f"⏰ Strategic Time Blocks: {target_date.strftime('%Y-%m-%d')}\n\nAvailable {duration}+ minute slots:\n\n" + "\n• ".join(free_slots)
+            result += "\n\n🎯 Coordination Recommendations:\n• Use longer blocks for complex project coordination\n• Shorter slots perfect for assistant check-ins\n• Consider async collaboration during busy periods"
         
         return result
     
@@ -824,7 +824,7 @@ def execute_function(function_name, arguments):
         emails = search_gmail_messages(gmail_service, query, max_results)
         
         if not emails:
-            result = f"📧 **No emails found for '{query}'**\n\n🎯 **Coordination Opportunity:**\nConsider having Vivian create proactive communications about this topic."
+            result = f"📧 No emails found for '{query}'\n\n🎯 Coordination Opportunity:\nConsider having Vivian create proactive communications about this topic."
         else:
             email_list = []
             for email in emails:
@@ -832,8 +832,8 @@ def execute_function(function_name, arguments):
                 unread_indicator = "🔵 " if email.get('is_unread') else ""
                 email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})")
             
-            result = f"📧 **Email Search: '{query}'** ({len(emails)} found)\n\n" + "\n\n".join(email_list)
-            result += "\n\n🎯 **Coordination Options:**\n• Route follow-ups to appropriate assistants\n• Have Celeste summarize key themes\n• Coordinate responses via Vivian for external communications"
+            result = f"📧 Email Search: '{query}' ({len(emails)} found)\n\n" + "\n\n".join(email_list)
+            result += "\n\n🎯 Coordination Options:\n• Route follow-ups to appropriate assistants\n• Have Celeste summarize key themes\n• Coordinate responses via Vivian for external communications"
         
         return result
     
@@ -843,7 +843,7 @@ def execute_function(function_name, arguments):
         emails = get_recent_emails(gmail_service, max_results)
         
         if not emails:
-            result = "📧 **Inbox Clear**\n\nNo recent emails - strategic communication opportunity!"
+            result = "📧 Inbox Clear\n\nNo recent emails - strategic communication opportunity!"
         else:
             email_list = []
             unread_count = 0
@@ -856,8 +856,8 @@ def execute_function(function_name, arguments):
                 
                 email_list.append(f"• {unread_indicator}{email['subject']}\n  From: {email['sender']} ({date_str})")
             
-            result = f"📧 **Recent Communications** ({unread_count} unread)\n\n" + "\n\n".join(email_list)
-            result += f"\n\n🎯 **Strategic Coordination:**\n• {unread_count} items requiring attention\n• Consider routing responses to specialized assistants\n• Maintain strategic focus on high-impact communications"
+            result = f"📧 Recent Communications ({unread_count} unread)\n\n" + "\n\n".join(email_list)
+            result += f"\n\n🎯 Strategic Coordination:\n• {unread_count} items requiring attention\n• Consider routing responses to specialized assistants\n• Maintain strategic focus on high-impact communications"
         
         return result
     
@@ -867,15 +867,15 @@ def execute_function(function_name, arguments):
         body = arguments.get('body', '')
         
         if not to or not subject or not body:
-            result = "❌ **Missing Email Fields**\n\nRequired: recipient, subject, and body\n\n🎯 **Coordination Option:**\nDelegate email composition to Celeste or Vivian for professional formatting."
+            result = "❌ Missing Email Fields\n\nRequired: recipient, subject, and body\n\n🎯 Coordination Option:\nDelegate email composition to Celeste or Vivian for professional formatting."
         else:
             result = send_email(gmail_service, to, subject, body)
-            result += "\n\n🎯 **Follow-up Coordination:**\n• Track response via email monitoring\n• Schedule follow-up if needed\n• Document outcome in coordination log"
+            result += "\n\n🎯 Follow-up Coordination:\n• Track response via email monitoring\n• Schedule follow-up if needed\n• Document outcome in coordination log"
         
         return result
     
     else:
-        result = f"❌ **Unknown Function:** {function_name}\n\n🎯 **Available Functions:**\nCoordination: analyze_task_requirements, route_to_assistant, coordinate_multi_assistant_project\nPersonal: get_today_schedule, search_emails, create_dashboard_summary"
+        result = f"❌ Unknown Function: {function_name}\n\n🎯 Available Functions:\nCoordination: analyze_task_requirements, route_to_assistant, coordinate_multi_assistant_project\nPersonal: get_today_schedule, search_emails, create_dashboard_summary"
         return result
 
 # ============================================================================
@@ -912,28 +912,33 @@ async def handle_function_calls(run, thread_id):
     )
 
 # ============================================================================
-# ENHANCED RESPONSE FORMATTING
+# ENHANCED RESPONSE FORMATTING - COMPACT VERSION
 # ============================================================================
 
 def format_for_discord_rose(response):
-    """Format response specifically for Rose's coordination focus"""
+    """Format response specifically for Rose's coordination focus - COMPACT VERSION"""
     
     # Clean up formatting
     response = response.replace('**', '')  # Remove bold initially
-    response = response.replace('\n\n\n', '\n\n')  # Remove excessive breaks
+    response = response.replace('\n\n\n', '\n')  # Remove excessive breaks
+    response = response.replace('\n\n', '\n')  # COMPACT: Single line breaks only
     
     # Add coordination-specific headers
     if 'coordination' in response.lower() or 'route' in response.lower():
         if not response.startswith('🎯'):
-            response = '🎯 **Coordination Update** \n\n' + response
+            response = '🎯 **Coordination Update**\n' + response
     elif 'schedule' in response.lower() or 'calendar' in response.lower():
         if not response.startswith('📅'):
-            response = '📅 **Strategic Schedule** \n\n' + response
+            response = '📅 **Strategic Schedule**\n' + response
     elif 'email' in response.lower() and not response.startswith('📧'):
-        response = '📧 **Communication Coordination** \n\n' + response
+        response = '📧 **Communication Coordination**\n' + response
     elif 'dashboard' in response.lower():
         if not response.startswith('📊'):
-            response = '📊 **Life OS Dashboard** \n\n' + response
+            response = '📊 **Life OS Dashboard**\n' + response
+    
+    # COMPACT: Remove empty lines and optimize spacing
+    lines = [line.strip() for line in response.split('\n') if line.strip()]
+    response = '\n'.join(lines)
     
     # Ensure manageable length for Discord
     if len(response) > 1800:
@@ -943,7 +948,7 @@ def format_for_discord_rose(response):
             if len(truncated + sentence + '. ') < 1700:
                 truncated += sentence + '. '
             else:
-                truncated += "\n\n🎯 *Need more details? Ask for specific coordination!*"
+                truncated += "\n🎯 *Need more details? Ask for specific coordination!*"
                 break
         response = truncated
     
@@ -959,7 +964,7 @@ async def get_openai_response(user_message: str, user_id: int, clear_memory: boo
         # Handle memory clearing
         if clear_memory:
             clear_user_memory(user_id)
-            return "🧹 **Memory cleared!** Ready for fresh coordination."
+            return "🧹 Memory cleared! Ready for fresh coordination."
         
         # Get or create thread for this specific user
         thread_id = get_user_thread(user_id)
