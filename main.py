@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-ROSE CLEAN DISCORD BOT - Executive Assistant
-Based on proven Vivian/Maeve pattern - reliable and clean
-Executive planning, calendar, productivity without complex coordination
+ROSE FIXED DISCORD BOT - Executive Assistant
+Fixed function calling loop issue - prevents infinite calendar calls
 """
 
 import discord
@@ -124,7 +123,7 @@ async def planning_web_search(query, search_focus="productivity", num_results=3)
         return f"🔍 Planning search error: {str(e)}"
 
 # ============================================================================
-# ROSE'S OPENAI INTEGRATION
+# ROSE'S OPENAI INTEGRATION - FIXED FUNCTION HANDLING
 # ============================================================================
 
 def get_user_thread(user_id):
@@ -154,17 +153,17 @@ async def get_rose_response(message, user_id):
             content=f"USER REQUEST: {clean_message}\n\nRespond as Rose Ashcombe, executive assistant. Use your planning and calendar functions for productivity and scheduling requests. Keep response under 1200 characters for Discord. Focus on strategic planning and executive efficiency."
         )
         
-        # Run assistant
+        # Run assistant with more specific instructions to prevent loops
         run = client.beta.threads.runs.create(
             thread_id=thread_id,
             assistant_id=ASSISTANT_ID,
-            instructions="You are Rose Ashcombe, executive assistant. Use your calendar and planning functions for productivity requests. Keep responses under 1200 characters. Focus on strategic planning and executive efficiency."
+            instructions="You are Rose Ashcombe, executive assistant. Use functions ONLY when specifically needed. If calendar data is not available, provide strategic advice based on general planning principles. Keep responses under 1200 characters. Avoid calling the same function multiple times."
         )
         
         print(f"🏃 Rose run created: {run.id}")
         
-        # Wait for completion
-        for attempt in range(20):
+        # Wait for completion with function call handling
+        for attempt in range(15):  # Reduced from 20 to prevent long loops
             run_status = client.beta.threads.runs.retrieve(
                 thread_id=thread_id,
                 run_id=run.id
@@ -182,7 +181,7 @@ async def get_rose_response(message, user_id):
             
             await asyncio.sleep(1)
         else:
-            return "⏱️ Request timed out - try a simpler planning question"
+            return "⏱️ Request timed out - providing general executive advice instead."
         
         # Get response
         messages = client.beta.threads.messages.list(thread_id=thread_id, limit=5)
@@ -198,7 +197,7 @@ async def get_rose_response(message, user_id):
         return "❌ Something went wrong with executive planning. Please try again."
 
 async def handle_rose_functions(run, thread_id):
-    """Handle Rose's executive function calls"""
+    """Handle Rose's executive function calls - FIXED to prevent loops"""
     tool_outputs = []
     
     for tool_call in run.required_action.submit_tool_outputs.tool_calls:
@@ -211,7 +210,7 @@ async def handle_rose_functions(run, thread_id):
         
         print(f"🔧 Rose Function: {function_name}")
         
-        # Handle Rose's executive functions
+        # Handle Rose's executive functions with more complete responses
         if function_name == "planning_search":
             query = arguments.get('query', '')
             focus = arguments.get('focus', 'productivity')
@@ -224,24 +223,76 @@ async def handle_rose_functions(run, thread_id):
                 output = "📋 No planning query provided"
                 
         elif function_name == "get_today_schedule":
-            output = "📅 Today's Schedule: [Calendar integration would show actual events here]"
+            # More complete response to satisfy the assistant
+            output = """📅 **Today's Executive Schedule**
+
+I don't have access to your live calendar, but I can help you optimize your day strategically:
+
+🎯 **Strategic Time Blocks:**
+• Morning: High-focus work (2-3 hours)
+• Midday: Meetings and collaboration 
+• Afternoon: Administrative tasks and planning
+• Evening: Review and next-day preparation
+
+📋 **Executive Planning Tip:** Use time blocking to protect your most important work. Would you like me to search for time management strategies?"""
             
         elif function_name == "get_upcoming_events":
             days = arguments.get('days', 7)
-            output = f"📅 Upcoming Events: Checking next {days} days for strategic planning"
+            # More complete response to prevent re-calling
+            output = f"""📅 **Upcoming Events Planning ({days} days)**
+
+I don't have live calendar access, but here's strategic planning guidance:
+
+🎯 **Weekly Planning Framework:**
+• **Monday:** Week planning and priority setting
+• **Wednesday:** Mid-week review and adjustments  
+• **Friday:** Week completion and next week prep
+
+📋 **Executive Recommendations:**
+• Block 2-hour focus sessions for deep work
+• Schedule buffer time between meetings
+• Plan strategic thinking time daily
+
+Would you like me to research specific productivity systems or scheduling strategies?"""
             
         elif function_name == "find_free_time":
             duration = arguments.get('duration', 60)
             date = arguments.get('date', 'today')
-            output = f"⏰ Free Time: Looking for {duration}-minute blocks on {date}"
+            output = f"""⏰ **Finding {duration}-minute Focus Blocks**
+
+**Strategic Scheduling Advice:**
+• Best focus times: 9-11 AM or 2-4 PM
+• Avoid: Right after lunch (1-2 PM)
+• Protect: Early morning for deep work
+
+**Executive Time Management:**
+• Batch similar tasks together
+• Use calendar blocking to protect focus time
+• Build in 15-minute buffers between meetings
+
+Would you like me to research time blocking strategies?"""
             
         elif function_name == "search_emails":
             query = arguments.get('query', '')
             max_results = arguments.get('max_results', 5)
-            output = f"📧 Email Search: Searching for '{query}' (executive review)"
+            output = f"""📧 **Email Management Strategy**
+
+I don't have direct email access, but here's executive email guidance:
+
+🎯 **Email Processing System:**
+• Check email at set times (not constantly)
+• Use 2-minute rule: If it takes <2 min, do it now
+• Archive, delegate, or schedule longer items
+
+📋 **Search Strategy for '{query}':**
+• Use specific keywords and date ranges
+• Set up filters for priority senders
+• Create folders for project organization
+
+Want me to research email management systems?"""
             
         else:
-            output = f"📋 Function '{function_name}' executed for executive planning"
+            output = f"📋 Function '{function_name}' executed for executive planning. I've provided strategic guidance based on executive planning principles."
         
         tool_outputs.append({
             "tool_call_id": tool_call.id,
