@@ -13,7 +13,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Your existing assistant ID
-EXISTING_ASSISTANT_ID =asst_pvsyZQdHFQYUCkZe0HZHLA2z
+EXISTING_ASSISTANT_ID = "asst_pvsyZQdHFQYUCkZe0HZHLA2z"
 
 # Rose's SIMPLIFIED functions - executive focus without complex coordination
 rose_clean_functions = [
