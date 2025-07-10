@@ -736,16 +736,83 @@ async def ping(ctx):
 async def status(ctx):
     """Show Rose's status with error handling"""
     try:
-        status_msg = f"""👑 **Rose Ashcombe Status**
-✅ OpenAI Assistant: {'Connected' if ASSISTANT_ID else 'Not configured'}
-🔍 Planning Search: {'Connected' if BRAVE_API_KEY else 'Not configured'}
-📅 Calendar Integration: {'Connected' if calendar_service else 'Not configured'}
-👥 Active Conversations: {len(user_conversations)}
-🏃 Active Runs: {len(active_runs)}
-"""
-        await ctx.send(status_msg)
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant (Crash Fixed)",
+            description="Strategic Planning • Calendar Management • Life OS Coordination",
+            color=0xd4af37
+        )
+        
+        embed.add_field(
+            name="🔗 OpenAI Assistant",
+            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔍 Planning Search",
+            value="✅ Connected" if BRAVE_API_KEY else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Integration",
+            value="✅ Connected" if calendar_service else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👑 Executive Functions",
+            value="• Planning & Productivity Research\n• Calendar Management\n• Email Coordination\n• Schedule Optimization\n• Strategic Time Blocking",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📊 Active Status",
+            value=f"👥 Conversations: {len(user_conversations)}\n🏃 Active Runs: {len(active_runs)}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
     except Exception as e:
         print(f"❌ Status command error: {e}")
+
+@bot.command(name='help')
+async def help_command(ctx):
+    """Show Rose's enhanced help"""
+    try:
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Your strategic planning specialist with calendar integration and productivity optimization",
+            color=0xd4af37
+        )
+        
+        embed.add_field(
+            name="💬 How to Use Rose",
+            value=f"• Mention @{ASSISTANT_NAME} for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your calendar and goals",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🔧 Executive Commands",
+            value="• `!schedule` - Get today's calendar\n• `!upcoming [days]` - View upcoming events\n• `!plan [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - Show capabilities",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="👑 Example Requests",
+            value="• `@Rose help me plan my week strategically`\n• `@Rose what's the best time blocking method?`\n• `@Rose analyze my schedule for optimization`\n• `@Rose research productivity systems for executives`",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📊 Specialties",
+            value="👑 Executive Planning • 📅 Calendar Management • 🎯 Productivity Systems • ⚡ Time Optimization • 📋 Life OS",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        print(f"❌ Help command error: {e}")
 
 @bot.command(name='schedule')
 async def schedule_command(ctx):
