@@ -678,22 +678,24 @@ Keep core content focused and always provide strategic executive context."""
                 elif run_status.status in ["failed", "cancelled", "expired"]:
                     print(f"❌ Run {run_status.status}")
                     return (
-                    return (
                         "❌ Executive analysis interrupted. "
                         "Please try again with a different request."
                     )
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1} failed with error: {e}")
+                print(f"❌ Error during run lifecycle: {e}")
+                return "❌ An unexpected error occurred during analysis."
             await asyncio.sleep(2)
-                   print(f"❌ Error during run lifecycle: {e}")
-                   return "❌ An unexpected error occurred during analysis."
 
-    else:
         print("⏱️ Run timed out")
         return (
-                "⏱️ Executive office is busy analyzing complex strategies. "
-                "Please try again in a moment."
-            )
+            "⏱️ Executive office is busy analyzing complex strategies. "
+            "Please try again in a moment."
+        )
+        return (
+            "⏱️ Executive office is busy analyzing complex strategies. "
+            "Please try again in a moment."
+        )
     finally:
         # Clear active run status regardless of outcome
         active_runs.pop(user_id, None)
