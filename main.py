@@ -5,7 +5,7 @@ Executive Assistant with Enhanced Error Handling, Planning & Calendar Functions
 ENHANCED: Multi-calendar support for BG Calendar + BG Tasks
 FIXED: Environment variable handling and function integration
 """
-
+import pytz
 import discord
 from discord.ext import commands
 import os
@@ -131,57 +131,46 @@ def get_calendar_events(calendar_id, start_time, end_time):
         print(f"❌ Error getting events from {calendar_id}: {e}")
         return []
 
-def format_event(event, calendar_type=""):
-    """Helper function to format a single event"""
-    start = event['start'].get('dateTime', event['start'].get('date'))
-    title = event.get('summary', 'Untitled Event')
-    
-    # Add calendar indicator
-    if calendar_type == "tasks":
-        title = f"✅ {title}"
-    elif calendar_type == "calendar":
-        title = f"📅 {title}"
-    
-    if 'T' in start:  # Has time
-        try:
-            time_str = datetime.fromisoformat(start.replace('Z', '+00:00')).strftime('%I:%M %p')
-            return f"• {time_str}: {title}"
-        except:
-            return f"• {title}"
-    else:  # All day event
-        return f"• All Day: {title}"
+def format
 
 def get_today_schedule():
-    """Get today's schedule from both calendars with error handling"""
+    """Get today's schedule from both calendars with PROPER timezone handling"""
     if not calendar_service:
         return "📅 **Today's Schedule:** Calendar integration not configured\n\n🎯 **Planning Tip:** Set up your calendar integration for automated schedule management"
     
     try:
-        # Get today's date range
-        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow = today.replace(hour=23, minute=59, second=59)
+        # FIXED: Use Toronto timezone instead of UTC
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Get today in Toronto timezone
+        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_toronto = today_toronto.replace(hour=23, minute=59, second=59)
+        
+        # Convert to UTC for Google Calendar API (Google expects UTC)
+        today_utc = today_toronto.astimezone(pytz.UTC)
+        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
         
         all_events = []
         
         # Get events from primary calendar
         if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, today, tomorrow)
+            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, today_utc, tomorrow_utc)
             for event in calendar_events:
-                formatted = format_event(event, "calendar")
+                formatted = format_event(event, "calendar", toronto_tz)
                 all_events.append((event, formatted, "calendar"))
         
         # Get events from tasks calendar
         if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, today, tomorrow)
+            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, today_utc, tomorrow_utc)
             for event in task_events:
-                formatted = format_event(event, "tasks")
+                formatted = format_event(event, "tasks", toronto_tz)
                 all_events.append((event, formatted, "tasks"))
         
         # If no specific calendars configured, try primary
         if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
-            primary_events = get_calendar_events('primary', today, tomorrow)
+            primary_events = get_calendar_events('primary', today_utc, tomorrow_utc)
             for event in primary_events:
-                formatted = format_event(event, "calendar")
+                formatted = format_event(event, "calendar", toronto_tz)
                 all_events.append((event, formatted, "calendar"))
         
         if not all_events:
@@ -193,11 +182,13 @@ def get_today_schedule():
             start = event['start'].get('dateTime', event['start'].get('date'))
             try:
                 if 'T' in start:
-                    return datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    # Parse and convert to Toronto timezone
+                    utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    return utc_time.astimezone(toronto_tz)
                 else:
                     return datetime.fromisoformat(start)
             except:
-                return datetime.now(timezone.utc)
+                return datetime.now(toronto_tz)
         
         all_events.sort(key=get_event_time)
         
@@ -223,39 +214,45 @@ def get_today_schedule():
         return "📅 **Today's Schedule:** Error retrieving calendar data\n\n🎯 **Backup Plan:** Use manual schedule review"
 
 def get_upcoming_events(days=7):
-    """Get upcoming events from both calendars with error handling"""
+    """Get upcoming events from both calendars with PROPER timezone handling"""
     if not calendar_service:
         return f"📅 **Upcoming {days} Days:** Calendar integration not configured\n\n🎯 **Planning Tip:** Manual weekly planning recommended"
     
     try:
-        # Get date range
-        start_time = datetime.now(timezone.utc)
-        end_time = start_time + timedelta(days=days)
+        # FIXED: Use Toronto timezone
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Get date range in Toronto timezone then convert to UTC
+        start_toronto = datetime.now(toronto_tz)
+        end_toronto = start_toronto + timedelta(days=days)
+        
+        start_utc = start_toronto.astimezone(pytz.UTC)
+        end_utc = end_toronto.astimezone(pytz.UTC)
         
         all_events = []
         
         # Get events from primary calendar
         if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, start_time, end_time)
+            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, start_utc, end_utc)
             for event in calendar_events:
                 all_events.append((event, "calendar"))
         
         # Get events from tasks calendar
         if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, start_time, end_time)
+            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, start_utc, end_utc)
             for event in task_events:
                 all_events.append((event, "tasks"))
         
         # If no specific calendars configured, try primary
         if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
-            primary_events = get_calendar_events('primary', start_time, end_time)
+            primary_events = get_calendar_events('primary', start_utc, end_utc)
             for event in primary_events:
                 all_events.append((event, "calendar"))
         
         if not all_events:
             return f"📅 **Upcoming {days} Days:** No scheduled events\n\n🎯 **Strategic Opportunity:** Focus on long-term planning and goal setting"
         
-        # Group by date
+        # Group by date using Toronto timezone
         events_by_date = defaultdict(list)
         
         for event, calendar_type in all_events:
@@ -263,14 +260,15 @@ def get_upcoming_events(days=7):
             
             try:
                 if 'T' in start:
-                    date_obj = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    date_str = date_obj.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type)
+                    utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    toronto_time = utc_time.astimezone(toronto_tz)
+                    date_str = toronto_time.strftime('%a %m/%d')
+                    formatted = format_event(event, calendar_type, toronto_tz)
                     events_by_date[date_str].append(formatted)
                 else:
                     date_obj = datetime.fromisoformat(start)
                     date_str = date_obj.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type)
+                    formatted = format_event(event, calendar_type, toronto_tz)
                     events_by_date[date_str].append(formatted)
             except Exception as e:
                 print(f"❌ Date parsing error: {e}")
@@ -301,46 +299,54 @@ def get_upcoming_events(days=7):
         return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
 
 def get_morning_briefing():
-    """Comprehensive morning briefing from both calendars"""
+    """Comprehensive morning briefing with PROPER timezone handling"""
     if not calendar_service:
         return "🌅 **Morning Briefing:** Calendar integration needed for full briefing\n\n📋 **Manual Planning:** Review your calendar and prioritize your day"
     
     try:
+        # FIXED: Use Toronto timezone for proper date calculation
+        toronto_tz = pytz.timezone('America/Toronto')
+        
         # Get today's full schedule
         today_schedule = get_today_schedule()
         
-        # Get tomorrow's preview
-        tomorrow = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        day_after = tomorrow + timedelta(days=1)
+        # Get tomorrow's preview using Toronto timezone
+        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_toronto = today_toronto + timedelta(days=1)
+        day_after_toronto = tomorrow_toronto + timedelta(days=1)
+        
+        # Convert to UTC for API calls
+        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
+        day_after_utc = day_after_toronto.astimezone(pytz.UTC)
         
         tomorrow_events = []
         
         # Get tomorrow's events from both calendars
         if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, tomorrow, day_after)
+            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "calendar") for event in calendar_events])
         
         if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, tomorrow, day_after)
+            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "tasks") for event in task_events])
         
         # If no specific calendars configured, try primary
         if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
-            primary_events = get_calendar_events('primary', tomorrow, day_after)
+            primary_events = get_calendar_events('primary', tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "calendar") for event in primary_events])
         
         # Format tomorrow's preview
         if tomorrow_events:
             tomorrow_formatted = []
             for event, calendar_type in tomorrow_events[:3]:  # Limit to 3 for briefing
-                formatted = format_event(event, calendar_type)
+                formatted = format_event(event, calendar_type, toronto_tz)
                 tomorrow_formatted.append(formatted)
             tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
         else:
             tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - great for strategic planning"
         
-        # Combine into morning briefing
-        current_time = datetime.now().strftime('%A, %B %d')
+        # Combine into morning briefing with CORRECT date
+        current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
         briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_preview}\n\n💼 **Executive Focus:** Prioritize high-impact activities during peak energy hours"
         
         return briefing
