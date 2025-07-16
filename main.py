@@ -36,6 +36,11 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Simplified calendar integration - working Google Calendars only
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')  # Primary BG Calendar
+GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')  # BG Tasks
+
 # Validate critical environment variables
 if not DISCORD_TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found in environment variables")
@@ -1049,17 +1054,17 @@ CALENDAR QUERY DETECTION:
 TOOL USAGE GUIDELINES:
 - For 'create_calendar_event(title, start_time, end_time, calendar_type, description)':
     - 'title': String, e.g., "Team Meeting"
-    - 'start_time': String, full ISO 8601 format, e.g., "2025-07-17T09:00:00" (Toronto time). IMPORTANT: Always use the current year (2025) or a future year. Never use past years.
-    - 'end_time': String, full ISO 8601 format, e.g., "2025-07-17T10:00:00" (Toronto time). IMPORTANT: Always use the current year (2025) or a future year. Never use past years.
+    - 'start_time': String, full ISO 8601 format, e.g., "2025-07-17T09:00:00" (Toronto time)
+    - 'end_time': String, full ISO 8601 format, e.g., "2025-07-17T10:00:00" (Toronto time)
     - 'calendar_type': String, "primary" or "tasks" (default "primary")
     - 'description': String, optional
 - For 'reschedule_event(event_search, new_start_time, new_end_time)':
     - 'event_search': String, a keyword or phrase to find the event, e.g., "Team Sync" or "Project Review"
-    - 'new_start_time': String, full ISO 8601 format, e.g., "2025-07-24T14:00:00" (Toronto time). IMPORTANT: Always use the current year (2025) or a future year. Never use past years.
-    - 'new_end_time': String, full ISO 8601 format, e.g., "2025-07-24T15:00:00" (Toronto time). IMPORTANT: Always use the current year (2025) or a future year. Never use past years.
+    - 'new_start_time': String, full ISO 8601 format, e.g., "2025-07-24T14:00:00" (Toronto time)
+    - 'new_end_time': String, full ISO 8601 format, e.g., "2025-07-24T15:00:00" (Toronto time)
 - For 'find_meeting_time(duration_minutes, preferred_day, preferred_start_hour, preferred_end_hour)':
     - 'duration_minutes': Integer, e.g., 30, 60
-    - 'preferred_day': String, YYYY-MM-DD format (optional), e.g., "2025-07-18". IMPORTANT: Always use the current year (2025) or a future year. Never use past years.
+    - 'preferred_day': String, YYYY-MM-DD format (optional), e.g., "2025-07-18"
     - 'preferred_start_hour': Integer, 0-23 (optional, default 9)
     - 'preferred_end_hour': Integer, 0-23 (optional, default 17)
 
