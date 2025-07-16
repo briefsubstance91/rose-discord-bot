@@ -131,7 +131,25 @@ def get_calendar_events(calendar_id, start_time, end_time):
         print(f"❌ Error getting events from {calendar_id}: {e}")
         return []
 
-def format
+def format_event(event, calendar_type=""):
+    """Helper function to format a single event"""
+    start = event['start'].get('dateTime', event['start'].get('date'))
+    title = event.get('summary', 'Untitled Event')
+    
+    # Add calendar indicator
+    if calendar_type == "tasks":
+        title = f"✅ {title}"
+    elif calendar_type == "calendar":
+        title = f"📅 {title}"
+    
+    if 'T' in start:  # Has time
+        try:
+            time_str = datetime.fromisoformat(start.replace('Z', '+00:00')).strftime('%I:%M %p')
+            return f"• {time_str}: {title}"
+        except:
+            return f"• {title}"
+    else:  # All day event
+        return f"• All Day: {title}"
 
 def get_today_schedule():
     """Get today's schedule from both calendars with PROPER timezone handling"""
