@@ -670,27 +670,20 @@ Keep core content focused and always provide strategic executive context."""
         print(f"👑 Rose run created: {run.id}")
         
         # Wait for completion with function handling
-        for attempt in range(20):
-            try:
-                run_status = client.beta.threads.runs.retrieve(
-                    thread_id=thread_id,
-                    run_id=run.id
-                )
-                print(f"🔄 Status: {run_status.status} (attempt {attempt + 1})")
-                if run_status.status == "completed":
-                    break
-                elif run_status.status == "requires_action":
-                    await handle_rose_functions_enhanced(run_status, thread_id)
-                elif run_status.status in ["failed", "cancelled", "expired"]:
-                    print(f"❌ Run {run_status.status}")
-                      return (
-                        "❌ Executive analysis interrupted. "
-                        "Please try again with a different request."
-                    )        
-                    await asyncio.sleep(2)
-            except Exception as e:
-                 print(f"❌ Error during run lifecycle: {e}")
-                return "❌ An unexpected error occurred during analysis."
+             for attempt in range(20):
+               try:
+ 
+                   elif run_status.status in ["failed", "cancelled", "expired"]:
+                       print(f"❌ Run {run_status.status}")
+                       return (
+                           "❌ Executive analysis interrupted. "
+                           "Please try again with a different request."
+                       )
+                   await asyncio.sleep(2)
+               except Exception as e:
+                   print(f"❌ Error during run lifecycle: {e}")
+                   return "❌ An unexpected error occurred during analysis."
+
     else:
         print("⏱️ Run timed out")
         return (
