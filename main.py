@@ -672,10 +672,17 @@ Keep core content focused and always provide strategic executive context."""
         # Wait for completion with function handling
         for attempt in range(20):
             try:
- 
+                run_status = client.runs.get(run.id)
+                if run_status.status == "completed":
+                    break
                 elif run_status.status in ["failed", "cancelled", "expired"]:
                     print(f"❌ Run {run_status.status}")
                     return (
+                        "❌ Executive analysis interrupted. "
+                        "Please try again with a different request."
+                    )
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt + 1} failed with error: {e}")
                         "❌ Executive analysis interrupted. "
                         "Please try again with a different request."
                        )
