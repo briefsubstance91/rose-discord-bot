@@ -131,6 +131,8 @@ def get_calendar_events(calendar_id, start_time, end_time):
         print(f"❌ Error getting events from {calendar_id}: {e}")
         return []
 
+def format
+
 def get_today_schedule():
     """Get today's schedule from both calendars with PROPER timezone handling"""
     if not calendar_service:
