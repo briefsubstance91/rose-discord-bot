@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Your existing Rose Assistant ID
-EXISTING_ASSISTANT_ID = "asst_pvsyZQdHFQYUCkZe0HZHLA2z"  # Update this with your actual ID
+# Your existing Rose Assistant ID - UPDATE THIS!
+EXISTING_ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or "asst_your_rose_id_here"
 
 # Rose's ENHANCED functions with morning briefing support
 rose_enhanced_functions = [
@@ -62,7 +62,7 @@ rose_enhanced_functions = [
             }
         }
     },
-    # Email Management
+    # Email Management (placeholder for future integration)
     {
         "type": "function",
         "function": {
@@ -130,7 +130,7 @@ For planning and productivity requests, use planning_search():
 🌅 **MORNING BRIEFING EXPERTISE:**
 When asked for morning briefings or daily overviews:
 • Use get_morning_briefing() for comprehensive daily start
-• Include today's schedule from BOTH calendars (📅 appointments + 📋 tasks)
+• Include today's schedule from BOTH calendars (📅 appointments + ✅ tasks)
 • Provide tomorrow's preview for strategic planning
 • Add executive insights for optimal day management
 
@@ -139,7 +139,7 @@ When asked for morning briefings or daily overviews:
 • **Planning Expertise**: Systems thinking, optimization mindset
 • **Multi-Calendar Awareness**: Distinguish between appointments and tasks
 • **Practical Advice**: Actionable recommendations with clear next steps
-• **Keep Concise**: Under 1200 characters for Discord
+• **Keep Concise**: Under 1200 characters for Discord efficiency
 • **Be Direct**: Clear, efficient communication style
 
 💼 **ROSE'S ENHANCED PERSPECTIVE:**
@@ -172,15 +172,19 @@ You are the executive brain behind personal productivity - strategic, efficient,
 def update_rose_assistant():
     """Update existing Rose assistant with enhanced multi-calendar functionality"""
     try:
-        if EXISTING_ASSISTANT_ID == "asst_pvsyZQdHFQYUCkZe0HZHLA2z":
-            print("⚠️ WARNING: Using example Assistant ID. Please update EXISTING_ASSISTANT_ID with your actual Rose ID!")
-            print("📝 You can find your Assistant ID in Railway environment variables or OpenAI platform")
+        if not EXISTING_ASSISTANT_ID or EXISTING_ASSISTANT_ID == "asst_your_rose_id_here":
+            print("⚠️ WARNING: Please update EXISTING_ASSISTANT_ID with your actual Rose Assistant ID!")
+            print("📝 You can find your Assistant ID in:")
+            print("   - Railway environment variables (ROSE_ASSISTANT_ID)")
+            print("   - OpenAI platform assistant list")
+            print("   - Your previous assistant creation scripts")
+            return None
             
         print("👑 Updating Rose Ashcombe with Multi-Calendar Support...")
         
         assistant = client.beta.assistants.update(
             assistant_id=EXISTING_ASSISTANT_ID,
-            name="Rose Ashcombe - Executive Assistant (Multi-Calendar)",
+            name="Rose Ashcombe - Executive Assistant (Multi-Calendar Enhanced)",
             instructions=rose_enhanced_instructions,
             tools=rose_enhanced_functions,
             model="gpt-4o"
@@ -227,7 +231,8 @@ if __name__ == "__main__":
         assistant_id = update_rose_assistant()
         if assistant_id:
             print(f"\n🎉 **DEPLOYMENT READY!**")
-            print(f"📤 Update your Railway environment with:")
+            print(f"📤 Make sure your Railway environment has:")
             print(f"   ROSE_ASSISTANT_ID={assistant_id}")
+            print(f"   GOOGLE_CALENDAR_ID=your_bg_calendar_id")
             print(f"   GOOGLE_TASKS_CALENDAR_ID=your_bg_tasks_calendar_id")
             print(f"\n🚀 Deploy the updated main.py to Railway and test!")
