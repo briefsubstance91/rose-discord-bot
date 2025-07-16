@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (TRIPLE CALENDAR + TIMEZONE FIXED)
+ROSE ASHCOMBE - DISCORD BOT (CLEANED CALENDAR VERSION)
 Executive Assistant with Enhanced Error Handling, Planning & Calendar Functions
-ENHANCED: Triple-calendar support (BG Calendar + BG Tasks + Britt iCloud)
-FIXED: Timezone handling for Toronto/Eastern, function conflicts, and imports
+CLEANED: Removed iCloud calendar complexity, focus on working Google Calendars only
 """
 import pytz
 import discord
@@ -18,6 +17,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 import traceback
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
@@ -27,7 +27,7 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Triple Calendar + Timezone Fixed)"
+ASSISTANT_ROLE = "Executive Assistant (Cleaned Calendar)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -36,11 +36,10 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Triple calendar integration variables
+# Simplified calendar integration - working Google Calendars only
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')  # Primary BG Calendar
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')  # BG Tasks
-BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')  # Britt iCloud
 
 # Validate critical environment variables
 if not DISCORD_TOKEN:
@@ -71,33 +70,90 @@ except Exception as e:
     print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
     exit(1)
 
-# Google Calendar setup with error handling - ENHANCED FOR TRIPLE CALENDAR
+# Simplified Google Calendar setup - working calendars only
 calendar_service = None
+accessible_calendars = []
+service_account_email = None
+
+def test_calendar_access(calendar_id, calendar_name):
+    """Test calendar access with clean error handling"""
+    if not calendar_service or not calendar_id:
+        return False
+    
+    try:
+        # Test calendar metadata
+        calendar_info = calendar_service.calendars().get(calendarId=calendar_id).execute()
+        print(f"✅ {calendar_name} accessible")
+        
+        # Test event access (fetch a few recent events)
+        now = datetime.now(pytz.UTC)
+        past_24h = now - timedelta(hours=24)
+        
+        events_result = calendar_service.events().list(
+            calendarId=calendar_id,
+            timeMin=past_24h.isoformat(),
+            timeMax=now.isoformat(),
+            maxResults=5,
+            singleEvents=True
+        ).execute()
+        
+        events = events_result.get('items', [])
+        print(f"✅ {calendar_name} events: {len(events)} found")
+        
+        return True
+        
+    except HttpError as e:
+        print(f"❌ {calendar_name} HTTP Error {e.resp.status}: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ {calendar_name} error: {e}")
+        return False
+
+# Initialize Google Calendar service
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
         credentials = Credentials.from_service_account_info(
             credentials_info,
-            scopes=['https://www.googleapis.com/auth/calendar.readonly']
+            scopes=[
+                'https://www.googleapis.com/auth/calendar.readonly',
+                'https://www.googleapis.com/auth/calendar.events' # Added for event creation/modification
+            ]
         )
         calendar_service = build('calendar', 'v3', credentials=credentials)
-        print("✅ Google Calendar service connected successfully")
+        print("✅ Google Calendar service initialized")
         
-        # Verify calendar access
-        if GOOGLE_CALENDAR_ID:
-            print(f"📅 Primary Calendar: {GOOGLE_CALENDAR_ID}")
-        if GOOGLE_TASKS_CALENDAR_ID:
-            print(f"✅ Tasks Calendar: {GOOGLE_TASKS_CALENDAR_ID}")
-        if BRITT_ICLOUD_CALENDAR_ID:
-            print(f"🍎 Britt iCloud Calendar: {BRITT_ICLOUD_CALENDAR_ID}")
+        # Get service account email
+        service_account_email = credentials_info.get('client_email')
+        print(f"📧 Service Account: {service_account_email}")
         
-        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
-            print("⚠️ No calendar IDs configured - using 'primary' calendar")
+        # Test only the working calendars
+        working_calendars_to_check = [
+            ("BG Calendar", GOOGLE_CALENDAR_ID, "calendar"),
+            ("BG Tasks", GOOGLE_TASKS_CALENDAR_ID, "tasks")
+        ]
+        
+        for name, calendar_id, calendar_type in working_calendars_to_check:
+            if calendar_id and test_calendar_access(calendar_id, name):
+                accessible_calendars.append((name, calendar_id, calendar_type))
+        
+        # Add 'primary' as fallback if no specific IDs are configured or accessible
+        if not accessible_calendars:
+            print("⚠️ No configured calendars accessible, testing 'primary'...")
+            if test_calendar_access('primary', "Primary"):
+                accessible_calendars.append(("Primary", "primary", "calendar"))
+        
+        print(f"\n📅 Final accessible calendars: {len(accessible_calendars)}")
+        for name, _, _ in accessible_calendars:
+            print(f"   ✅ {name}")
+            
     else:
         print("⚠️ Google Calendar credentials not found - calendar functions disabled")
+        
 except Exception as e:
     print(f"❌ Google Calendar setup error: {e}")
     calendar_service = None
+    accessible_calendars = []
 
 # Memory and duplicate prevention systems
 user_conversations = {}
@@ -108,64 +164,61 @@ active_runs = {}
 print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
 
 # ============================================================================
-# ENHANCED TRIPLE CALENDAR FUNCTIONS WITH TORONTO TIMEZONE
+# SIMPLIFIED CALENDAR FUNCTIONS - NO ICLOUD COMPLEXITY
 # ============================================================================
 
-def get_calendar_events(calendar_id, start_time, end_time):
-    """Helper function to get events from a specific calendar"""
+def get_calendar_events(calendar_id, start_time, end_time, max_results=100):
+    """Get events from a specific calendar - simplified"""
     if not calendar_service:
         return []
-    
-    # Use 'primary' if no calendar_id provided
-    if not calendar_id:
-        calendar_id = 'primary'
     
     try:
         events_result = calendar_service.events().list(
             calendarId=calendar_id,
             timeMin=start_time.isoformat(),
             timeMax=end_time.isoformat(),
+            maxResults=max_results,
             singleEvents=True,
             orderBy='startTime'
         ).execute()
         
-        return events_result.get('items', [])
+        events = events_result.get('items', [])
+        return events
+        
     except Exception as e:
         print(f"❌ Error getting events from {calendar_id}: {e}")
         return []
 
 def format_event(event, calendar_type="", user_timezone=None):
-    """Helper function to format a single event with proper Toronto timezone"""
+    """Format a single event with Toronto timezone"""
     if user_timezone is None:
         user_timezone = pytz.timezone('America/Toronto')
     
     start = event['start'].get('dateTime', event['start'].get('date'))
     title = event.get('summary', 'Untitled Event')
     
-    # Add calendar indicator
+    # Simple calendar indicators
     if calendar_type == "tasks":
         title = f"✅ {title}"
     elif calendar_type == "calendar":
         title = f"📅 {title}"
-    elif calendar_type == "britt":
-        title = f"🍎 {title}"
     
     if 'T' in start:  # Has time
         try:
-            # Parse UTC time and convert to Toronto timezone
             utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
             local_time = utc_time.astimezone(user_timezone)
             time_str = local_time.strftime('%I:%M %p')
             return f"• {time_str}: {title}"
-        except:
+        except Exception as e:
+            print(f"❌ Error formatting event: {e}")
             return f"• {title}"
     else:  # All day event
         return f"• All Day: {title}"
 
 def get_today_schedule():
-    """Get today's schedule from all three calendars with Toronto timezone handling"""
-    if not calendar_service:
-        return "📅 **Today's Schedule:** Calendar integration not configured\n\n🎯 **Planning Tip:** Set up your calendar integration for automated schedule management"
+    """Get today's schedule - simplified for working calendars only"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Today's Schedule:** Calendar integration not available\n\n🎯 **Manual Planning:** Review your calendar apps directly"
     
     try:
         # Use Toronto timezone
@@ -173,7 +226,7 @@ def get_today_schedule():
         
         # Get today in Toronto timezone
         today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow_toronto = today_toronto.replace(hour=23, minute=59, second=59)
+        tomorrow_toronto = today_toronto + timedelta(days=1) # End of today
         
         # Convert to UTC for Google Calendar API
         today_utc = today_toronto.astimezone(pytz.UTC)
@@ -181,38 +234,18 @@ def get_today_schedule():
         
         all_events = []
         
-        # Get events from primary calendar
-        if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, today_utc, tomorrow_utc)
-            for event in calendar_events:
-                formatted = format_event(event, "calendar", toronto_tz)
-                all_events.append((event, formatted, "calendar"))
-        
-        # Get events from tasks calendar
-        if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, today_utc, tomorrow_utc)
-            for event in task_events:
-                formatted = format_event(event, "tasks", toronto_tz)
-                all_events.append((event, formatted, "tasks"))
-        
-        # Get events from Britt iCloud calendar
-        if BRITT_ICLOUD_CALENDAR_ID:
-            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, today_utc, tomorrow_utc)
-            for event in britt_events:
-                formatted = format_event(event, "britt", toronto_tz)
-                all_events.append((event, formatted, "britt"))
-        
-        # If no specific calendars configured, try primary
-        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
-            primary_events = get_calendar_events('primary', today_utc, tomorrow_utc)
-            for event in primary_events:
-                formatted = format_event(event, "calendar", toronto_tz)
-                all_events.append((event, formatted, "calendar"))
+        # Get events from accessible calendars only
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, today_utc, tomorrow_utc)
+            for event in events:
+                formatted = format_event(event, calendar_type, toronto_tz)
+                all_events.append((event, formatted, calendar_type, calendar_name))
         
         if not all_events:
-            return "📅 **Today's Schedule:** No scheduled events\n\n🎯 **Executive Opportunity:** Perfect day for deep work and strategic planning"
+            calendar_list = ", ".join([name for name, _, _ in accessible_calendars])
+            return f"📅 **Today's Schedule:** No events found\n\n🎯 **Executive Opportunity:** Clear schedule across {calendar_list} - perfect for strategic planning"
         
-        # Sort all events by start time
+        # Sort events by start time
         def get_event_time(event_tuple):
             event = event_tuple[0]
             start = event['start'].get('dateTime', event['start'].get('date'))
@@ -220,51 +253,46 @@ def get_today_schedule():
                 if 'T' in start:
                     utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                     return utc_time.astimezone(toronto_tz)
-                else:
-                    return datetime.fromisoformat(start)
+                else: # All-day event, use the date itself
+                    return datetime.fromisoformat(start).replace(tzinfo=toronto_tz)
             except:
-                return datetime.now(toronto_tz)
+                return datetime.now(toronto_tz) # Fallback if parsing fails
         
         all_events.sort(key=get_event_time)
         
         # Format response
         formatted_events = [event_tuple[1] for event_tuple in all_events]
         
-        # Count by type
-        calendar_count = len([e for e in all_events if e[2] == "calendar"])
-        tasks_count = len([e for e in all_events if e[2] == "tasks"])
-        britt_count = len([e for e in all_events if e[2] == "britt"])
+        # Count by calendar for breakdown
+        calendar_counts = {}
+        for _, _, _, calendar_name in all_events:
+            calendar_counts[calendar_name] = calendar_counts.get(calendar_name, 0) + 1
         
         header = f"📅 **Today's Executive Schedule:** {len(all_events)} events"
         
-        # Add detailed breakdown
-        breakdown_parts = []
-        if calendar_count > 0:
-            breakdown_parts.append(f"{calendar_count} appointments")
-        if tasks_count > 0:
-            breakdown_parts.append(f"{tasks_count} tasks")
-        if britt_count > 0:
-            breakdown_parts.append(f"{britt_count} iCloud events")
+        # Add breakdown by calendar
+        if calendar_counts:
+            breakdown = []
+            for calendar_name, count in calendar_counts.items():
+                breakdown.append(f"{count} {calendar_name}")
+            header += f" ({', '.join(breakdown)})"
         
-        if breakdown_parts:
-            header += f" ({', '.join(breakdown_parts)})"
-        
-        return header + "\n\n" + "\n".join(formatted_events[:15])  # Limit for Discord
+        return header + "\n\n" + "\n".join(formatted_events[:15]) # Limit for Discord
         
     except Exception as e:
-        print(f"❌ Calendar error: {e}")
-        return "📅 **Today's Schedule:** Error retrieving calendar data\n\n🎯 **Backup Plan:** Use manual schedule review"
+        print(f"❌ Calendar error in get_today_schedule: {e}")
+        return "📅 **Today's Schedule:** Error retrieving calendar data\n\n🎯 **Backup Plan:** Check your calendar apps directly"
 
 def get_upcoming_events(days=7):
-    """Get upcoming events from all three calendars with Toronto timezone handling"""
-    if not calendar_service:
-        return f"📅 **Upcoming {days} Days:** Calendar integration not configured\n\n🎯 **Planning Tip:** Manual weekly planning recommended"
+    """Get upcoming events - simplified for working calendars only"""
+    if not calendar_service or not accessible_calendars:
+        return f"📅 **Upcoming {days} Days:** Calendar integration not available\n\n🎯 **Manual Planning:** Review your calendar apps"
     
     try:
         # Use Toronto timezone
         toronto_tz = pytz.timezone('America/Toronto')
         
-        # Get date range in Toronto timezone then convert to UTC
+        # Get date range
         start_toronto = datetime.now(toronto_tz)
         end_toronto = start_toronto + timedelta(days=days)
         
@@ -273,37 +301,20 @@ def get_upcoming_events(days=7):
         
         all_events = []
         
-        # Get events from primary calendar
-        if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, start_utc, end_utc)
-            for event in calendar_events:
-                all_events.append((event, "calendar"))
-        
-        # Get events from tasks calendar
-        if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, start_utc, end_utc)
-            for event in task_events:
-                all_events.append((event, "tasks"))
-        
-        # Get events from Britt iCloud calendar
-        if BRITT_ICLOUD_CALENDAR_ID:
-            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, start_utc, end_utc)
-            for event in britt_events:
-                all_events.append((event, "britt"))
-        
-        # If no specific calendars configured, try primary
-        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
-            primary_events = get_calendar_events('primary', start_utc, end_utc)
-            for event in primary_events:
-                all_events.append((event, "calendar"))
+        # Get events from accessible calendars only
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, start_utc, end_utc)
+            for event in events:
+                all_events.append((event, calendar_type, calendar_name))
         
         if not all_events:
-            return f"📅 **Upcoming {days} Days:** No scheduled events\n\n🎯 **Strategic Opportunity:** Focus on long-term planning and goal setting"
+            calendar_list = ", ".join([name for name, _, _ in accessible_calendars])
+            return f"📅 **Upcoming {days} Days:** No events found\n\n🎯 **Strategic Opportunity:** Clear schedule across {calendar_list}"
         
-        # Group by date using Toronto timezone
+        # Group by date
         events_by_date = defaultdict(list)
         
-        for event, calendar_type in all_events:
+        for event, calendar_type, calendar_name in all_events:
             start = event['start'].get('dateTime', event['start'].get('date'))
             
             try:
@@ -319,92 +330,93 @@ def get_upcoming_events(days=7):
                     formatted = format_event(event, calendar_type, toronto_tz)
                     events_by_date[date_str].append(formatted)
             except Exception as e:
-                print(f"❌ Date parsing error: {e}")
+                print(f"❌ Date parsing error in get_upcoming_events: {e}")
                 continue
         
         # Format response
         formatted = []
         total_events = len(all_events)
-        calendar_count = len([e for e in all_events if e[1] == "calendar"])
-        tasks_count = len([e for e in all_events if e[1] == "tasks"])
-        britt_count = len([e for e in all_events if e[1] == "britt"])
         
-        for date, day_events in list(events_by_date.items())[:7]:  # Limit to 7 days for Discord
+        # Count by calendar for breakdown
+        calendar_counts = {}
+        for _, _, calendar_name in all_events:
+            calendar_counts[calendar_name] = calendar_counts.get(calendar_name, 0) + 1
+        
+        for date, day_events in sorted(events_by_date.items())[:7]: # Limit to 7 days for Discord
             formatted.append(f"**{date}**")
-            formatted.extend(day_events[:6])  # Limit events per day for readability
+            # Sort events within the day by time
+            day_events_sorted = sorted(day_events, key=lambda x: datetime.strptime(x.split(': ')[0].replace('• ', '').strip(), '%I:%M %p') if '• ' in x and 'All Day' not in x else datetime.min)
+            formatted.extend(day_events_sorted[:6]) # Limit events per day for readability
         
         header = f"📅 **Upcoming {days} Days:** {total_events} total events"
         
-        # Add detailed breakdown
-        breakdown_parts = []
-        if calendar_count > 0:
-            breakdown_parts.append(f"{calendar_count} appointments")
-        if tasks_count > 0:
-            breakdown_parts.append(f"{tasks_count} tasks")
-        if britt_count > 0:
-            breakdown_parts.append(f"{britt_count} iCloud events")
-        
-        if breakdown_parts:
-            header += f" ({', '.join(breakdown_parts)})"
+        # Add breakdown by calendar
+        if calendar_counts:
+            breakdown = []
+            for calendar_name, count in calendar_counts.items():
+                breakdown.append(f"{count} {calendar_name}")
+            header += f" ({', '.join(breakdown)})"
         
         return header + "\n\n" + "\n".join(formatted)
         
     except Exception as e:
-        print(f"❌ Calendar error: {e}")
+        print(f"❌ Calendar error in get_upcoming_events: {e}")
         return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
 
 def get_morning_briefing():
-    """Comprehensive morning briefing with Toronto timezone handling"""
-    if not calendar_service:
-        return "🌅 **Morning Briefing:** Calendar integration needed for full briefing\n\n📋 **Manual Planning:** Review your calendar and prioritize your day"
+    """Morning briefing - simplified for working calendars only"""
+    if not calendar_service or not accessible_calendars:
+        return "🌅 **Morning Briefing:** Calendar integration not available\n\n📋 **Manual Planning:** Review your calendar apps"
     
     try:
-        # Use Toronto timezone for proper date calculation
+        # Use Toronto timezone
         toronto_tz = pytz.timezone('America/Toronto')
         
-        # Get today's full schedule
+        # Get today's schedule
         today_schedule = get_today_schedule()
         
-        # Get tomorrow's preview using Toronto timezone
+        # Get tomorrow's preview
         today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
         tomorrow_toronto = today_toronto + timedelta(days=1)
-        day_after_toronto = tomorrow_toronto + timedelta(days=1)
+        day_after_tomorrow_toronto = tomorrow_toronto + timedelta(days=1)
         
-        # Convert to UTC for API calls
+        # Convert to UTC
         tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
-        day_after_utc = day_after_toronto.astimezone(pytz.UTC)
+        day_after_tomorrow_utc = day_after_tomorrow_toronto.astimezone(pytz.UTC)
         
         tomorrow_events = []
         
-        # Get tomorrow's events from all three calendars
-        if GOOGLE_CALENDAR_ID:
-            calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, "calendar") for event in calendar_events])
-        
-        if GOOGLE_TASKS_CALENDAR_ID:
-            task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, "tasks") for event in task_events])
-        
-        if BRITT_ICLOUD_CALENDAR_ID:
-            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, "britt") for event in britt_events])
-        
-        # If no specific calendars configured, try primary
-        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
-            primary_events = get_calendar_events('primary', tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, "calendar") for event in primary_events])
+        # Get tomorrow's events from accessible calendars
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, tomorrow_utc, day_after_tomorrow_utc)
+            tomorrow_events.extend([(event, calendar_type, calendar_name) for event in events])
         
         # Format tomorrow's preview
         if tomorrow_events:
             tomorrow_formatted = []
-            for event, calendar_type in tomorrow_events[:4]:  # Limit to 4 for briefing
+            # Sort tomorrow's events by time
+            def get_event_time_for_sort(event_tuple):
+                event = event_tuple[0]
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                try:
+                    if 'T' in start:
+                        utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        return utc_time.astimezone(toronto_tz)
+                    else:
+                        return datetime.fromisoformat(start).replace(tzinfo=toronto_tz)
+                except:
+                    return datetime.now(toronto_tz)
+            
+            tomorrow_events.sort(key=get_event_time_for_sort)
+
+            for event, calendar_type, calendar_name in tomorrow_events[:4]: # Limit to 4 for briefing
                 formatted = format_event(event, calendar_type, toronto_tz)
                 tomorrow_formatted.append(formatted)
             tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
         else:
-            tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - great for strategic planning"
+            tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - strategic planning day"
         
-        # Combine into morning briefing with correct Toronto date
+        # Combine briefing
         current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
         briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_preview}\n\n💼 **Executive Focus:** Prioritize high-impact activities during peak energy hours"
         
@@ -412,7 +424,7 @@ def get_morning_briefing():
         
     except Exception as e:
         print(f"❌ Morning briefing error: {e}")
-        return "🌅 **Morning Briefing:** Error generating briefing - please check calendar manually"
+        return "🌅 **Morning Briefing:** Error generating briefing"
 
 # ============================================================================
 # ENHANCED PLANNING SEARCH WITH ERROR HANDLING
@@ -486,86 +498,154 @@ async def planning_search_enhanced(query, focus_area="general", num_results=3):
         return f"🔍 Planning search error: Please try again", []
 
 # ============================================================================
-# CALENDAR EVENT MANAGEMENT FUNCTIONS (PHASE 2)
+# CALENDAR EVENT MANAGEMENT FUNCTIONS (ADAPTED FOR GOOGLE CALENDARS ONLY)
 # ============================================================================
 
 def create_calendar_event(title, start_time, end_time, calendar_type="primary", description=""):
-    """Create a new calendar event"""
-    if not calendar_service:
-        return "📅 **Event Creation:** Calendar integration not configured"
+    """Create a new calendar event in an accessible Google Calendar"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Creation:** Calendar integration not configured or no accessible calendars."
     
-    # Determine which calendar to use
-    calendar_id = "primary"
-    if calendar_type == "tasks" and GOOGLE_TASKS_CALENDAR_ID:
-        calendar_id = GOOGLE_TASKS_CALENDAR_ID
-    elif calendar_type == "britt" and BRITT_ICLOUD_CALENDAR_ID:
-        calendar_id = BRITT_ICLOUD_CALENDAR_ID
-    elif calendar_type == "primary" and GOOGLE_CALENDAR_ID:
-        calendar_id = GOOGLE_CALENDAR_ID
+    target_calendar_id = None
+    target_calendar_name = "Primary" # Default name
+
+    # Find the correct calendar ID based on type
+    for name, cal_id, cal_type in accessible_calendars:
+        if calendar_type == "tasks" and cal_type == "tasks":
+            target_calendar_id = cal_id
+            target_calendar_name = name
+            break
+        elif calendar_type == "primary" and cal_type == "calendar":
+            target_calendar_id = cal_id
+            target_calendar_name = name
+            break
     
+    # If a specific calendar type wasn't found, try 'primary' if it's accessible
+    if not target_calendar_id:
+        for name, cal_id, cal_type in accessible_calendars:
+            if cal_id == 'primary' and cal_type == 'calendar':
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+        if not target_calendar_id: # Fallback if 'primary' is not explicitly listed but exists
+            print("⚠️ Could not find a specific calendar, attempting to use the first accessible calendar.")
+            target_calendar_id = accessible_calendars[0][1]
+            target_calendar_name = accessible_calendars[0][0]
+
+
+    if not target_calendar_id:
+        return "❌ **Event Creation Failed:** No suitable calendar found for event creation."
+
     try:
-        # Create event object
+        # Ensure times are in Toronto timezone for consistency
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Parse input times as UTC and then ensure they are timezone-aware for Google Calendar API
+        # Google Calendar API expects RFC3339 format with Z for UTC or offset
+        
+        # Attempt to parse as datetime with timezone, then convert to Toronto, then to UTC for API
+        try:
+            # If start_time/end_time are already ISO format with Z or offset, fromisoformat handles it
+            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+            
+            # If they are naive, assume they are local Toronto time and make them timezone-aware
+            if start_dt.tzinfo is None:
+                start_dt = toronto_tz.localize(start_dt)
+            if end_dt.tzinfo is None:
+                end_dt = toronto_tz.localize(end_dt)
+
+            start_iso = start_dt.isoformat()
+            end_iso = end_dt.isoformat()
+
+        except ValueError:
+            # Fallback for simpler date strings if fromisoformat fails
+            # This might need more robust parsing depending on user input flexibility
+            print(f"⚠️ Could not parse '{start_time}' or '{end_time}' as full ISO. Attempting simpler parse.")
+            # For simplicity, if it's just a date, treat as all day, otherwise try to parse as Toronto time
+            if 'T' not in start_time and 'T' not in end_time: # Likely all-day event
+                event = {
+                    'summary': title,
+                    'start': {'date': start_time},
+                    'end': {'date': end_time},
+                    'description': description,
+                }
+            else: # Try to parse as Toronto time
+                try:
+                    start_dt = toronto_tz.localize(datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S'))
+                    end_dt = toronto_tz.localize(datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S'))
+                    start_iso = start_dt.isoformat()
+                    end_iso = end_dt.isoformat()
+                    event = {
+                        'summary': title,
+                        'start': {
+                            'dateTime': start_iso,
+                            'timeZone': 'America/Toronto',
+                        },
+                        'end': {
+                            'dateTime': end_iso,
+                            'timeZone': 'America/Toronto',
+                        },
+                        'description': description,
+                    }
+                except ValueError as ve:
+                    print(f"❌ Failed to parse date/time strings for event creation: {ve}")
+                    return f"❌ **Event Creation Failed:** Invalid date/time format for '{title}'. Please use YYYY-MM-DDTHH:MM:SS format."
+        
+        # Create event object (assuming dateTime format for most cases)
         event = {
             'summary': title,
             'start': {
-                'dateTime': start_time,
+                'dateTime': start_iso,
                 'timeZone': 'America/Toronto',
             },
             'end': {
-                'dateTime': end_time,
+                'dateTime': end_iso,
                 'timeZone': 'America/Toronto',
             },
             'description': description,
         }
-        
+
         # Create the event
         created_event = calendar_service.events().insert(
-            calendarId=calendar_id,
+            calendarId=target_calendar_id,
             body=event
         ).execute()
         
         # Format confirmation
-        toronto_tz = pytz.timezone('America/Toronto')
-        start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00')).astimezone(toronto_tz)
-        end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        # Convert times to Toronto timezone for display
+        display_start_dt = datetime.fromisoformat(created_event['start'].get('dateTime', created_event['start'].get('date')).replace('Z', '+00:00')).astimezone(toronto_tz)
+        display_end_dt = datetime.fromisoformat(created_event['end'].get('dateTime', created_event['end'].get('date')).replace('Z', '+00:00')).astimezone(toronto_tz)
         
-        calendar_name = "Tasks" if calendar_type == "tasks" else "Britt iCloud" if calendar_type == "britt" else "Primary"
-        
-        return f"✅ **Event Created:** {title}\n📅 **When:** {start_dt.strftime('%A, %B %d at %I:%M %p')} - {end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {calendar_name}\n🔗 **Link:** {created_event.get('htmlLink', 'Available in calendar')}"
+        return f"✅ **Event Created:** {title}\n📅 **When:** {display_start_dt.strftime('%A, %B %d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {target_calendar_name}\n🔗 **Link:** {created_event.get('htmlLink', 'Available in calendar')}"
         
     except Exception as e:
         print(f"❌ Error creating calendar event: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
         return f"❌ **Event Creation Failed:** Unable to create '{title}' - please try again or create manually"
 
 def reschedule_event(event_search, new_start_time, new_end_time):
-    """Reschedule an existing calendar event"""
-    if not calendar_service:
-        return "📅 **Event Rescheduling:** Calendar integration not configured"
+    """Reschedule an existing calendar event in an accessible Google Calendar"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Rescheduling:** Calendar integration not configured or no accessible calendars."
     
     try:
-        # Search for the event across all calendars
+        # Search for the event across all accessible calendars
         toronto_tz = pytz.timezone('America/Toronto')
         today = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        week_later = today + timedelta(days=7)
+        week_later = today + timedelta(days=7) # Search up to 7 days from now
         
         today_utc = today.astimezone(pytz.UTC)
         week_later_utc = week_later.astimezone(pytz.UTC)
         
         found_event = None
-        found_calendar = None
+        found_calendar_id = None
+        found_calendar_name = None
         
-        # Search in all calendars
-        for calendar_id, calendar_name in [
-            (GOOGLE_CALENDAR_ID, "Primary"),
-            (GOOGLE_TASKS_CALENDAR_ID, "Tasks"),
-            (BRITT_ICLOUD_CALENDAR_ID, "Britt iCloud")
-        ]:
-            if not calendar_id:
-                continue
-                
+        for name, cal_id, cal_type in accessible_calendars:
             try:
                 events = calendar_service.events().list(
-                    calendarId=calendar_id,
+                    calendarId=cal_id,
                     timeMin=today_utc.isoformat(),
                     timeMax=week_later_utc.isoformat(),
                     q=event_search,
@@ -575,46 +655,65 @@ def reschedule_event(event_search, new_start_time, new_end_time):
                 
                 if events.get('items'):
                     found_event = events['items'][0]  # Get first match
-                    found_calendar = calendar_id
-                    break
+                    found_calendar_id = cal_id
+                    found_calendar_name = name
+                    break # Found the event, stop searching
                     
             except Exception as e:
-                print(f"❌ Error searching calendar {calendar_id}: {e}")
+                print(f"❌ Error searching calendar {cal_id}: {e}")
                 continue
         
         if not found_event:
-            return f"❌ **Event Not Found:** No event matching '{event_search}' found in your calendars"
+            return f"❌ **Event Not Found:** No event matching '{event_search}' found in your accessible calendars."
         
+        # Parse new times and ensure they are timezone-aware for Google Calendar API
+        try:
+            new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', '+00:00'))
+            new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', '+00:00'))
+
+            if new_start_dt.tzinfo is None:
+                new_start_dt = toronto_tz.localize(new_start_dt)
+            if new_end_dt.tzinfo is None:
+                new_end_dt = toronto_tz.localize(new_end_dt)
+
+            new_start_iso = new_start_dt.isoformat()
+            new_end_iso = new_end_dt.isoformat()
+
+        except ValueError as ve:
+            print(f"❌ Failed to parse new date/time strings for reschedule: {ve}")
+            return f"❌ **Rescheduling Failed:** Invalid new date/time format. Please use YYYY-MM-DDTHH:MM:SS format."
+
         # Update the event
         found_event['start'] = {
-            'dateTime': new_start_time,
+            'dateTime': new_start_iso,
             'timeZone': 'America/Toronto',
         }
         found_event['end'] = {
-            'dateTime': new_end_time,
+            'dateTime': new_end_iso,
             'timeZone': 'America/Toronto',
         }
         
         updated_event = calendar_service.events().update(
-            calendarId=found_calendar,
+            calendarId=found_calendar_id,
             eventId=found_event['id'],
             body=found_event
         ).execute()
         
         # Format confirmation
-        start_dt = datetime.fromisoformat(new_start_time.replace('Z', '+00:00')).astimezone(toronto_tz)
-        end_dt = datetime.fromisoformat(new_end_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        display_start_dt = datetime.fromisoformat(updated_event['start'].get('dateTime', updated_event['start'].get('date')).replace('Z', '+00:00')).astimezone(toronto_tz)
+        display_end_dt = datetime.fromisoformat(updated_event['end'].get('dateTime', updated_event['end'].get('date')).replace('Z', '+00:00')).astimezone(toronto_tz)
         
-        return f"✅ **Event Rescheduled:** {found_event['summary']}\n📅 **New Time:** {start_dt.strftime('%A, %B %d at %I:%M %p')} - {end_dt.strftime('%I:%M %p')}\n🔗 **Link:** {updated_event.get('htmlLink', 'Available in calendar')}"
+        return f"✅ **Event Rescheduled:** {updated_event['summary']}\n📅 **New Time:** {display_start_dt.strftime('%A, %B %d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {found_calendar_name}\n🔗 **Link:** {updated_event.get('htmlLink', 'Available in calendar')}"
         
     except Exception as e:
         print(f"❌ Error rescheduling event: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
         return f"❌ **Rescheduling Failed:** Unable to reschedule '{event_search}' - please try again or update manually"
 
 def find_meeting_time(duration_minutes, preferred_day=None, preferred_start_hour=9, preferred_end_hour=17):
-    """Find available meeting time slots"""
-    if not calendar_service:
-        return "📅 **Meeting Time Search:** Calendar integration not configured"
+    """Find available meeting time slots in accessible Google Calendars"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Meeting Time Search:** Calendar integration not configured or no accessible calendars."
     
     try:
         toronto_tz = pytz.timezone('America/Toronto')
@@ -622,8 +721,9 @@ def find_meeting_time(duration_minutes, preferred_day=None, preferred_start_hour
         # Set search range
         if preferred_day:
             try:
-                search_start = datetime.strptime(preferred_day, '%Y-%m-%d').replace(tzinfo=toronto_tz)
-            except:
+                # Attempt to parse preferred_day, default to today if invalid
+                search_start = toronto_tz.localize(datetime.strptime(preferred_day, '%Y-%m-%d')).replace(hour=0, minute=0, second=0, microsecond=0)
+            except ValueError:
                 search_start = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
         else:
             search_start = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -634,60 +734,78 @@ def find_meeting_time(duration_minutes, preferred_day=None, preferred_start_hour
         search_start_utc = search_start.astimezone(pytz.UTC)
         search_end_utc = search_end.astimezone(pytz.UTC)
         
-        # Get all events from all calendars
+        # Get all events from all accessible calendars
         all_events = []
-        
-        for calendar_id in [GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]:
-            if not calendar_id:
-                continue
-                
+        for name, cal_id, cal_type in accessible_calendars:
             try:
-                events = get_calendar_events(calendar_id, search_start_utc, search_end_utc)
+                events = get_calendar_events(cal_id, search_start_utc, search_end_utc)
                 all_events.extend(events)
             except Exception as e:
-                print(f"❌ Error getting events from calendar: {e}")
+                print(f"❌ Error getting events from calendar {cal_id}: {e}")
                 continue
         
-        # Find gaps between events
-        available_slots = []
-        current_time = search_start.replace(hour=preferred_start_hour, minute=0, second=0, microsecond=0)
+        # Process events to create busy intervals
+        busy_intervals = []
+        for event in all_events:
+            start_time_str = event['start'].get('dateTime', event['start'].get('date'))
+            end_time_str = event['end'].get('dateTime', event['end'].get('date'))
+            
+            try:
+                if 'T' in start_time_str: # Has time component
+                    start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00')).astimezone(toronto_tz)
+                    end_dt = datetime.fromisoformat(end_time_str.replace('Z', '+00:00')).astimezone(toronto_tz)
+                else: # All-day event
+                    start_dt = toronto_tz.localize(datetime.strptime(start_time_str, '%Y-%m-%d')).replace(hour=0, minute=0, second=0)
+                    end_dt = toronto_tz.localize(datetime.strptime(end_time_str, '%Y-%m-%d')).replace(hour=23, minute=59, second=59)
+                busy_intervals.append((start_dt, end_dt))
+            except ValueError as ve:
+                print(f"⚠️ Skipping event due to date parsing error: {ve} - {event.get('summary')}")
+                continue
         
-        for day in range(7):  # Check next 7 days
-            day_start = current_time.replace(hour=preferred_start_hour)
-            day_end = current_time.replace(hour=preferred_end_hour)
-            
-            # Get events for this day
-            day_events = []
-            for event in all_events:
-                event_start = event['start'].get('dateTime', event['start'].get('date'))
-                if 'T' in event_start:
-                    event_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00')).astimezone(toronto_tz)
-                    if event_dt.date() == current_time.date():
-                        day_events.append(event_dt)
-            
-            # Sort events by time
-            day_events.sort()
-            
-            # Find gaps
-            if not day_events:
-                # Whole day available
-                available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {day_start.strftime('%I:%M %p')} - {day_end.strftime('%I:%M %p')} (Full day available)")
-            else:
-                # Check gap before first event
-                if day_events[0] - day_start >= timedelta(minutes=duration_minutes):
-                    available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {day_start.strftime('%I:%M %p')} - {day_events[0].strftime('%I:%M %p')}")
+        # Sort busy intervals by start time
+        busy_intervals.sort(key=lambda x: x[0])
+        
+        available_slots = []
+        current_check_day = search_start # Start checking from the beginning of the preferred day or today
+
+        for day_offset in range(7): # Check next 7 days
+            day_start_time = current_check_day.replace(hour=preferred_start_hour, minute=0, second=0, microsecond=0)
+            day_end_time = current_check_day.replace(hour=preferred_end_hour, minute=0, second=0, microsecond=0)
+
+            # Ensure day_start_time is not in the past relative to now
+            if day_start_time < datetime.now(toronto_tz):
+                day_start_time = datetime.now(toronto_tz) # Start from current time if it's past preferred_start_hour
+
+            # Filter busy intervals for the current day
+            daily_busy_intervals = [
+                (start, end) for start, end in busy_intervals
+                if start.date() == current_check_day.date() or end.date() == current_check_day.date()
+            ]
+
+            # Initialize current available time for the day
+            current_available_pointer = day_start_time
+
+            for busy_start, busy_end in daily_busy_intervals:
+                # If there's a gap before the busy interval
+                if busy_start > current_available_pointer:
+                    potential_slot_end = min(busy_start, day_end_time)
+                    if (potential_slot_end - current_available_pointer).total_seconds() >= duration_minutes * 60:
+                        available_slots.append(f"• {current_check_day.strftime('%A, %B %d')}: {current_available_pointer.strftime('%I:%M %p')} - {potential_slot_end.strftime('%I:%M %p')}")
                 
-                # Check gaps between events
-                for i in range(len(day_events) - 1):
-                    gap_start = day_events[i] + timedelta(hours=1)  # Assume 1 hour meetings
-                    gap_end = day_events[i + 1]
-                    if gap_end - gap_start >= timedelta(minutes=duration_minutes):
-                        available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {gap_start.strftime('%I:%M %p')} - {gap_end.strftime('%I:%M %p')}")
+                # Move pointer past the current busy interval
+                current_available_pointer = max(current_available_pointer, busy_end)
+                
+                if len(available_slots) >= 5: # Limit to 5 suggestions
+                    break
             
-            current_time += timedelta(days=1)
-            
-            # Limit to 5 suggestions
-            if len(available_slots) >= 5:
+            # Check for remaining time after the last busy interval
+            if current_available_pointer < day_end_time:
+                if (day_end_time - current_available_pointer).total_seconds() >= duration_minutes * 60:
+                    available_slots.append(f"• {current_check_day.strftime('%A, %B %d')}: {current_available_pointer.strftime('%I:%M %p')} - {day_end_time.strftime('%I:%M %p')}")
+
+            current_check_day += timedelta(days=1) # Move to the next day
+
+            if len(available_slots) >= 5: # Limit to 5 suggestions
                 break
         
         if not available_slots:
@@ -697,7 +815,8 @@ def find_meeting_time(duration_minutes, preferred_day=None, preferred_start_hour
         
     except Exception as e:
         print(f"❌ Error finding meeting time: {e}")
-        return f"❌ **Meeting Time Search Failed:** Unable to find available slots - please check calendar manually"
+        print(f"📋 Traceback: {traceback.format_exc()}")
+        return f"❌ **Meeting Time Search Failed:** Unable to find available slots - please try again or check calendars manually"
 
 # ============================================================================
 # ENHANCED FUNCTION HANDLING
@@ -790,12 +909,12 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 
                 output = find_meeting_time(duration_minutes, preferred_day, preferred_start_hour, preferred_end_hour)
                 
-            elif function_name == "find_free_time":
+            elif function_name == "find_free_time": # Placeholder function
                 duration = arguments.get('duration', 60)
                 date = arguments.get('date', '')
                 output = f"⏰ **Free Time Analysis ({duration}min):**\n\n🎯 **Strategic Blocks (Toronto Time):**\n• Early morning: Deep work (6-8am)\n• Mid-morning: Meetings (9-11am)\n• Afternoon: Administrative (2-4pm)\n\n💡 **Tip:** Schedule {duration}-minute blocks for maximum productivity"
                 
-            elif function_name == "search_emails":
+            elif function_name == "search_emails": # Placeholder function
                 query = arguments.get('query', '')
                 max_results = arguments.get('max_results', 5)
                 if query:
@@ -860,6 +979,11 @@ async def get_rose_response(message, user_id):
         # Clean message
         clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
         
+        # Build string of accessible calendar names for the prompt
+        accessible_cal_names = ", ".join([name for name, _, _ in accessible_calendars])
+        if not accessible_cal_names:
+            accessible_cal_names = "no calendars configured"
+
         # Enhanced message with executive planning focus + calendar intelligence
         enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
 
@@ -868,7 +992,7 @@ RESPONSE GUIDELINES:
 - SMART CALENDAR DETECTION: Automatically detect if this is a general or specific calendar query
 - GENERAL CALENDAR QUERIES (auto-include full schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
 - SPECIFIC CALENDAR QUERIES (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
-- When using calendar functions, provide triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
+- When using calendar functions, provide insights from accessible calendars: {accessible_cal_names}
 - For planning research, include actionable productivity recommendations
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
@@ -909,10 +1033,10 @@ CALENDAR MANAGEMENT CAPABILITIES:
             run = client.beta.threads.runs.create(
                 thread_id=thread_id,
                 assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant with enhanced triple-calendar and planning research capabilities plus calendar event management.
+                instructions=f"""You are Rose Ashcombe, executive assistant with enhanced Google calendar and planning research capabilities plus calendar event management.
 
 EXECUTIVE APPROACH:
-- Use calendar functions for triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
+- Use calendar functions for insights from accessible calendars: {accessible_cal_names}
 - Use planning_search for productivity and planning information
 - SMART CALENDAR DETECTION: Automatically detect general vs specific calendar queries
 - GENERAL QUERIES: Auto-call get_today_schedule() and provide executive insights
@@ -1069,16 +1193,20 @@ async def on_ready():
         print(f"🤖 Connected as: {bot.user}")
         print(f"🆔 Bot ID: {bot.user.id}")
         print(f"🎯 Assistant ID: {ASSISTANT_ID}")
-        print(f"📅 Calendar Integration: {'✅ Active' if calendar_service else '❌ Disabled'}")
+        print(f"📅 Calendar Integration: {'✅ Active' if calendar_service and accessible_calendars else '❌ Disabled'}")
         print(f"🔍 Search Integration: {'✅ Active' if BRAVE_API_KEY else '❌ Disabled'}")
         print(f"📺 Allowed Channels: {', '.join(ALLOWED_CHANNELS)}")
-        print("🚀 Ready for executive planning and triple-calendar management!")
+        print("🚀 Ready for executive planning and Google Calendar management!")
         
-        # Set bot status
+        # Set bot status based on accessible calendars
+        status_text = "📅 Google Calendar"
+        if any(cal_type == "tasks" for _, _, cal_type in accessible_calendars):
+            status_text += " • ✅ Tasks"
+        
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="📅 BG Calendar • ✅ Tasks • 🍎 iCloud"
+                name=status_text
             ),
             status=discord.Status.online
         )
@@ -1145,7 +1273,7 @@ async def on_message(message):
         print(f"📋 Critical traceback: {traceback.format_exc()}")
 
 # ============================================================================
-# DISCORD COMMANDS - ENHANCED WITH TRIPLE CALENDAR SUPPORT
+# DISCORD COMMANDS - ENHANCED WITH GOOGLE CALENDAR SUPPORT
 # ============================================================================
 
 @bot.command(name='ping')
@@ -1168,15 +1296,23 @@ async def status_command(ctx):
             color=0xd4af37
         )
         
+        calendar_status_value = ""
+        if calendar_service and accessible_calendars:
+            for name, _, _ in accessible_calendars:
+                calendar_status_value += f"• {name}: ✅\n"
+            calendar_status_value += f"🔧 Service: ✅"
+        else:
+            calendar_status_value = "❌ Not configured or accessible"
+
         embed.add_field(
-            name="🗓️ Triple Calendar Integration",
-            value=f"📅 BG Calendar: {'✅' if GOOGLE_CALENDAR_ID else '❌'}\n✅ BG Tasks: {'✅' if GOOGLE_TASKS_CALENDAR_ID else '❌'}\n🍎 Britt iCloud: {'✅' if BRITT_ICLOUD_CALENDAR_ID else '❌'}\n🔧 Service: {'✅' if calendar_service else '❌'}",
+            name="🗓️ Google Calendar Integration",
+            value=calendar_status_value,
             inline=True
         )
         
         embed.add_field(
             name="🔧 Executive Functions",
-            value="📅 Today's Schedule\n📊 Weekly Planning\n🌅 Morning Briefings\n⏰ Free Time Analysis\n🔍 Planning Research\n📧 Email Management",
+            value="📅 Today's Schedule\n📊 Weekly Planning\n🌅 Morning Briefings\n⏰ Free Time Analysis\n🔍 Planning Research\n📧 Email Management\n➕ Create Event\n🔄 Reschedule Event\n⏱️ Find Meeting Time",
             inline=True
         )
         
@@ -1208,13 +1344,13 @@ async def help_command(ctx):
     try:
         embed = discord.Embed(
             title="👑 Rose Ashcombe - Executive Assistant",
-            description="Your strategic planning specialist with triple-calendar integration and productivity optimization",
+            description="Your strategic planning specialist with Google Calendar integration and productivity optimization",
             color=0xd4af37
         )
         
         embed.add_field(
             name="💬 How to Use Rose",
-            value=f"• Mention @{ASSISTANT_NAME} for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your triple calendar and goals",
+            value=f"• Mention @{ASSISTANT_NAME} for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your Google Calendars and goals",
             inline=False
         )
         
@@ -1226,13 +1362,17 @@ async def help_command(ctx):
         
         embed.add_field(
             name="👑 Example Requests",
-            value="• `@Rose give me my morning briefing`\n• `@Rose help me plan my week strategically`\n• `@Rose what's the best time blocking method?`\n• `@Rose analyze my schedule for optimization`",
+            value="• `@Rose give me my morning briefing`\n• `@Rose help me plan my week strategically`\n• `@Rose what's the best time blocking method?`\n• `@Rose analyze my schedule for optimization`\n• `@Rose create an event 'Team Sync' for tomorrow 10 AM to 11 AM`\n• `@Rose reschedule 'Project Review' to next Monday at 2 PM`\n• `@Rose find a 30-minute meeting slot for me`",
             inline=False
         )
         
+        accessible_cal_names_for_help = ", ".join([name for name, _, _ in accessible_calendars])
+        if not accessible_cal_names_for_help:
+            accessible_cal_names_for_help = "No Google Calendars configured."
+
         embed.add_field(
-            name="📊 Triple Calendar Support",
-            value="📅 BG Calendar (Appointments) • ✅ BG Tasks (Tasks) • 🍎 Britt iCloud (Personal) • 🇨🇦 Toronto Time • 🎯 Productivity Systems",
+            name="📊 Google Calendar Support",
+            value=f"Integrated Calendars: {accessible_cal_names_for_help}\n🇨🇦 Toronto Time • 🎯 Productivity Systems",
             inline=False
         )
         
@@ -1255,7 +1395,7 @@ async def schedule_command(ctx):
 async def upcoming_command(ctx, days: int = 7):
     """Get upcoming events with error handling"""
     try:
-        if days < 1 or days > 14:
+        if days < 1 or days > 14: # Limit to a reasonable range
             days = 7
         async with ctx.typing():
             events = get_upcoming_events(days)
@@ -1284,7 +1424,7 @@ async def planning_search_command(ctx, *, query):
             
             response = f"📊 **Planning Research:** {query}\n\n{search_results}"
             
-            if len(response) > 1900:
+            if len(response) > 1900: # Truncate if too long for initial send
                 response = response[:1900] + "..."
             
             await ctx.send(response)
@@ -1309,14 +1449,14 @@ async def on_command_error(ctx, error):
         print(f"❌ Command error: {error}")
         await ctx.send("❌ Command error occurred. Please try again.")
 
-# ============================================================================
+# ============================================================================\
 # MAIN EXECUTION
 # ============================================================================
 
 if __name__ == "__main__":
     try:
         print(f"🚀 Launching {ASSISTANT_NAME}...")
-        print(f"📅 Triple Calendar Support: {bool(any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]))}")
+        print(f"📅 Google Calendar Support: {bool(accessible_calendars)}")
         print(f"🔍 Planning Research: {bool(BRAVE_API_KEY)}")
         print(f"🇨🇦 Timezone: Toronto (America/Toronto)")
         print("🎯 Starting Discord bot...")
