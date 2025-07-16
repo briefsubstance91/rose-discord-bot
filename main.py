@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (MULTI-CALENDAR ENHANCED - FIXED)
+ROSE ASHCOMBE - DISCORD BOT (TRIPLE CALENDAR + TIMEZONE FIXED)
 Executive Assistant with Enhanced Error Handling, Planning & Calendar Functions
-ENHANCED: Multi-calendar support for BG Calendar + BG Tasks
-FIXED: Environment variable handling and function integration
+ENHANCED: Triple-calendar support (BG Calendar + BG Tasks + Britt iCloud)
+FIXED: Timezone handling for Toronto/Eastern, function conflicts, and imports
 """
 import pytz
 import discord
@@ -27,7 +27,7 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Multi-Calendar Enhanced)"
+ASSISTANT_ROLE = "Executive Assistant (Triple Calendar + Timezone Fixed)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -36,10 +36,11 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Calendar integration variables - ENHANCED FOR MULTI-CALENDAR
+# Triple calendar integration variables
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')  # Primary BG Calendar
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')  # BG Tasks
+BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')  # Britt iCloud
 
 # Validate critical environment variables
 if not DISCORD_TOKEN:
@@ -70,7 +71,7 @@ except Exception as e:
     print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
     exit(1)
 
-# Google Calendar setup with error handling - ENHANCED FOR MULTI-CALENDAR
+# Google Calendar setup with error handling - ENHANCED FOR TRIPLE CALENDAR
 calendar_service = None
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
@@ -87,8 +88,10 @@ try:
             print(f"📅 Primary Calendar: {GOOGLE_CALENDAR_ID}")
         if GOOGLE_TASKS_CALENDAR_ID:
             print(f"✅ Tasks Calendar: {GOOGLE_TASKS_CALENDAR_ID}")
+        if BRITT_ICLOUD_CALENDAR_ID:
+            print(f"🍎 Britt iCloud Calendar: {BRITT_ICLOUD_CALENDAR_ID}")
         
-        if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
+        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
             print("⚠️ No calendar IDs configured - using 'primary' calendar")
     else:
         print("⚠️ Google Calendar credentials not found - calendar functions disabled")
@@ -105,18 +108,8 @@ active_runs = {}
 print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
 
 # ============================================================================
-# ENHANCED MULTI-CALENDAR FUNCTIONS
+# ENHANCED TRIPLE CALENDAR FUNCTIONS WITH TORONTO TIMEZONE
 # ============================================================================
-
-def format_event(start_time, summary, tz):
-    try:
-        # Handles dateTime format
-        local_start = datetime.datetime.fromisoformat(start_time).astimezone(tz)
-        return f"{local_start.strftime('%A, %B %d at %I:%M %p')}: {summary}"
-    except ValueError:
-        # Handles all-day events (date only)
-        local_start = tz.localize(datetime.datetime.strptime(start_time, "%Y-%m-%d"))
-        return f"{local_start.strftime('%A, %B %d')}: {summary}"
 
 def get_calendar_events(calendar_id, start_time, end_time):
     """Helper function to get events from a specific calendar"""
@@ -141,8 +134,11 @@ def get_calendar_events(calendar_id, start_time, end_time):
         print(f"❌ Error getting events from {calendar_id}: {e}")
         return []
 
-def format_event(event, calendar_type=""):
-    """Helper function to format a single event"""
+def format_event(event, calendar_type="", user_timezone=None):
+    """Helper function to format a single event with proper Toronto timezone"""
+    if user_timezone is None:
+        user_timezone = pytz.timezone('America/Toronto')
+    
     start = event['start'].get('dateTime', event['start'].get('date'))
     title = event.get('summary', 'Untitled Event')
     
@@ -151,10 +147,15 @@ def format_event(event, calendar_type=""):
         title = f"✅ {title}"
     elif calendar_type == "calendar":
         title = f"📅 {title}"
+    elif calendar_type == "britt":
+        title = f"🍎 {title}"
     
     if 'T' in start:  # Has time
         try:
-            time_str = datetime.fromisoformat(start.replace('Z', '+00:00')).strftime('%I:%M %p')
+            # Parse UTC time and convert to Toronto timezone
+            utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            local_time = utc_time.astimezone(user_timezone)
+            time_str = local_time.strftime('%I:%M %p')
             return f"• {time_str}: {title}"
         except:
             return f"• {title}"
@@ -162,19 +163,19 @@ def format_event(event, calendar_type=""):
         return f"• All Day: {title}"
 
 def get_today_schedule():
-    """Get today's schedule from both calendars with PROPER timezone handling"""
+    """Get today's schedule from all three calendars with Toronto timezone handling"""
     if not calendar_service:
         return "📅 **Today's Schedule:** Calendar integration not configured\n\n🎯 **Planning Tip:** Set up your calendar integration for automated schedule management"
     
     try:
-        # FIXED: Use Toronto timezone instead of UTC
+        # Use Toronto timezone
         toronto_tz = pytz.timezone('America/Toronto')
         
         # Get today in Toronto timezone
         today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
         tomorrow_toronto = today_toronto.replace(hour=23, minute=59, second=59)
         
-        # Convert to UTC for Google Calendar API (Google expects UTC)
+        # Convert to UTC for Google Calendar API
         today_utc = today_toronto.astimezone(pytz.UTC)
         tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
         
@@ -194,8 +195,15 @@ def get_today_schedule():
                 formatted = format_event(event, "tasks", toronto_tz)
                 all_events.append((event, formatted, "tasks"))
         
+        # Get events from Britt iCloud calendar
+        if BRITT_ICLOUD_CALENDAR_ID:
+            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, today_utc, tomorrow_utc)
+            for event in britt_events:
+                formatted = format_event(event, "britt", toronto_tz)
+                all_events.append((event, formatted, "britt"))
+        
         # If no specific calendars configured, try primary
-        if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
+        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
             primary_events = get_calendar_events('primary', today_utc, tomorrow_utc)
             for event in primary_events:
                 formatted = format_event(event, "calendar", toronto_tz)
@@ -210,7 +218,6 @@ def get_today_schedule():
             start = event['start'].get('dateTime', event['start'].get('date'))
             try:
                 if 'T' in start:
-                    # Parse and convert to Toronto timezone
                     utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                     return utc_time.astimezone(toronto_tz)
                 else:
@@ -226,28 +233,35 @@ def get_today_schedule():
         # Count by type
         calendar_count = len([e for e in all_events if e[2] == "calendar"])
         tasks_count = len([e for e in all_events if e[2] == "tasks"])
+        britt_count = len([e for e in all_events if e[2] == "britt"])
         
         header = f"📅 **Today's Executive Schedule:** {len(all_events)} events"
-        if calendar_count > 0 and tasks_count > 0:
-            header += f" ({calendar_count} appointments, {tasks_count} tasks)"
-        elif calendar_count > 0:
-            header += f" ({calendar_count} appointments)"
-        elif tasks_count > 0:
-            header += f" ({tasks_count} tasks)"
         
-        return header + "\n\n" + "\n".join(formatted_events[:10])  # Limit for Discord
+        # Add detailed breakdown
+        breakdown_parts = []
+        if calendar_count > 0:
+            breakdown_parts.append(f"{calendar_count} appointments")
+        if tasks_count > 0:
+            breakdown_parts.append(f"{tasks_count} tasks")
+        if britt_count > 0:
+            breakdown_parts.append(f"{britt_count} iCloud events")
+        
+        if breakdown_parts:
+            header += f" ({', '.join(breakdown_parts)})"
+        
+        return header + "\n\n" + "\n".join(formatted_events[:15])  # Limit for Discord
         
     except Exception as e:
         print(f"❌ Calendar error: {e}")
         return "📅 **Today's Schedule:** Error retrieving calendar data\n\n🎯 **Backup Plan:** Use manual schedule review"
 
 def get_upcoming_events(days=7):
-    """Get upcoming events from both calendars with PROPER timezone handling"""
+    """Get upcoming events from all three calendars with Toronto timezone handling"""
     if not calendar_service:
         return f"📅 **Upcoming {days} Days:** Calendar integration not configured\n\n🎯 **Planning Tip:** Manual weekly planning recommended"
     
     try:
-        # FIXED: Use Toronto timezone
+        # Use Toronto timezone
         toronto_tz = pytz.timezone('America/Toronto')
         
         # Get date range in Toronto timezone then convert to UTC
@@ -271,8 +285,14 @@ def get_upcoming_events(days=7):
             for event in task_events:
                 all_events.append((event, "tasks"))
         
+        # Get events from Britt iCloud calendar
+        if BRITT_ICLOUD_CALENDAR_ID:
+            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, start_utc, end_utc)
+            for event in britt_events:
+                all_events.append((event, "britt"))
+        
         # If no specific calendars configured, try primary
-        if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
+        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
             primary_events = get_calendar_events('primary', start_utc, end_utc)
             for event in primary_events:
                 all_events.append((event, "calendar"))
@@ -307,18 +327,25 @@ def get_upcoming_events(days=7):
         total_events = len(all_events)
         calendar_count = len([e for e in all_events if e[1] == "calendar"])
         tasks_count = len([e for e in all_events if e[1] == "tasks"])
+        britt_count = len([e for e in all_events if e[1] == "britt"])
         
         for date, day_events in list(events_by_date.items())[:7]:  # Limit to 7 days for Discord
             formatted.append(f"**{date}**")
-            formatted.extend(day_events[:5])  # Limit events per day for readability
+            formatted.extend(day_events[:6])  # Limit events per day for readability
         
         header = f"📅 **Upcoming {days} Days:** {total_events} total events"
-        if calendar_count > 0 and tasks_count > 0:
-            header += f" ({calendar_count} appointments, {tasks_count} tasks)"
-        elif calendar_count > 0:
-            header += f" ({calendar_count} appointments)"
-        elif tasks_count > 0:
-            header += f" ({tasks_count} tasks)"
+        
+        # Add detailed breakdown
+        breakdown_parts = []
+        if calendar_count > 0:
+            breakdown_parts.append(f"{calendar_count} appointments")
+        if tasks_count > 0:
+            breakdown_parts.append(f"{tasks_count} tasks")
+        if britt_count > 0:
+            breakdown_parts.append(f"{britt_count} iCloud events")
+        
+        if breakdown_parts:
+            header += f" ({', '.join(breakdown_parts)})"
         
         return header + "\n\n" + "\n".join(formatted)
         
@@ -327,12 +354,12 @@ def get_upcoming_events(days=7):
         return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
 
 def get_morning_briefing():
-    """Comprehensive morning briefing with PROPER timezone handling"""
+    """Comprehensive morning briefing with Toronto timezone handling"""
     if not calendar_service:
         return "🌅 **Morning Briefing:** Calendar integration needed for full briefing\n\n📋 **Manual Planning:** Review your calendar and prioritize your day"
     
     try:
-        # FIXED: Use Toronto timezone for proper date calculation
+        # Use Toronto timezone for proper date calculation
         toronto_tz = pytz.timezone('America/Toronto')
         
         # Get today's full schedule
@@ -349,7 +376,7 @@ def get_morning_briefing():
         
         tomorrow_events = []
         
-        # Get tomorrow's events from both calendars
+        # Get tomorrow's events from all three calendars
         if GOOGLE_CALENDAR_ID:
             calendar_events = get_calendar_events(GOOGLE_CALENDAR_ID, tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "calendar") for event in calendar_events])
@@ -358,22 +385,26 @@ def get_morning_briefing():
             task_events = get_calendar_events(GOOGLE_TASKS_CALENDAR_ID, tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "tasks") for event in task_events])
         
+        if BRITT_ICLOUD_CALENDAR_ID:
+            britt_events = get_calendar_events(BRITT_ICLOUD_CALENDAR_ID, tomorrow_utc, day_after_utc)
+            tomorrow_events.extend([(event, "britt") for event in britt_events])
+        
         # If no specific calendars configured, try primary
-        if not GOOGLE_CALENDAR_ID and not GOOGLE_TASKS_CALENDAR_ID:
+        if not any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]):
             primary_events = get_calendar_events('primary', tomorrow_utc, day_after_utc)
             tomorrow_events.extend([(event, "calendar") for event in primary_events])
         
         # Format tomorrow's preview
         if tomorrow_events:
             tomorrow_formatted = []
-            for event, calendar_type in tomorrow_events[:3]:  # Limit to 3 for briefing
+            for event, calendar_type in tomorrow_events[:4]:  # Limit to 4 for briefing
                 formatted = format_event(event, calendar_type, toronto_tz)
                 tomorrow_formatted.append(formatted)
             tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
         else:
             tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - great for strategic planning"
         
-        # Combine into morning briefing with CORRECT date
+        # Combine into morning briefing with correct Toronto date
         current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
         briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_preview}\n\n💼 **Executive Focus:** Prioritize high-impact activities during peak energy hours"
         
@@ -518,7 +549,7 @@ async def handle_rose_functions_enhanced(run, thread_id):
             elif function_name == "find_free_time":
                 duration = arguments.get('duration', 60)
                 date = arguments.get('date', '')
-                output = f"⏰ **Free Time Analysis ({duration}min):**\n\n🎯 **Strategic Blocks:**\n• Early morning: Deep work (6-8am)\n• Mid-morning: Meetings (9-11am)\n• Afternoon: Administrative (2-4pm)\n\n💡 **Tip:** Schedule {duration}-minute blocks for maximum productivity"
+                output = f"⏰ **Free Time Analysis ({duration}min):**\n\n🎯 **Strategic Blocks (Toronto Time):**\n• Early morning: Deep work (6-8am)\n• Mid-morning: Meetings (9-11am)\n• Afternoon: Administrative (2-4pm)\n\n💡 **Tip:** Schedule {duration}-minute blocks for maximum productivity"
                 
             elif function_name == "search_emails":
                 query = arguments.get('query', '')
@@ -590,7 +621,7 @@ async def get_rose_response(message, user_id):
 
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
-- When using calendar functions, provide multi-calendar insights (BG Calendar + BG Tasks)
+- When using calendar functions, provide triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
 - For planning research, include actionable productivity recommendations
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
@@ -625,14 +656,15 @@ RESPONSE GUIDELINES:
             run = client.beta.threads.runs.create(
                 thread_id=thread_id,
                 assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant with enhanced multi-calendar and planning research capabilities.
+                instructions="""You are Rose Ashcombe, executive assistant with enhanced triple-calendar and planning research capabilities.
 
 EXECUTIVE APPROACH:
-- Use calendar functions for multi-calendar insights (BG Calendar + BG Tasks)
+- Use calendar functions for triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
 - Use planning_search for productivity and planning information
 - Apply strategic thinking with systems optimization
 - Provide actionable recommendations with clear timelines
 - Focus on executive-level insights and life management
+- All times are in Toronto timezone (America/Toronto)
 
 FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 📧 💼) and provide organized, action-oriented guidance.
 
@@ -723,6 +755,47 @@ def format_for_discord_rose(response):
         return "👑 Executive message needs refinement. Please try again."
 
 # ============================================================================
+# ENHANCED MESSAGE HANDLING
+# ============================================================================
+
+async def send_long_message(original_message, response):
+    """Send response with length handling and error recovery"""
+    try:
+        if len(response) <= 2000:
+            await original_message.reply(response)
+        else:
+            # Split into chunks
+            chunks = []
+            current_chunk = ""
+            
+            for line in response.split('\n'):
+                if len(current_chunk + line + '\n') > 1900:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = line + '\n'
+                else:
+                    current_chunk += line + '\n'
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            # Send chunks
+            for i, chunk in enumerate(chunks):
+                if i == 0:
+                    await original_message.reply(chunk)
+                else:
+                    await original_message.channel.send(chunk)
+                    
+    except discord.HTTPException as e:
+        print(f"❌ Discord HTTP error: {e}")
+        try:
+            await original_message.reply("👑 Executive guidance too complex for Discord. Please try a more specific request.")
+        except:
+            pass
+    except Exception as e:
+        print(f"❌ Message sending error: {e}")
+
+# ============================================================================
 # DISCORD EVENT HANDLERS
 # ============================================================================
 
@@ -737,13 +810,13 @@ async def on_ready():
         print(f"📅 Calendar Integration: {'✅ Active' if calendar_service else '❌ Disabled'}")
         print(f"🔍 Search Integration: {'✅ Active' if BRAVE_API_KEY else '❌ Disabled'}")
         print(f"📺 Allowed Channels: {', '.join(ALLOWED_CHANNELS)}")
-        print("🚀 Ready for executive planning and multi-calendar management!")
+        print("🚀 Ready for executive planning and triple-calendar management!")
         
         # Set bot status
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="📅 BG Calendar & ✅ BG Tasks"
+                name="📅 BG Calendar • ✅ Tasks • 🍎 iCloud"
             ),
             status=discord.Status.online
         )
@@ -751,61 +824,66 @@ async def on_ready():
         print(f"❌ Error in on_ready: {e}")
 
 @bot.event
-async def on_message(message):
-    """Enhanced message handler with multi-calendar support"""
-    # Basic validation
-    if message.author == bot.user:
-        return
-    
-    # Channel validation
-    if message.guild and message.channel.name not in ALLOWED_CHANNELS:
-        return
-    
-    # Check if Rose is mentioned or message is a command
-    is_mentioned = bot.user in message.mentions
-    is_command = message.content.startswith('!')
-    
-    if not is_mentioned and not is_command:
-        return
-    
-    # Process commands first
-    await bot.process_commands(message)
-    
-    # Handle mentions (OpenAI Assistant integration)
-    if is_mentioned and not is_command:
-        await handle_mention(message)
+async def on_error(event, *args, **kwargs):
+    """Global error handler"""
+    print(f"❌ Discord error in {event}: {traceback.format_exc()}")
 
-async def handle_mention(message):
-    """Handle mentions with OpenAI Assistant integration"""
-    user_id = str(message.author.id)
-    message_id = f"{message.id}-{int(time.time())}"
-    
-    # Prevent duplicate processing
-    if message_id in processing_messages:
-        return
-    processing_messages.add(message_id)
-    
+@bot.event
+async def on_message(message):
+    """Enhanced message handling with comprehensive error checking"""
     try:
-        async with message.channel.typing():
-            # Get response from assistant
-            response = await get_rose_response(message.content, user_id)
+        # Skip bot's own messages
+        if message.author == bot.user:
+            return
+        
+        # Process commands first
+        await bot.process_commands(message)
+        
+        # Only respond in allowed channels or DMs
+        if not isinstance(message.channel, discord.DMChannel) and message.channel.name not in ALLOWED_CHANNELS:
+            return
+
+        # Respond to mentions or DMs
+        if bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel):
             
-            # Send response with length handling
-            if len(response) > 1900:
-                chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
-                for chunk in chunks:
-                    await message.reply(chunk) if chunks.index(chunk) == 0 else await message.channel.send(chunk)
-            else:
-                await message.reply(response)
+            # DUPLICATE PREVENTION
+            message_key = f"{message.author.id}_{message.content[:50]}"
+            current_time = time.time()
+            
+            # Check if we're already processing this message
+            if message_key in processing_messages:
+                return
+            
+            # Check if user sent same message too quickly (within 5 seconds)
+            if message.author.id in last_response_time:
+                if current_time - last_response_time[message.author.id] < 5:
+                    return
+            
+            # Mark message as being processed
+            processing_messages.add(message_key)
+            last_response_time[message.author.id] = current_time
+            
+            try:
+                async with message.channel.typing():
+                    response = await get_rose_response(message.content, message.author.id)
+                    await send_long_message(message, response)
+            except Exception as e:
+                print(f"❌ Message error: {e}")
+                print(f"📋 Message traceback: {traceback.format_exc()}")
+                try:
+                    await message.reply("❌ Something went wrong with executive consultation. Please try again!")
+                except:
+                    pass
+            finally:
+                # Always clean up
+                processing_messages.discard(message_key)
                 
     except Exception as e:
-        print(f"❌ Error handling mention: {e}")
-        await message.reply("❌ I encountered an executive planning error. Please try again.")
-    finally:
-        processing_messages.discard(message_id)
+        print(f"❌ Critical on_message error: {e}")
+        print(f"📋 Critical traceback: {traceback.format_exc()}")
 
 # ============================================================================
-# DISCORD COMMANDS - ENHANCED WITH MULTI-CALENDAR SUPPORT
+# DISCORD COMMANDS - ENHANCED WITH TRIPLE CALENDAR SUPPORT
 # ============================================================================
 
 @bot.command(name='ping')
@@ -818,7 +896,7 @@ async def ping_command(ctx):
             color=0xd4af37
         )
         embed.add_field(name="📡 Latency", value=f"{latency}ms", inline=True)
-        embed.add_field(name="📅 Multi-Calendar", value="✅ Connected" if calendar_service else "❌ Offline", inline=True)
+        embed.add_field(name="📅 Triple Calendar", value="✅ Connected" if calendar_service else "❌ Offline", inline=True)
         embed.add_field(name="🔍 Search", value="✅ Active" if BRAVE_API_KEY else "❌ Disabled", inline=True)
         await ctx.send(embed=embed)
     except Exception as e:
@@ -835,14 +913,14 @@ async def status_command(ctx):
         )
         
         embed.add_field(
-            name="🗓️ Multi-Calendar Integration",
-            value=f"📅 BG Calendar: {'✅' if GOOGLE_CALENDAR_ID else '❌'}\n✅ BG Tasks: {'✅' if GOOGLE_TASKS_CALENDAR_ID else '❌'}\n🔧 Service: {'✅' if calendar_service else '❌'}",
+            name="🗓️ Triple Calendar Integration",
+            value=f"📅 BG Calendar: {'✅' if GOOGLE_CALENDAR_ID else '❌'}\n✅ BG Tasks: {'✅' if GOOGLE_TASKS_CALENDAR_ID else '❌'}\n🍎 Britt iCloud: {'✅' if BRITT_ICLOUD_CALENDAR_ID else '❌'}\n🔧 Service: {'✅' if calendar_service else '❌'}",
             inline=True
         )
         
         embed.add_field(
             name="🔧 Executive Functions",
-            value="📅 Today's Schedule\n📊 Weekly Planning\n🌅 Morning Briefings\n⏰ Free Time Analysis\n🔍 Planning Research",
+            value="📅 Today's Schedule\n📊 Weekly Planning\n🌅 Morning Briefings\n⏰ Free Time Analysis\n🔍 Planning Research\n📧 Email Management",
             inline=True
         )
         
@@ -853,9 +931,15 @@ async def status_command(ctx):
         )
         
         embed.add_field(
+            name="🕐 Timezone",
+            value="🇨🇦 Toronto (America/Toronto)",
+            inline=True
+        )
+        
+        embed.add_field(
             name="📊 Active Status",
             value=f"👥 Conversations: {len(user_conversations)}\n🏃 Active Runs: {len(active_runs)}",
-            inline=False
+            inline=True
         )
         
         await ctx.send(embed=embed)
@@ -868,19 +952,19 @@ async def help_command(ctx):
     try:
         embed = discord.Embed(
             title="👑 Rose Ashcombe - Executive Assistant",
-            description="Your strategic planning specialist with multi-calendar integration and productivity optimization",
+            description="Your strategic planning specialist with triple-calendar integration and productivity optimization",
             color=0xd4af37
         )
         
         embed.add_field(
             name="💬 How to Use Rose",
-            value=f"• Mention @{ASSISTANT_NAME} for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your calendar and goals",
+            value=f"• Mention @{ASSISTANT_NAME} for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your triple calendar and goals",
             inline=False
         )
         
         embed.add_field(
             name="🔧 Executive Commands",
-            value="• `!schedule` - Get today's schedule from both calendars\n• `!upcoming [days]` - View upcoming events\n• `!briefing` - Morning briefing with both calendars\n• `!plan [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - Show capabilities",
+            value="• `!schedule` - Get today's schedule from all calendars\n• `!upcoming [days]` - View upcoming events\n• `!briefing` - Morning briefing with all calendars\n• `!plan [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - Show capabilities",
             inline=False
         )
         
@@ -891,8 +975,8 @@ async def help_command(ctx):
         )
         
         embed.add_field(
-            name="📊 Multi-Calendar Support",
-            value="📅 BG Calendar (Appointments) • ✅ BG Tasks (Tasks) • 🎯 Productivity Systems • ⚡ Time Optimization • 📋 Life OS",
+            name="📊 Triple Calendar Support",
+            value="📅 BG Calendar (Appointments) • ✅ BG Tasks (Tasks) • 🍎 Britt iCloud (Personal) • 🇨🇦 Toronto Time • 🎯 Productivity Systems",
             inline=False
         )
         
@@ -957,11 +1041,6 @@ async def planning_search_command(ctx, *, query):
 # ============================================================================
 
 @bot.event
-async def on_error(event, *args, **kwargs):
-    """Global error handler"""
-    print(f"❌ Discord error in {event}: {args}")
-
-@bot.event
 async def on_command_error(ctx, error):
     """Command error handler"""
     if isinstance(error, commands.CommandNotFound):
@@ -981,8 +1060,9 @@ async def on_command_error(ctx, error):
 if __name__ == "__main__":
     try:
         print(f"🚀 Launching {ASSISTANT_NAME}...")
-        print(f"📅 Multi-Calendar Support: {bool(GOOGLE_CALENDAR_ID or GOOGLE_TASKS_CALENDAR_ID)}")
+        print(f"📅 Triple Calendar Support: {bool(any([GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]))}")
         print(f"🔍 Planning Research: {bool(BRAVE_API_KEY)}")
+        print(f"🇨🇦 Timezone: Toronto (America/Toronto)")
         print("🎯 Starting Discord bot...")
         
         bot.run(DISCORD_TOKEN)
