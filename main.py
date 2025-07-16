@@ -1,17 +1,75 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - CLEANED CALENDAR CODE
-Executive Assistant with Google Calendar Integration Only
-CLEANED: Removed iCloud calendar complexity, focus on working calendars
+ROSE ASHCOMBE - DISCORD BOT (CLEANED CALENDAR VERSION)
+Executive Assistant with Enhanced Error Handling, Planning & Calendar Functions
+CLEANED: Removed iCloud calendar complexity, focus on working Google Calendars only
 """
+import pytz
+import discord
+from discord.ext import commands
+import asyncio
+import aiohttp
+import json
+import time
+import re
+from dotenv import load_dotenv
+from openai import OpenAI
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import traceback
+from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 
-# Environment variables - REMOVE BRITT_ICLOUD_CALENDAR_ID
+# Load environment variables
+load_dotenv()
+
+# Rose's executive configuration
+ASSISTANT_NAME = "Rose Ashcombe"
+ASSISTANT_ROLE = "Executive Assistant (Cleaned Calendar)"
+ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
+
+# Environment variables with fallbacks
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("ROSE_DISCORD_TOKEN")
+ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
+BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Simplified calendar integration - working calendars only
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')  # Primary BG Calendar
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')  # BG Tasks
-# REMOVED: BRITT_ICLOUD_CALENDAR_ID - not accessible via API
 
-# Simplified Google Calendar setup - focus on working calendars only
+# Validate critical environment variables
+if not DISCORD_TOKEN:
+    print("❌ CRITICAL: DISCORD_TOKEN not found in environment variables")
+    exit(1)
+
+if not OPENAI_API_KEY:
+    print("❌ CRITICAL: OPENAI_API_KEY not found in environment variables")
+    exit(1)
+
+if not ASSISTANT_ID:
+    print("❌ CRITICAL: ROSE_ASSISTANT_ID not found in environment variables")
+    exit(1)
+
+# Discord setup with error handling
+try:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+except Exception as e:
+    print(f"❌ CRITICAL: Discord bot initialization failed: {e}")
+    exit(1)
+
+# OpenAI setup with error handling
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+except Exception as e:
+    print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
+    exit(1)
+
+# Simplified Google Calendar setup - working calendars only
 calendar_service = None
 accessible_calendars = []
 service_account_email = None
@@ -95,6 +153,14 @@ except Exception as e:
     print(f"❌ Google Calendar setup error: {e}")
     calendar_service = None
     accessible_calendars = []
+
+# Memory and duplicate prevention systems
+user_conversations = {}
+processing_messages = set()
+last_response_time = {}
+active_runs = {}
+
+print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
 
 # ============================================================================
 # SIMPLIFIED CALENDAR FUNCTIONS - NO ICLOUD COMPLEXITY
@@ -343,82 +409,334 @@ def get_morning_briefing():
         return "🌅 **Morning Briefing:** Error generating briefing"
 
 # ============================================================================
-# SIMPLIFIED DISCORD COMMANDS - NO ICLOUD REFERENCES
+# ENHANCED PLANNING SEARCH WITH ERROR HANDLING
 # ============================================================================
 
-@bot.command(name='calendars')
-async def calendars_command(ctx):
-    """Show accessible calendar status"""
+async def planning_search_enhanced(query, focus_area="general", num_results=3):
+    """Enhanced planning and productivity research with comprehensive error handling"""
+    if not BRAVE_API_KEY:
+        return "🔍 Planning research requires Brave Search API configuration", []
+    
     try:
-        embed = discord.Embed(
-            title="📅 Rose's Calendar Status",
-            description="Google Calendar integration status",
-            color=0xE91E63
-        )
+        # Enhance query for planning content
+        planning_query = f"{query} {focus_area} productivity executive planning time management 2025"
         
-        if accessible_calendars:
-            accessible_list = []
-            for name, calendar_id, calendar_type in accessible_calendars:
-                accessible_list.append(f"✅ **{name}** ({calendar_type})")
-            
-            embed.add_field(
-                name="📋 Accessible Calendars",
-                value="\n".join(accessible_list),
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name="📋 Accessible Calendars",
-                value="❌ No calendars currently accessible",
-                inline=False
-            )
+        headers = {
+            'X-Subscription-Token': BRAVE_API_KEY,
+            'Accept': 'application/json'
+        }
         
-        # Service account info
-        if service_account_email:
-            embed.add_field(
-                name="🔧 Service Account",
-                value=f"Share calendars with: `{service_account_email}`",
-                inline=False
-            )
+        params = {
+            'q': planning_query,
+            'count': num_results,
+            'country': 'US',
+            'search_lang': 'en',
+            'ui_lang': 'en',
+            'safesearch': 'moderate'
+        }
         
-        await ctx.send(embed=embed)
-        
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.search.brave.com/res/v1/web/search', 
+                                   headers=headers, params=params, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = data.get('web', {}).get('results', [])
+                    
+                    if not results:
+                        return "🔍 No planning research results found for this query", []
+                    
+                    formatted_results = []
+                    sources = []
+                    
+                    for i, result in enumerate(results[:num_results]):
+                        title = result.get('title', 'No title')
+                        snippet = result.get('description', 'No description')
+                        url = result.get('url', '')
+                        
+                        # Extract domain for credibility
+                        domain = url.split('/')[2] if len(url.split('/')) > 2 else 'Unknown'
+                        
+                        formatted_results.append(f"**{i+1}. {title}**\n{snippet}")
+                        sources.append({
+                            'number': i+1,
+                            'title': title,
+                            'url': url,
+                            'domain': domain
+                        })
+                    
+                    return "\n\n".join(formatted_results), sources
+                else:
+                    return f"🔍 Planning search error: HTTP {response.status}", []
+                    
+    except asyncio.TimeoutError:
+        return "🔍 Planning search timed out", []
     except Exception as e:
-        print(f"❌ Calendars command error: {e}")
-        await ctx.send("❌ Error checking calendar status")
+        print(f"❌ Planning search error: {e}")
+        return f"🔍 Planning search error: Please try again", []
 
-@bot.command(name='schedule')
-async def schedule_command(ctx, timeframe="today"):
-    """Get schedule for specified timeframe"""
-    try:
-        async with ctx.typing():
-            if timeframe.lower() == "today":
-                response = get_today_schedule()
-            elif timeframe.lower() == "tomorrow":
-                response = get_upcoming_events(1)
-            elif timeframe.lower() == "week":
-                response = get_upcoming_events(7)
+# ============================================================================
+# ENHANCED FUNCTION HANDLING WITH FIXED OPENAI API CALLS
+# ============================================================================
+
+async def handle_rose_functions_enhanced(run, thread_id):
+    """Enhanced function handling with fixed OpenAI API calls"""
+    
+    if not run or not hasattr(run, 'required_action') or not run.required_action:
+        return
+        
+    if not hasattr(run.required_action, 'submit_tool_outputs') or not run.required_action.submit_tool_outputs:
+        return
+    
+    if not hasattr(run.required_action.submit_tool_outputs, 'tool_calls') or not run.required_action.submit_tool_outputs.tool_calls:
+        return
+    
+    tool_outputs = []
+    
+    for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+        function_name = getattr(tool_call.function, 'name', 'unknown')
+        
+        try:
+            arguments_str = getattr(tool_call.function, 'arguments', '{}')
+            arguments = json.loads(arguments_str) if arguments_str else {}
+        except (json.JSONDecodeError, AttributeError) as e:
+            print(f"❌ Error parsing function arguments: {e}")
+            arguments = {}
+        
+        print(f"👑 Rose Function: {function_name}")
+        print(f"📋 Arguments: {arguments}")
+        
+        try:
+            if function_name == "planning_search":
+                query = arguments.get('query', '')
+                focus = arguments.get('focus', 'general')
+                num_results = arguments.get('num_results', 3)
+                
+                if query:
+                    search_results, sources = await planning_search_enhanced(query, focus, num_results)
+                    output = f"📊 **Planning Research:** {query}\n\n{search_results}"
+                    
+                    if sources:
+                        output += "\n\n📚 **Sources:**\n"
+                        for source in sources:
+                            output += f"({source['number']}) {source['title']} - {source['domain']}\n"
+                else:
+                    output = "🔍 No planning research query provided"
+                    
+            elif function_name == "get_today_schedule":
+                output = get_today_schedule()
+                    
+            elif function_name == "get_upcoming_events":
+                days = arguments.get('days', 7)
+                output = get_upcoming_events(days)
+                
+            elif function_name == "get_morning_briefing":
+                output = get_morning_briefing()
+                
             else:
-                try:
-                    days = int(timeframe)
-                    response = get_upcoming_events(days)
-                except ValueError:
-                    response = get_today_schedule()
-            
-            await ctx.send(response)
-            
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("❌ Error retrieving schedule")
-
-@bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Get morning briefing"""
+                output = f"❓ Function {function_name} not fully implemented yet"
+                
+        except Exception as e:
+            print(f"❌ Function execution error: {e}")
+            output = f"❌ Error executing {function_name}: Please try again"
+        
+        tool_outputs.append({
+            "tool_call_id": tool_call.id,
+            "output": output[:1500]  # Keep within reasonable limits
+        })
+    
+    # Submit tool outputs with error handling
     try:
-        async with ctx.typing():
-            response = get_morning_briefing()
-            await ctx.send(response)
-            
+        if tool_outputs:
+            client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread_id,
+                run_id=run.id,
+                tool_outputs=tool_outputs
+            )
+            print(f"✅ Submitted {len(tool_outputs)} tool outputs successfully")
     except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("❌ Error generating briefing")
+        print(f"❌ Error submitting tool outputs: {e}")
+
+# ============================================================================
+# MAIN CONVERSATION HANDLER WITH FIXED OPENAI API CALLS
+# ============================================================================
+
+async def get_rose_response(message, user_id):
+    """Get response from Rose's enhanced OpenAI assistant with fixed API calls"""
+    try:
+        if not ASSISTANT_ID:
+            return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
+        
+        # Check if user already has an active run
+        if user_id in active_runs:
+            return "👑 Rose is currently analyzing your executive strategy. Please wait a moment..."
+        
+        # Mark user as having active run
+        active_runs[user_id] = True
+        
+        # Get user's thread
+        if user_id not in user_conversations:
+            thread = client.beta.threads.create()
+            user_conversations[user_id] = thread.id
+            print(f"👑 Created executive thread for user {user_id}")
+        
+        thread_id = user_conversations[user_id]
+        
+        # Clean message
+        clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
+        
+        # Enhanced message with executive planning focus
+        enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
+
+RESPONSE GUIDELINES:
+- Use professional executive formatting with strategic headers
+- SMART CALENDAR DETECTION: Automatically detect if this is a general or specific calendar query
+- GENERAL CALENDAR QUERIES (auto-include full schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
+- SPECIFIC CALENDAR QUERIES (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
+- When using calendar functions, provide insights from accessible calendars: {[name for name, _, _ in accessible_calendars]}
+- For planning research, include actionable productivity recommendations
+- Apply executive assistant tone: strategic, organized, action-oriented
+- Keep main content under 1200 characters for Discord efficiency
+- Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
+- IMPORTANT: Always provide strategic context and actionable next steps
+- All times are in Toronto timezone (America/Toronto)"""
+        
+        try:
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=enhanced_message
+            )
+        except Exception as e:
+            if "while a run" in str(e) and "is active" in str(e):
+                print("⏳ Waiting for previous executive analysis to complete...")
+                await asyncio.sleep(3)
+                try:
+                    client.beta.threads.messages.create(
+                        thread_id=thread_id,
+                        role="user",
+                        content=enhanced_message
+                    )
+                except Exception as e2:
+                    print(f"❌ Still can't add message: {e2}")
+                    return "👑 Executive office is busy. Please try again in a moment."
+            else:
+                print(f"❌ Message creation error: {e}")
+                return "❌ Error creating executive message. Please try again."
+        
+        # Run assistant with executive instructions
+        try:
+            run = client.beta.threads.runs.create(
+                thread_id=thread_id,
+                assistant_id=ASSISTANT_ID,
+                instructions="""You are Rose Ashcombe, executive assistant specialist with enhanced planning and calendar integration.
+
+EXECUTIVE APPROACH:
+- Use executive calendar functions to provide comprehensive scheduling insights
+- Apply strategic planning perspective with productivity optimization
+- Include actionable recommendations with clear timelines
+- Focus on high-impact activity identification and time management
+
+FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼) and provide organized, action-oriented guidance.
+
+STRUCTURE:
+👑 **Executive Summary:** [strategic overview with calendar insights]
+📊 **Strategic Analysis:** [research-backed recommendations]
+🎯 **Action Items:** [specific next steps with timing]
+
+Keep core content focused and always provide strategic context with calendar coordination."""
+            )
+        except Exception as e:
+            print(f"❌ Run creation error: {e}")
+            return "❌ Error starting executive analysis. Please try again."
+        
+        print(f"👑 Rose run created: {run.id}")
+        
+        # Wait for completion with function handling
+        for attempt in range(20):
+            try:
+                run_status = client.beta.threads.runs.retrieve(
+                    thread_id=thread_id,
+                    run_id=run.id
+                )
+            except Exception as e:
+                print(f"❌ Error retrieving run status: {e}")
+                await asyncio.sleep(2)
+                continue
+            
+            print(f"🔄 Status: {run_status.status} (attempt {attempt + 1})")
+            
+            if run_status.status == "completed":
+                break
+            elif run_status.status == "requires_action":
+                await handle_rose_functions_enhanced(run_status, thread_id)
+            elif run_status.status in ["failed", "cancelled", "expired"]:
+                print(f"❌ Run {run_status.status}")
+                return "❌ Executive analysis interrupted. Please try again with a different request."
+            
+            await asyncio.sleep(2)
+        else:
+            print("⏱️ Run timed out")
+            return "⏱️ Executive office is busy with strategic planning. Please try again in a moment."
+        
+        # Get response and apply enhanced formatting
+        try:
+            messages = client.beta.threads.messages.list(thread_id=thread_id, limit=5)
+            for msg in messages.data:
+                if msg.role == "assistant":
+                    response = msg.content[0].text.value
+                    return format_for_discord_rose(response)
+        except Exception as e:
+            print(f"❌ Error retrieving messages: {e}")
+            return "❌ Error retrieving executive guidance. Please try again."
+        
+        return "👑 Executive analysis unclear. Please try again with a different approach."
+        
+    except Exception as e:
+        print(f"❌ Rose error: {e}")
+        print(f"📋 Full traceback: {traceback.format_exc()}")
+        return "❌ Something went wrong with executive strategy. Please try again!"
+    finally:
+        # Always remove user from active runs when done
+        active_runs.pop(user_id, None)
+
+def format_for_discord_rose(response):
+    """Format response for Discord with error handling"""
+    try:
+        if not response or not isinstance(response, str):
+            return "👑 Executive strategy processing. Please try again."
+        
+        # Clean excessive spacing
+        response = response.replace('\n\n\n\n', '\n\n')
+        response = response.replace('\n\n\n', '\n\n')
+        
+        # Length management
+        if len(response) > 1900:
+            response = response[:1900] + "\n\n👑 *(Executive insights continue)*"
+        
+        return response.strip()
+        
+    except Exception as e:
+        print(f"❌ Discord formatting error: {e}")
+        return "👑 Executive message needs refinement. Please try again."
+
+# ============================================================================
+# ENHANCED MESSAGE HANDLING WITH COMPREHENSIVE ERROR HANDLING
+# ============================================================================
+
+async def send_long_message(original_message, response):
+    """Send response with length handling and error recovery"""
+    try:
+        if len(response) <= 2000:
+            await original_message.reply(response)
+        else:
+            # Split into chunks
+            chunks = []
+            current_chunk = ""
+            
+            for line in response.split('\n'):
+                if len(current_chunk + line + '\n') > 1900:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = line + '\n'
+                else:
+                    current_chunk += line + '\n'
