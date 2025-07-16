@@ -670,7 +670,7 @@ Keep core content focused and always provide strategic executive context."""
         print(f"👑 Rose run created: {run.id}")
         
         # Wait for completion with function handling
-             for attempt in range(20):
+          for attempt in range(20):
                try:
  
                    elif run_status.status in ["failed", "cancelled", "expired"]:
