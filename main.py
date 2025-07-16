@@ -108,6 +108,16 @@ print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
 # ENHANCED MULTI-CALENDAR FUNCTIONS
 # ============================================================================
 
+def format_event(start_time, summary, tz):
+    try:
+        # Handles dateTime format
+        local_start = datetime.datetime.fromisoformat(start_time).astimezone(tz)
+        return f"{local_start.strftime('%A, %B %d at %I:%M %p')}: {summary}"
+    except ValueError:
+        # Handles all-day events (date only)
+        local_start = tz.localize(datetime.datetime.strptime(start_time, "%Y-%m-%d"))
+        return f"{local_start.strftime('%A, %B %d')}: {summary}"
+
 def get_calendar_events(calendar_id, start_time, end_time):
     """Helper function to get events from a specific calendar"""
     if not calendar_service:
