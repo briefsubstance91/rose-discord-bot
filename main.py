@@ -670,14 +670,14 @@ Keep core content focused and always provide strategic executive context."""
         print(f"👑 Rose run created: {run.id}")
         
         # Wait for completion with function handling
-          for attempt in range(20):
-               try:
+        for attempt in range(20):
+            try:
  
-                   elif run_status.status in ["failed", "cancelled", "expired"]:
-                       print(f"❌ Run {run_status.status}")
-                       return (
-                           "❌ Executive analysis interrupted. "
-                           "Please try again with a different request."
+                elif run_status.status in ["failed", "cancelled", "expired"]:
+                    print(f"❌ Run {run_status.status}")
+                    return (
+                        "❌ Executive analysis interrupted. "
+                        "Please try again with a different request."
                        )
                    await asyncio.sleep(2)
                except Exception as e:
