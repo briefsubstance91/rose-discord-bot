@@ -671,10 +671,6 @@ Keep core content focused and always provide strategic executive context."""
         
         # Wait for completion with function handling
         for attempt in range(20):
-            try:
-                run_status = client.beta.threads.runs.retrieve(
-                    thread_id=thread_id,
-                    run_id=run.id
         try:
             for attempt in range(20):
                 run_status = client.beta.threads.runs.retrieve(
