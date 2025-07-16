@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (CALENDAR & API FIXES)
+ROSE ASHCOMBE - DISCORD BOT (ENHANCED CALENDAR DEBUG)
 Executive Assistant with Enhanced Error Handling, Planning & Calendar Functions
-FIXED: Calendar access permissions, OpenAI API deprecation warnings, error handling
+ENHANCED: Better calendar debugging, error handling, and iCloud calendar support
 """
 import pytz
 import discord
@@ -27,7 +27,7 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Calendar & API Fixed)"
+ASSISTANT_ROLE = "Executive Assistant (Enhanced Calendar Debug)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -74,38 +74,103 @@ except Exception as e:
 # Enhanced Google Calendar setup with comprehensive error handling
 calendar_service = None
 accessible_calendars = []
+service_account_email = None
+
+def get_all_accessible_calendars():
+    """Get list of all calendars accessible to service account"""
+    if not calendar_service:
+        return []
+    
+    try:
+        calendar_list = calendar_service.calendarList().list().execute()
+        calendars = []
+        
+        print(f"📋 Found {len(calendar_list.get('items', []))} accessible calendars:")
+        
+        for calendar in calendar_list.get('items', []):
+            cal_id = calendar['id']
+            summary = calendar.get('summary', 'Unnamed')
+            access_role = calendar.get('accessRole', 'unknown')
+            
+            print(f"   • {summary}")
+            print(f"     ID: {cal_id}")
+            print(f"     Access: {access_role}")
+            
+            # Identify imported calendars
+            if 'import.calendar.google.com' in cal_id:
+                print(f"     🍎 Imported calendar (likely iCloud)")
+            elif cal_id == 'primary':
+                print(f"     📅 Primary Google Calendar")
+            elif '@group.calendar.google.com' in cal_id:
+                print(f"     👥 Shared Google Calendar")
+            
+            calendars.append((summary, cal_id, access_role))
+            print()
+        
+        return calendars
+        
+    except Exception as e:
+        print(f"❌ Error listing calendars: {e}")
+        return []
 
 def test_calendar_access(calendar_id, calendar_name):
-    """Test if we can access a specific calendar"""
+    """Enhanced calendar testing with better error messages"""
     if not calendar_service or not calendar_id:
         return False
     
     try:
-        # Try to get calendar metadata
-        calendar_service.calendars().get(calendarId=calendar_id).execute()
+        # Test calendar metadata
+        calendar_info = calendar_service.calendars().get(calendarId=calendar_id).execute()
+        print(f"✅ {calendar_name} metadata retrieved")
         
-        # Try to get recent events (past 24 hours)
+        # Test event access with recent events
         now = datetime.now(pytz.UTC)
-        yesterday = now - timedelta(days=1)
+        past_24h = now - timedelta(hours=24)
         
-        calendar_service.events().list(
+        events_result = calendar_service.events().list(
             calendarId=calendar_id,
-            timeMin=yesterday.isoformat(),
+            timeMin=past_24h.isoformat(),
             timeMax=now.isoformat(),
-            maxResults=1,
+            maxResults=5,
             singleEvents=True
         ).execute()
         
-        print(f"✅ Calendar access verified: {calendar_name} ({calendar_id})")
+        events = events_result.get('items', [])
+        print(f"✅ {calendar_name} events retrieved: {len(events)} events")
+        
+        # Additional check: try to get calendar's access role
+        calendar_list = calendar_service.calendarList().list().execute()
+        for cal in calendar_list.get('items', []):
+            if cal['id'] == calendar_id:
+                access_role = cal.get('accessRole', 'unknown')
+                print(f"📋 {calendar_name} access role: {access_role}")
+                break
+        
         return True
         
     except HttpError as e:
-        print(f"❌ Calendar access failed: {calendar_name} ({calendar_id}) - Error: {e}")
+        error_code = e.resp.status
+        error_details = e.error_details if hasattr(e, 'error_details') else str(e)
+        
+        print(f"❌ {calendar_name} HTTP Error {error_code}: {error_details}")
+        
+        if error_code == 404:
+            print(f"💡 {calendar_name}: Calendar not found - check ID format")
+            print(f"   ID used: {calendar_id}")
+        elif error_code == 403:
+            print(f"💡 {calendar_name}: Permission denied")
+            print(f"   Suggestion: Share calendar with service account")
+        elif error_code == 400:
+            print(f"💡 {calendar_name}: Bad request - malformed calendar ID")
+        
         return False
+        
     except Exception as e:
-        print(f"❌ Calendar test error: {calendar_name} - {e}")
+        print(f"❌ {calendar_name} unexpected error: {e}")
+        print(f"   Exception type: {type(e).__name__}")
         return False
 
+# Initialize Google Calendar service with enhanced debugging
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
@@ -119,32 +184,52 @@ try:
         calendar_service = build('calendar', 'v3', credentials=credentials)
         print("✅ Google Calendar service initialized")
         
-        # Test calendar access and build accessible calendars list
-        if GOOGLE_CALENDAR_ID:
-            if test_calendar_access(GOOGLE_CALENDAR_ID, "BG Calendar"):
-                accessible_calendars.append(("BG Calendar", GOOGLE_CALENDAR_ID, "calendar"))
+        # Get service account email for sharing instructions
+        service_account_email = credentials_info.get('client_email')
+        print(f"📧 Service Account Email: {service_account_email}")
+        print(f"💡 Share calendars with this email for access")
         
-        if GOOGLE_TASKS_CALENDAR_ID:
-            if test_calendar_access(GOOGLE_TASKS_CALENDAR_ID, "BG Tasks"):
-                accessible_calendars.append(("BG Tasks", GOOGLE_TASKS_CALENDAR_ID, "tasks"))
+        # List all accessible calendars first
+        all_calendars = get_all_accessible_calendars()
         
-        if BRITT_ICLOUD_CALENDAR_ID:
-            if test_calendar_access(BRITT_ICLOUD_CALENDAR_ID, "Britt iCloud"):
-                accessible_calendars.append(("Britt iCloud", BRITT_ICLOUD_CALENDAR_ID, "britt"))
+        # Test specific calendars
+        calendars_to_test = [
+            ("BG Calendar", GOOGLE_CALENDAR_ID),
+            ("BG Tasks", GOOGLE_TASKS_CALENDAR_ID),
+            ("Britt iCloud", BRITT_ICLOUD_CALENDAR_ID)
+        ]
         
-        # Fall back to primary calendar if no specific calendars work
+        accessible_calendars = []
+        
+        for name, calendar_id in calendars_to_test:
+            if calendar_id and test_calendar_access(calendar_id, name):
+                # Determine calendar type
+                if "task" in name.lower():
+                    accessible_calendars.append((name, calendar_id, "tasks"))
+                elif "britt" in name.lower():
+                    accessible_calendars.append((name, calendar_id, "britt"))
+                else:
+                    accessible_calendars.append((name, calendar_id, "calendar"))
+        
+        # If no calendars work, try primary as fallback
         if not accessible_calendars:
+            print("⚠️ No configured calendars accessible, testing primary...")
             if test_calendar_access('primary', "Primary"):
                 accessible_calendars.append(("Primary", "primary", "calendar"))
         
-        print(f"📅 Accessible calendars: {len(accessible_calendars)}")
+        print(f"\n📅 Final accessible calendars: {len(accessible_calendars)}")
         for name, _, _ in accessible_calendars:
-            print(f"   • {name}")
+            print(f"   ✅ {name}")
         
         if not accessible_calendars:
-            print("⚠️ No accessible calendars found - calendar functions will be limited")
+            print("❌ No accessible calendars found")
+            print("💡 Next steps:")
+            print("   1. Check service account email above")
+            print("   2. Share calendars with service account")
+            print("   3. Verify calendar IDs are correct")
+            
     else:
-        print("⚠️ Google Calendar credentials not found - calendar functions disabled")
+        print("⚠️ Google Calendar credentials not found")
         
 except Exception as e:
     print(f"❌ Google Calendar setup error: {e}")
@@ -630,72 +715,3 @@ RESPONSE GUIDELINES:
             else:
                 print(f"❌ Message creation error: {e}")
                 return "❌ Error creating executive message. Please try again."
-        
-        # Run assistant with executive instructions
-        try:
-            run = client.beta.threads.runs.create(
-                thread_id=thread_id,
-                assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant with enhanced calendar and planning research capabilities.
-
-EXECUTIVE APPROACH:
-- Use calendar functions for insights from accessible calendars
-- Use planning_search for productivity and planning information
-- SMART CALENDAR DETECTION: Automatically detect general vs specific calendar queries
-- GENERAL QUERIES: Auto-call get_today_schedule() and provide executive insights
-- SPECIFIC QUERIES: Answer directly without full schedule
-- Apply strategic thinking with systems optimization
-- Provide actionable recommendations with clear timelines
-- Focus on executive-level insights and life management
-- All times are in Toronto timezone (America/Toronto)
-
-CALENDAR QUERY DETECTION:
-- GENERAL (auto-include schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
-- SPECIFIC (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
-
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 💼) and provide organized, action-oriented guidance.
-
-EXECUTIVE STRUCTURE:
-👑 **Executive Summary:** [strategic overview with key insights]
-📅 **Calendar Overview:** [schedule from get_today_schedule() for general queries]
-💼 **Executive Insights:** [brief insights: event count, next meeting, largest time block]
-📊 **Action Items:** [specific next steps with timing]
-
-Keep core content focused and always provide strategic executive context."""
-            )
-        except Exception as e:
-            print(f"❌ Run creation error: {e}")
-            return "❌ Error starting executive analysis. Please try again."
-        
-        print(f"👑 Rose run created: {run.id}")
-        
-        # Wait for completion with function handling
-        for attempt in range(20):
-            try:
-                run_status = client.runs.get(run.id)
-                if run_status.status == "completed":
-                    break
-                elif run_status.status in ["failed", "cancelled", "expired"]:
-                    print(f"❌ Run {run_status.status}")
-                    return (
-                        "❌ Executive analysis interrupted. "
-                        "Please try again with a different request."
-                    )
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1} failed with error: {e}")
-                print(f"❌ Error during run lifecycle: {e}")
-                return "❌ An unexpected error occurred during analysis."
-            await asyncio.sleep(2)
-
-        print("⏱️ Run timed out")
-        return (
-            "⏱️ Executive office is busy analyzing complex strategies. "
-            "Please try again in a moment."
-        )
-        return (
-            "⏱️ Executive office is busy analyzing complex strategies. "
-            "Please try again in a moment."
-        )
-    finally:
-        # Clear active run status regardless of outcome
-        active_runs.pop(user_id, None)
