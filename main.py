@@ -168,11 +168,10 @@ except Exception as e:
     calendar_service = None
     accessible_calendars = []
 
-# Memory and duplicate prevention systems
+# Memory and duplicate prevention systems - following team patterns
 user_conversations = {}
 processing_messages = set()
 last_response_time = {}
-active_runs = {}
 
 print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
 
@@ -1108,19 +1107,18 @@ async def get_rose_response(message, user_id):
             return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
         
         # Check if user already has an active run
-        if user_id in active_runs:
+        if user_id in user_conversations and user_conversations[user_id].get('active', False):
             return "👑 Rose is currently analyzing your executive strategy. Please wait a moment..."
-        
-        # Mark user as having active run
-        active_runs[user_id] = True
         
         # Get user's thread
         if user_id not in user_conversations:
             thread = client.beta.threads.create()
-            user_conversations[user_id] = thread.id
+            user_conversations[user_id] = {'thread_id': thread.id, 'active': False}
             print(f"👑 Created executive thread for user {user_id}")
         
-        thread_id = user_conversations[user_id]
+        # Mark as active
+        user_conversations[user_id]['active'] = True
+        thread_id = user_conversations[user_id]['thread_id']
         
         # Clean message
         clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
@@ -1250,7 +1248,8 @@ Keep core content focused and always provide strategic context with calendar coo
         return "❌ Something went wrong with executive strategy. Please try again!"
     finally:
         # Always remove user from active runs when done
-        active_runs.pop(user_id, None)
+        if user_id in user_conversations:
+            user_conversations[user_id]['active'] = False
 
 def format_for_discord_rose(response):
     """Format response for Discord with error handling"""
@@ -1342,88 +1341,81 @@ async def on_ready():
         print(f"❌ Startup error: {e}")
 
 @bot.event
+async def on_error(event, *args, **kwargs):
+    """Global error handler"""
+    print(f"❌ Discord error in {event}: {traceback.format_exc()}")
+
+@bot.event
 async def on_message(message):
-    """Enhanced message handling with duplicate prevention and error recovery"""
-    # Skip self-messages
-    if message.author == bot.user:
-        return
-    
-    # Create message key for duplicate prevention
-    message_key = f"{message.author.id}_{hash(message.content)}_{int(time.time() // 10)}"
-    
-    # Skip if message is being processed
-    if message_key in processing_messages:
-        return
-    
-    # Rate limiting check
-    user_id = str(message.author.id)
-    current_time = time.time()
-    
-    if user_id in last_response_time:
-        time_since_last = current_time - last_response_time[user_id]
-        if time_since_last < 3:  # 3 second cooldown
-            return
-    
-    # Channel filtering with enhanced logic
-    channel_name = message.channel.name.lower() if hasattr(message.channel, 'name') else 'dm'
-    is_dm = isinstance(message.channel, discord.DMChannel)
-    is_mention = bot.user and bot.user.mentioned_in(message)
-    is_allowed_channel = any(allowed in channel_name for allowed in ALLOWED_CHANNELS)
-    
-    # Process if: DM, mention, or allowed channel
-    if not (is_dm or is_mention or is_allowed_channel):
-        return
-    
-    # Executive assistant trigger detection
-    rose_triggers = [
-        'rose', 'calendar', 'schedule', 'planning', 'executive', 
-        'briefing', 'meeting', 'appointment', 'strategy', 'productivity',
-        'move', 'reschedule', 'create', 'delete', 'task', 'event'
-    ]
-    
-    message_lower = message.content.lower()
-    has_trigger = any(trigger in message_lower for trigger in rose_triggers)
-    
-    # Skip if no trigger and not DM/mention
-    if not (is_dm or is_mention or has_trigger):
-        return
-    
-    # Mark as processing
-    processing_messages.add(message_key)
-    last_response_time[user_id] = current_time
-    
+    """Enhanced message handling following team patterns"""
     try:
-        # Show typing indicator
-        async with message.channel.typing():
-            # Get Rose's response
-            response = await get_rose_response(message.content, user_id)
-            
-            # Send response
-            await send_long_message(message, response)
-            
-    except discord.HTTPException as e:
-        print(f"❌ Discord HTTP error: {e}")
-        try:
-            await message.reply("👑 Executive office experiencing technical difficulties. Please try again.")
-        except:
-            pass
-    except Exception as e:
-        print(f"❌ Message handling error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-        try:
-            await message.reply("❌ Executive systems error. Please try again in a moment.")
-        except:
-            pass
-    finally:
-        # Always clean up
-        processing_messages.discard(message_key)
+        # Skip bot's own messages
+        if message.author == bot.user:
+            return
         
-    # Process other commands
-    await bot.process_commands(message)
+        # Process commands first
+        await bot.process_commands(message)
+        
+        # Only respond in allowed channels or DMs
+        channel_name = message.channel.name.lower() if hasattr(message.channel, 'name') else 'dm'
+        is_dm = isinstance(message.channel, discord.DMChannel)
+        is_allowed_channel = any(allowed in channel_name for allowed in ALLOWED_CHANNELS)
+        
+        if not (is_dm or is_allowed_channel):
+            return
+
+        # Respond to mentions or DMs
+        if bot.user.mentioned_in(message) or is_dm:
+            
+            # DUPLICATE PREVENTION
+            message_key = f"{message.author.id}_{message.content[:50]}"
+            current_time = time.time()
+            
+            # Check if we're already processing this message
+            if message_key in processing_messages:
+                return
+            
+            # Check if user sent same message too quickly (within 5 seconds)
+            if message.author.id in last_response_time:
+                if current_time - last_response_time[message.author.id] < 5:
+                    return
+            
+            # Mark message as being processed
+            processing_messages.add(message_key)
+            last_response_time[message.author.id] = current_time
+            
+            try:
+                async with message.channel.typing():
+                    response = await get_rose_response(message.content, message.author.id)
+                    await send_long_message(message, response)
+            except Exception as e:
+                print(f"❌ Message error: {e}")
+                print(f"📋 Message traceback: {traceback.format_exc()}")
+                try:
+                    await message.reply("❌ Something went wrong with executive consultation. Please try again!")
+                except:
+                    pass
+            finally:
+                # Always clean up
+                processing_messages.discard(message_key)
+                    
+    except Exception as e:
+        print(f"❌ Message event error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
 
 # ============================================================================
-# ENHANCED COMMANDS WITH COMPLETE CALENDAR MANAGEMENT
+# STANDARDIZED COMMANDS FOLLOWING TEAM PATTERNS
 # ============================================================================
+
+@bot.command(name='ping')
+async def ping_command(ctx):
+    """Test Rose's connectivity with executive flair"""
+    try:
+        latency = round(bot.latency * 1000)
+        await ctx.send(f"👑 Pong! Executive response time: {latency}ms")
+    except Exception as e:
+        print(f"❌ Ping command error: {e}")
+        await ctx.send("👑 Executive ping experiencing issues.")
 
 @bot.command(name='help')
 async def help_command(ctx):
@@ -1451,6 +1443,7 @@ async def help_command(ctx):
 
 **💼 Executive Functions:**
 • `!status` - System and calendar status
+• `!ping` - Test connectivity
 • `!help` - This command menu
 
 **🎯 Enhanced Features:**
