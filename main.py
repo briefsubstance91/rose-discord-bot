@@ -486,6 +486,220 @@ async def planning_search_enhanced(query, focus_area="general", num_results=3):
         return f"🔍 Planning search error: Please try again", []
 
 # ============================================================================
+# CALENDAR EVENT MANAGEMENT FUNCTIONS (PHASE 2)
+# ============================================================================
+
+def create_calendar_event(title, start_time, end_time, calendar_type="primary", description=""):
+    """Create a new calendar event"""
+    if not calendar_service:
+        return "📅 **Event Creation:** Calendar integration not configured"
+    
+    # Determine which calendar to use
+    calendar_id = "primary"
+    if calendar_type == "tasks" and GOOGLE_TASKS_CALENDAR_ID:
+        calendar_id = GOOGLE_TASKS_CALENDAR_ID
+    elif calendar_type == "britt" and BRITT_ICLOUD_CALENDAR_ID:
+        calendar_id = BRITT_ICLOUD_CALENDAR_ID
+    elif calendar_type == "primary" and GOOGLE_CALENDAR_ID:
+        calendar_id = GOOGLE_CALENDAR_ID
+    
+    try:
+        # Create event object
+        event = {
+            'summary': title,
+            'start': {
+                'dateTime': start_time,
+                'timeZone': 'America/Toronto',
+            },
+            'end': {
+                'dateTime': end_time,
+                'timeZone': 'America/Toronto',
+            },
+            'description': description,
+        }
+        
+        # Create the event
+        created_event = calendar_service.events().insert(
+            calendarId=calendar_id,
+            body=event
+        ).execute()
+        
+        # Format confirmation
+        toronto_tz = pytz.timezone('America/Toronto')
+        start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        
+        calendar_name = "Tasks" if calendar_type == "tasks" else "Britt iCloud" if calendar_type == "britt" else "Primary"
+        
+        return f"✅ **Event Created:** {title}\n📅 **When:** {start_dt.strftime('%A, %B %d at %I:%M %p')} - {end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {calendar_name}\n🔗 **Link:** {created_event.get('htmlLink', 'Available in calendar')}"
+        
+    except Exception as e:
+        print(f"❌ Error creating calendar event: {e}")
+        return f"❌ **Event Creation Failed:** Unable to create '{title}' - please try again or create manually"
+
+def reschedule_event(event_search, new_start_time, new_end_time):
+    """Reschedule an existing calendar event"""
+    if not calendar_service:
+        return "📅 **Event Rescheduling:** Calendar integration not configured"
+    
+    try:
+        # Search for the event across all calendars
+        toronto_tz = pytz.timezone('America/Toronto')
+        today = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        week_later = today + timedelta(days=7)
+        
+        today_utc = today.astimezone(pytz.UTC)
+        week_later_utc = week_later.astimezone(pytz.UTC)
+        
+        found_event = None
+        found_calendar = None
+        
+        # Search in all calendars
+        for calendar_id, calendar_name in [
+            (GOOGLE_CALENDAR_ID, "Primary"),
+            (GOOGLE_TASKS_CALENDAR_ID, "Tasks"),
+            (BRITT_ICLOUD_CALENDAR_ID, "Britt iCloud")
+        ]:
+            if not calendar_id:
+                continue
+                
+            try:
+                events = calendar_service.events().list(
+                    calendarId=calendar_id,
+                    timeMin=today_utc.isoformat(),
+                    timeMax=week_later_utc.isoformat(),
+                    q=event_search,
+                    singleEvents=True,
+                    orderBy='startTime'
+                ).execute()
+                
+                if events.get('items'):
+                    found_event = events['items'][0]  # Get first match
+                    found_calendar = calendar_id
+                    break
+                    
+            except Exception as e:
+                print(f"❌ Error searching calendar {calendar_id}: {e}")
+                continue
+        
+        if not found_event:
+            return f"❌ **Event Not Found:** No event matching '{event_search}' found in your calendars"
+        
+        # Update the event
+        found_event['start'] = {
+            'dateTime': new_start_time,
+            'timeZone': 'America/Toronto',
+        }
+        found_event['end'] = {
+            'dateTime': new_end_time,
+            'timeZone': 'America/Toronto',
+        }
+        
+        updated_event = calendar_service.events().update(
+            calendarId=found_calendar,
+            eventId=found_event['id'],
+            body=found_event
+        ).execute()
+        
+        # Format confirmation
+        start_dt = datetime.fromisoformat(new_start_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        end_dt = datetime.fromisoformat(new_end_time.replace('Z', '+00:00')).astimezone(toronto_tz)
+        
+        return f"✅ **Event Rescheduled:** {found_event['summary']}\n📅 **New Time:** {start_dt.strftime('%A, %B %d at %I:%M %p')} - {end_dt.strftime('%I:%M %p')}\n🔗 **Link:** {updated_event.get('htmlLink', 'Available in calendar')}"
+        
+    except Exception as e:
+        print(f"❌ Error rescheduling event: {e}")
+        return f"❌ **Rescheduling Failed:** Unable to reschedule '{event_search}' - please try again or update manually"
+
+def find_meeting_time(duration_minutes, preferred_day=None, preferred_start_hour=9, preferred_end_hour=17):
+    """Find available meeting time slots"""
+    if not calendar_service:
+        return "📅 **Meeting Time Search:** Calendar integration not configured"
+    
+    try:
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Set search range
+        if preferred_day:
+            try:
+                search_start = datetime.strptime(preferred_day, '%Y-%m-%d').replace(tzinfo=toronto_tz)
+            except:
+                search_start = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            search_start = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        search_end = search_start + timedelta(days=7)  # Search next 7 days
+        
+        # Convert to UTC for API
+        search_start_utc = search_start.astimezone(pytz.UTC)
+        search_end_utc = search_end.astimezone(pytz.UTC)
+        
+        # Get all events from all calendars
+        all_events = []
+        
+        for calendar_id in [GOOGLE_CALENDAR_ID, GOOGLE_TASKS_CALENDAR_ID, BRITT_ICLOUD_CALENDAR_ID]:
+            if not calendar_id:
+                continue
+                
+            try:
+                events = get_calendar_events(calendar_id, search_start_utc, search_end_utc)
+                all_events.extend(events)
+            except Exception as e:
+                print(f"❌ Error getting events from calendar: {e}")
+                continue
+        
+        # Find gaps between events
+        available_slots = []
+        current_time = search_start.replace(hour=preferred_start_hour, minute=0, second=0, microsecond=0)
+        
+        for day in range(7):  # Check next 7 days
+            day_start = current_time.replace(hour=preferred_start_hour)
+            day_end = current_time.replace(hour=preferred_end_hour)
+            
+            # Get events for this day
+            day_events = []
+            for event in all_events:
+                event_start = event['start'].get('dateTime', event['start'].get('date'))
+                if 'T' in event_start:
+                    event_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00')).astimezone(toronto_tz)
+                    if event_dt.date() == current_time.date():
+                        day_events.append(event_dt)
+            
+            # Sort events by time
+            day_events.sort()
+            
+            # Find gaps
+            if not day_events:
+                # Whole day available
+                available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {day_start.strftime('%I:%M %p')} - {day_end.strftime('%I:%M %p')} (Full day available)")
+            else:
+                # Check gap before first event
+                if day_events[0] - day_start >= timedelta(minutes=duration_minutes):
+                    available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {day_start.strftime('%I:%M %p')} - {day_events[0].strftime('%I:%M %p')}")
+                
+                # Check gaps between events
+                for i in range(len(day_events) - 1):
+                    gap_start = day_events[i] + timedelta(hours=1)  # Assume 1 hour meetings
+                    gap_end = day_events[i + 1]
+                    if gap_end - gap_start >= timedelta(minutes=duration_minutes):
+                        available_slots.append(f"• {current_time.strftime('%A, %B %d')}: {gap_start.strftime('%I:%M %p')} - {gap_end.strftime('%I:%M %p')}")
+            
+            current_time += timedelta(days=1)
+            
+            # Limit to 5 suggestions
+            if len(available_slots) >= 5:
+                break
+        
+        if not available_slots:
+            return f"⏰ **Meeting Time Search:** No {duration_minutes}-minute slots found in next 7 days during business hours\n\n💡 **Suggestion:** Consider extending search range or adjusting meeting duration"
+        
+        return f"⏰ **Available Meeting Times ({duration_minutes} minutes):**\n\n" + "\n".join(available_slots[:5])
+        
+    except Exception as e:
+        print(f"❌ Error finding meeting time: {e}")
+        return f"❌ **Meeting Time Search Failed:** Unable to find available slots - please check calendar manually"
+
+# ============================================================================
 # ENHANCED FUNCTION HANDLING
 # ============================================================================
 
@@ -545,6 +759,36 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 
             elif function_name == "get_morning_briefing":
                 output = get_morning_briefing()
+                
+            elif function_name == "create_calendar_event":
+                title = arguments.get('title', '')
+                start_time = arguments.get('start_time', '')
+                end_time = arguments.get('end_time', '')
+                calendar_type = arguments.get('calendar_type', 'primary')
+                description = arguments.get('description', '')
+                
+                if title and start_time and end_time:
+                    output = create_calendar_event(title, start_time, end_time, calendar_type, description)
+                else:
+                    output = "❌ **Event Creation:** Missing required details (title, start time, end time)"
+                    
+            elif function_name == "reschedule_event":
+                event_search = arguments.get('event_search', '')
+                new_start_time = arguments.get('new_start_time', '')
+                new_end_time = arguments.get('new_end_time', '')
+                
+                if event_search and new_start_time and new_end_time:
+                    output = reschedule_event(event_search, new_start_time, new_end_time)
+                else:
+                    output = "❌ **Event Rescheduling:** Missing required details (event search, new start time, new end time)"
+                    
+            elif function_name == "find_meeting_time":
+                duration_minutes = arguments.get('duration_minutes', 60)
+                preferred_day = arguments.get('preferred_day', None)
+                preferred_start_hour = arguments.get('preferred_start_hour', 9)
+                preferred_end_hour = arguments.get('preferred_end_hour', 17)
+                
+                output = find_meeting_time(duration_minutes, preferred_day, preferred_start_hour, preferred_end_hour)
                 
             elif function_name == "find_free_time":
                 duration = arguments.get('duration', 60)
@@ -616,17 +860,26 @@ async def get_rose_response(message, user_id):
         # Clean message
         clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
         
-        # Enhanced message with executive planning focus
+        # Enhanced message with executive planning focus + calendar intelligence
         enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
 
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
+- SMART CALENDAR DETECTION: Automatically detect if this is a general or specific calendar query
+- GENERAL CALENDAR QUERIES (auto-include full schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
+- SPECIFIC CALENDAR QUERIES (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
 - When using calendar functions, provide triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
 - For planning research, include actionable productivity recommendations
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
-- IMPORTANT: Always provide strategic context and actionable next steps"""
+- IMPORTANT: Always provide strategic context and actionable next steps
+
+CALENDAR MANAGEMENT CAPABILITIES:
+- Create calendar events with create_calendar_event()
+- Reschedule existing events with reschedule_event()
+- Find available meeting times with find_meeting_time()
+- All times are in Toronto timezone (America/Toronto)"""
         
         try:
             client.beta.threads.messages.create(
@@ -656,22 +909,31 @@ RESPONSE GUIDELINES:
             run = client.beta.threads.runs.create(
                 thread_id=thread_id,
                 assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant with enhanced triple-calendar and planning research capabilities.
+                instructions="""You are Rose Ashcombe, executive assistant with enhanced triple-calendar and planning research capabilities plus calendar event management.
 
 EXECUTIVE APPROACH:
 - Use calendar functions for triple-calendar insights (BG Calendar + BG Tasks + Britt iCloud)
 - Use planning_search for productivity and planning information
+- SMART CALENDAR DETECTION: Automatically detect general vs specific calendar queries
+- GENERAL QUERIES: Auto-call get_today_schedule() and provide executive insights
+- SPECIFIC QUERIES: Answer directly without full schedule
+- Use create_calendar_event(), reschedule_event(), find_meeting_time() for calendar management
 - Apply strategic thinking with systems optimization
 - Provide actionable recommendations with clear timelines
 - Focus on executive-level insights and life management
 - All times are in Toronto timezone (America/Toronto)
 
+CALENDAR QUERY DETECTION:
+- GENERAL (auto-include schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
+- SPECIFIC (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
+
 FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 📧 💼) and provide organized, action-oriented guidance.
 
-STRUCTURE:
+ENHANCED EXECUTIVE STRUCTURE:
 👑 **Executive Summary:** [strategic overview with key insights]
-📊 **Analysis:** [research-backed recommendations]
-💼 **Action Items:** [specific next steps with timing]
+📅 **Calendar Overview:** [schedule from get_today_schedule() for general queries]
+💼 **Executive Insights:** [brief insights: event count, next meeting, largest time block]
+📊 **Action Items:** [specific next steps with timing]
 
 Keep core content focused and always provide strategic executive context."""
             )
@@ -888,19 +1150,13 @@ async def on_message(message):
 
 @bot.command(name='ping')
 async def ping_command(ctx):
-    """Test Rose's responsiveness"""
+    """Test Rose's responsiveness with team-consistent styling"""
     try:
         latency = round(bot.latency * 1000)
-        embed = discord.Embed(
-            title="👑 Rose Executive Status Check",
-            color=0xd4af37
-        )
-        embed.add_field(name="📡 Latency", value=f"{latency}ms", inline=True)
-        embed.add_field(name="📅 Triple Calendar", value="✅ Connected" if calendar_service else "❌ Offline", inline=True)
-        embed.add_field(name="🔍 Search", value="✅ Active" if BRAVE_API_KEY else "❌ Disabled", inline=True)
-        await ctx.send(embed=embed)
+        await ctx.send(f"👑 Pong! Latency: {latency}ms - Executive operations running smoothly!")
     except Exception as e:
         print(f"❌ Ping command error: {e}")
+        await ctx.send("👑 Pong! Executive operations active!")
 
 @bot.command(name='status')
 async def status_command(ctx):
