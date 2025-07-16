@@ -1131,6 +1131,7 @@ RESPONSE GUIDELINES:
 - SMART CALENDAR DETECTION: Automatically detect if this is a general or specific calendar query
 - GENERAL CALENDAR QUERIES (auto-include full schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
 - SPECIFIC CALENDAR QUERIES (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
+- BRIEFING REQUESTS: "morning briefing", "daily briefing", "executive briefing", "give me a briefing", "brief me", "what's my day like"
 - TASK MANAGEMENT: Can move, create, reschedule, delete events between calendars
 - AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
 - CALENDAR CAPABILITIES: Create events, reschedule, move between calendars, bulk operations, smart scheduling
@@ -1140,7 +1141,7 @@ RESPONSE GUIDELINES:
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
 - IMPORTANT: Always provide strategic context and actionable next steps
 - All times are in Toronto timezone (America/Toronto)
-- ENHANCED FEATURES: Smart scheduling, bulk rescheduling, conflict detection"""
+- ENHANCED FEATURES: Smart scheduling, bulk rescheduling, conflict detection, morning briefings"""
         
         try:
             client.beta.threads.messages.create(
@@ -1178,6 +1179,7 @@ EXECUTIVE APPROACH:
 - Include actionable recommendations with clear timelines
 - Focus on high-impact activity identification and time management
 - Leverage advanced calendar management: move tasks between calendars, bulk operations, smart scheduling
+- BRIEFING INTELLIGENCE: For briefing requests, automatically use get_morning_briefing() function
 
 CALENDAR CAPABILITIES:
 - Create events in any accessible calendar
@@ -1426,8 +1428,11 @@ async def help_command(ctx):
 **📅 Calendar & Scheduling:**
 • `!today` - Today's executive schedule
 • `!upcoming [days]` - Upcoming events (default 7 days)
-• `!briefing` - Morning executive briefing
-• `!calendar` - Quick calendar overview
+• `!briefing` / `!daily` / `!morning` - Morning executive briefing
+• `!calendar` - Quick calendar overview with AI insights
+• `!schedule [timeframe]` - Flexible schedule view (today/week/month/[number])
+• `!agenda` - Comprehensive executive agenda overview
+• `!overview` - Complete executive overview (briefing + 3-day outlook)
 
 **🔧 Task & Event Management:**
 • `!create` - Create new calendar events
@@ -1460,11 +1465,17 @@ async def help_command(ctx):
 • Available in: {', '.join(ALLOWED_CHANNELS)}
 
 **💡 Example Commands:**
+• `!briefing` or `!daily` - Get comprehensive morning briefing
+• `!today` - See today's complete schedule
+• `!overview` - Complete executive overview with 3-day outlook
+• `!schedule week` - View this week's agenda
+• `!upcoming 3` - See next 3 days of events
+• `!agenda` - Comprehensive agenda overview
+• "Give me my morning briefing" - Natural language briefing request
+• "What's my day like?" - Natural language schedule request
 • "Move my dentist appointment to my tasks calendar"
 • "Reschedule all team meetings to next Tuesday"
 • "Find me 2 hours this week for deep work"
-• "Create a quarterly review meeting next Friday at 2pm"
-• "Delete the cancelled lunch meeting"
 """
         
         await ctx.send(help_text)
@@ -1532,7 +1543,144 @@ async def status_command(ctx):
         
     except Exception as e:
         print(f"❌ Status command error: {e}")
-        await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")
+@bot.command(name='today')
+async def today_command(ctx):
+    """Today's executive schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await ctx.send(schedule)
+    except Exception as e:
+        print(f"❌ Today command error: {e}")
+        await ctx.send("👑 Today's schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            # Limit days to reasonable range
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await ctx.send(events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("👑 Upcoming events unavailable. Please try again.")
+
+@bot.command(name='briefing')
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("👑 Executive briefing unavailable. Please try again.")
+
+@bot.command(name='calendar')
+async def calendar_command(ctx):
+    """Quick calendar overview command"""
+    try:
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            calendar_query = "what's on my calendar today and upcoming strategic overview executive summary"
+            response = await get_rose_response(calendar_query, user_id)
+            await send_long_message(ctx.message, response)
+    except Exception as e:
+        print(f"❌ Calendar command error: {e}")
+        await ctx.send("👑 Calendar overview unavailable. Please try again.")
+
+@bot.command(name='schedule')
+async def schedule_command(ctx, *, timeframe: str = "today"):
+    """Flexible schedule command - can show today, upcoming, or specific timeframes"""
+    try:
+        async with ctx.typing():
+            timeframe_lower = timeframe.lower()
+            
+            if any(word in timeframe_lower for word in ["today", "now", "current"]):
+                response = get_today_schedule()
+            elif any(word in timeframe_lower for word in ["tomorrow", "next"]):
+                response = get_upcoming_events(1)
+            elif any(word in timeframe_lower for word in ["week", "7"]):
+                response = get_upcoming_events(7)
+            elif any(word in timeframe_lower for word in ["month", "30"]):
+                response = get_upcoming_events(30)
+            elif timeframe_lower.isdigit():
+                days = int(timeframe_lower)
+                days = max(1, min(days, 30))  # Limit range
+                response = get_upcoming_events(days)
+            else:
+                # Default to today
+                response = get_today_schedule()
+            
+            await ctx.send(response)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("👑 Schedule view unavailable. Please try again.")
+
+@bot.command(name='agenda')
+async def agenda_command(ctx):
+    """Executive agenda command - comprehensive view"""
+    try:
+        async with ctx.typing():
+            # Get comprehensive agenda view
+            today_schedule = get_today_schedule()
+            tomorrow_events = get_upcoming_events(1)
+            
+            agenda = f"📋 **Executive Agenda Overview**\n\n{today_schedule}\n\n**Tomorrow:**\n{tomorrow_events}"
+            
+            # Limit response length
+            if len(agenda) > 1900:
+                agenda = agenda[:1900] + "\n\n👑 *Use `!today` and `!upcoming` for detailed views*"
+            
+            await ctx.send(agenda)
+    except Exception as e:
+        print(f"❌ Agenda command error: {e}")
+@bot.command(name='daily')
+async def daily_command(ctx):
+    """Daily executive briefing - alias for briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Daily briefing command error: {e}")
+        await ctx.send("👑 Daily executive briefing unavailable. Please try again.")
+
+@bot.command(name='morning')
+async def morning_command(ctx):
+    """Morning briefing command - alias for briefing"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Morning briefing command error: {e}")
+        await ctx.send("👑 Morning executive briefing unavailable. Please try again.")
+
+@bot.command(name='overview')
+async def overview_command(ctx):
+    """Executive overview command - comprehensive briefing"""
+    try:
+        async with ctx.typing():
+            # Get comprehensive overview
+            briefing = get_morning_briefing()
+            upcoming = get_upcoming_events(3)
+            
+            overview = f"{briefing}\n\n📋 **3-Day Executive Outlook:**\n{upcoming}"
+            
+            # Manage length
+            if len(overview) > 1900:
+                # Send briefing first, then upcoming
+                await ctx.send(briefing)
+                await ctx.send(f"📋 **3-Day Executive Outlook:**\n{upcoming}")
+            else:
+                await ctx.send(overview)
+                
+    except Exception as e:
+        print(f"❌ Overview command error: {e}")
+        await ctx.send("👑 Executive overview unavailable. Please try again.")
 
 @bot.command(name='today')
 async def today_command(ctx):
