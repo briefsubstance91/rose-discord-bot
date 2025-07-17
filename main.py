@@ -381,11 +381,15 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
         target_calendar_id = None
         target_calendar_name = None
         
+        print(f"🔍 Looking for calendar type: {calendar_type}")
+        print(f"📅 Available calendars: {[(name, cal_type) for name, _, cal_type in accessible_calendars]}")
+        
         # First, try exact calendar type match
         for name, cal_id, cal_type in accessible_calendars:
             if calendar_type == cal_type:
                 target_calendar_id = cal_id
                 target_calendar_name = name
+                print(f"✅ Exact match found: {name} ({cal_type})")
                 break
         
         # If no exact match, try keyword matching
@@ -394,6 +398,7 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
                 if calendar_type.lower() in name.lower() or calendar_type.lower() in cal_type.lower():
                     target_calendar_id = cal_id
                     target_calendar_name = name
+                    print(f"✅ Keyword match found: {name} ({cal_type})")
                     break
         
         # Last resort: use tasks calendar if available for task-related requests
@@ -402,6 +407,7 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
                 if "task" in name.lower() or cal_type == "tasks":
                     target_calendar_id = cal_id
                     target_calendar_name = name
+                    print(f"✅ Task calendar found: {name} ({cal_type})")
                     break
         
         # Final fallback to primary calendar only if no specific calendar found
@@ -410,15 +416,19 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
                 if "primary" in name.lower() or cal_id == "primary":
                     target_calendar_id = cal_id
                     target_calendar_name = name
+                    print(f"⚠️ Using primary fallback: {name} ({cal_type})")
                     break
         
         # If still no calendar found, use first available
         if not target_calendar_id and accessible_calendars:
             target_calendar_id = accessible_calendars[0][1]
             target_calendar_name = accessible_calendars[0][0]
+            print(f"⚠️ Using first available: {target_calendar_name}")
         
         if not target_calendar_id:
             return "❌ No suitable calendar found"
+        
+        print(f"🎯 Creating event in: {target_calendar_name} ({target_calendar_id})")
         
         # Parse times
         toronto_tz = pytz.timezone('America/Toronto')
@@ -473,7 +483,6 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
     except Exception as e:
         print(f"❌ Error creating calendar event: {e}")
         return f"❌ Failed to create '{title}': {str(e)}"
-
 
 def find_calendar_event(search_term, days_range=30):
     """Find calendar events matching a search term"""
@@ -570,7 +579,6 @@ def update_calendar_event(event_search, new_title=None, new_start_time=None, new
         print(f"❌ Error updating event: {e}")
         return f"❌ Failed to update '{event_search}': {str(e)}"
 
-
 def reschedule_event(event_search, new_start_time, new_end_time=None):
     """Reschedule an existing calendar event to new time"""
     if not calendar_service or not accessible_calendars:
@@ -641,7 +649,6 @@ def reschedule_event(event_search, new_start_time, new_end_time=None):
     except Exception as e:
         print(f"❌ Error rescheduling event: {e}")
         return f"❌ Failed to reschedule '{event_search}': {str(e)}"
-
 
 def move_task_between_calendars(task_search, target_calendar="tasks"):
     """Move tasks/events between different Google calendars"""
@@ -715,7 +722,6 @@ def move_task_between_calendars(task_search, target_calendar="tasks"):
         print(f"❌ Error moving task: {e}")
         return f"❌ Failed to move '{task_search}': {str(e)}"
 
-
 def delete_calendar_event(event_search):
     """Delete a calendar event"""
     if not calendar_service or not accessible_calendars:
@@ -743,7 +749,6 @@ def delete_calendar_event(event_search):
     except Exception as e:
         print(f"❌ Error deleting event: {e}")
         return f"❌ Failed to delete '{event_search}': {str(e)}"
-
 
 def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=None, days_ahead=7):
     """Find free time slots in the calendar"""
