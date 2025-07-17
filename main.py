@@ -201,7 +201,7 @@ def format_event(event, calendar_type="", user_timezone=None):
         try:
             utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
             local_time = utc_time.astimezone(user_timezone)
-            time_str = local_time.strftime('%I:%M %p')
+            time_str = local_time.strftime('%H:%M')  # 24-hour format
             return f"• {time_str}: {title}"
         except Exception as e:
             print(f"❌ Error formatting event: {e}")
@@ -372,7 +372,7 @@ def get_morning_briefing():
         return "🌅 **Morning Briefing:** Error generating briefing"
 
 def create_calendar_event(title, start_time, end_time, calendar_type="calendar", description=""):
-    """Create a new calendar event in specified Google Calendar"""
+    """Create a new calendar event in specified Google Calendar with concise confirmation"""
     if not calendar_service or not accessible_calendars:
         return "📅 Calendar integration not available"
     
@@ -474,11 +474,16 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
             body=event
         ).execute()
         
-        # Concise confirmation
+        # CONCISE CONFIRMATION with 24-hour time format
         display_start_dt = start_dt.astimezone(toronto_tz)
         display_end_dt = end_dt.astimezone(toronto_tz)
         
-        return f"✅ **{title}** created\n📅 {display_start_dt.strftime('%a %m/%d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ {target_calendar_name}\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
+        # Format day and date
+        day_date = display_start_dt.strftime('%A, %B %d, %Y')
+        start_time_24h = display_start_dt.strftime('%H:%M')
+        end_time_24h = display_end_dt.strftime('%H:%M')
+        
+        return f"✅ **{title}** created\n📅 {day_date}, {start_time_24h} - {end_time_24h}\n🗓️ {target_calendar_name}\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
         
     except Exception as e:
         print(f"❌ Error creating calendar event: {e}")
@@ -542,7 +547,7 @@ def update_calendar_event(event_search, new_title=None, new_start_time=None, new
                         'dateTime': new_start_dt.isoformat(),
                         'timeZone': 'America/Toronto',
                     }
-                    updated_fields.append(f"Start → {new_start_dt.strftime('%m/%d %I:%M %p')}")
+                    updated_fields.append(f"Start → {new_start_dt.strftime('%m/%d %H:%M')}")
                 except ValueError as e:
                     return f"❌ Invalid start time: {e}"
             
@@ -557,7 +562,7 @@ def update_calendar_event(event_search, new_title=None, new_start_time=None, new
                         'dateTime': new_end_dt.isoformat(),
                         'timeZone': 'America/Toronto',
                     }
-                    updated_fields.append(f"End → {new_end_dt.strftime('%m/%d %I:%M %p')}")
+                    updated_fields.append(f"End → {new_end_dt.strftime('%m/%d %H:%M')}")
                 except ValueError as e:
                     return f"❌ Invalid end time: {e}"
         
@@ -572,7 +577,7 @@ def update_calendar_event(event_search, new_title=None, new_start_time=None, new
             body=found_event
         ).execute()
         
-        # Concise confirmation
+        # Concise confirmation with 24-hour time
         return f"✅ **{updated_event['summary']}** updated\n🔄 {', '.join(updated_fields)}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
         
     except Exception as e:
@@ -640,11 +645,15 @@ def reschedule_event(event_search, new_start_time, new_end_time=None):
             body=found_event
         ).execute()
         
-        # Concise confirmation
+        # Concise confirmation with 24-hour time
         display_start_dt = new_start_dt.astimezone(toronto_tz)
         display_end_dt = new_end_dt.astimezone(toronto_tz)
         
-        return f"✅ **{updated_event['summary']}** rescheduled\n📅 {display_start_dt.strftime('%a %m/%d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
+        day_date = display_start_dt.strftime('%A, %B %d')
+        start_time_24h = display_start_dt.strftime('%H:%M')
+        end_time_24h = display_end_dt.strftime('%H:%M')
+        
+        return f"✅ **{updated_event['summary']}** rescheduled\n📅 {day_date}, {start_time_24h} - {end_time_24h}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
         
     except Exception as e:
         print(f"❌ Error rescheduling event: {e}")
@@ -809,13 +818,13 @@ def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=Non
                         'start': slot_start,
                         'end': slot_end,
                         'date': check_date.strftime('%A, %B %d'),
-                        'time': slot_start.strftime('%I:%M %p')
+                        'time': slot_start.strftime('%H:%M')  # 24-hour format
                     })
         
         if not available_slots:
             return f"❌ **No Available Slots:** No {duration_minutes}-minute slots found in the next {days_ahead} days.\n💡 **Suggestion:** Try reducing duration or expanding preferred hours."
         
-        # Return top 5 slots
+        # Return top 5 slots with 24-hour time
         result = f"📅 **Available {duration_minutes}-minute slots:**\n\n"
         for i, slot in enumerate(available_slots[:5]):
             result += f"**{i+1}.** {slot['date']} at {slot['time']}\n"
@@ -1083,7 +1092,8 @@ RESPONSE GUIDELINES:
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
 - When user says "tomorrow" use {tomorrow_date} ({tomorrow_formatted})
 - When user says "today" use {today_date} ({today_formatted})
-- All times are in Toronto timezone (America/Toronto)"""
+- All times are in Toronto timezone (America/Toronto)
+- Use 24-hour time format (14:30, not 2:30 PM)"""
         
         try:
             client.beta.threads.messages.create(
