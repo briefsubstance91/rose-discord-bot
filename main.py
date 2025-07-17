@@ -371,6 +371,434 @@ def get_morning_briefing():
         print(f"❌ Morning briefing error: {e}")
         return "🌅 **Morning Briefing:** Error generating briefing"
 
+def create_calendar_event(title, start_time, end_time, calendar_type="calendar", description=""):
+    """Create a new calendar event in specified Google Calendar"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Creation:** Calendar integration not configured."
+    
+    try:
+        # Find target calendar
+        target_calendar_id = None
+        target_calendar_name = "Primary"
+        
+        for name, cal_id, cal_type in accessible_calendars:
+            if calendar_type == "tasks" and cal_type == "tasks":
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+            elif calendar_type == "calendar" and cal_type == "calendar":
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+        
+        # Fallback to first available calendar
+        if not target_calendar_id and accessible_calendars:
+            target_calendar_id = accessible_calendars[0][1]
+            target_calendar_name = accessible_calendars[0][0]
+        
+        if not target_calendar_id:
+            return "❌ **Event Creation Failed:** No suitable calendar found."
+        
+        # Parse times
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        try:
+            # Handle different time formats
+            if "T" not in start_time:
+                # Assume it's just a date, add default time
+                start_time = f"{start_time}T15:00:00"  # 3 PM default
+            if "T" not in end_time:
+                end_time = f"{end_time}T16:00:00"  # 4 PM default
+                
+            start_dt = datetime.fromisoformat(start_time.replace('Z', ''))
+            end_dt = datetime.fromisoformat(end_time.replace('Z', ''))
+            
+            if start_dt.tzinfo is None:
+                start_dt = toronto_tz.localize(start_dt)
+            if end_dt.tzinfo is None:
+                end_dt = toronto_tz.localize(end_dt)
+            
+            start_iso = start_dt.isoformat()
+            end_iso = end_dt.isoformat()
+            
+        except ValueError as e:
+            return f"❌ **Invalid Time Format:** {e}. Please use YYYY-MM-DDTHH:MM:SS format."
+        
+        # Create event object
+        event = {
+            'summary': title,
+            'start': {
+                'dateTime': start_iso,
+                'timeZone': 'America/Toronto',
+            },
+            'end': {
+                'dateTime': end_iso,
+                'timeZone': 'America/Toronto',
+            },
+            'description': description,
+        }
+        
+        # Create the event
+        created_event = calendar_service.events().insert(
+            calendarId=target_calendar_id,
+            body=event
+        ).execute()
+        
+        # Format confirmation
+        display_start_dt = start_dt.astimezone(toronto_tz)
+        display_end_dt = end_dt.astimezone(toronto_tz)
+        
+        return f"✅ **Event Created:** {title}\n📅 **When:** {display_start_dt.strftime('%A, %B %d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {target_calendar_name}\n🔗 **Link:** {created_event.get('htmlLink', 'Available in calendar')}"
+        
+    except Exception as e:
+        print(f"❌ Error creating calendar event: {e}")
+        return f"❌ **Event Creation Failed:** Unable to create '{title}' - {str(e)}"
+
+def find_calendar_event(search_term, days_range=30):
+    """Find calendar events matching a search term"""
+    if not calendar_service or not accessible_calendars:
+        return None, None, None
+    
+    try:
+        toronto_tz = pytz.timezone('America/Toronto')
+        now = datetime.now(toronto_tz)
+        past_search = now - timedelta(days=7)  # Search past week
+        future_search = now + timedelta(days=days_range)  # Search ahead
+        
+        # Search all accessible calendars
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, past_search, future_search, max_results=200)
+            for event in events:
+                event_title = event.get('summary', '').lower()
+                if search_term.lower() in event_title:
+                    return event, calendar_id, calendar_name
+        
+        return None, None, None
+        
+    except Exception as e:
+        print(f"❌ Error finding event: {e}")
+        return None, None, None
+
+def update_calendar_event(event_search, new_title=None, new_start_time=None, new_end_time=None, new_description=None):
+    """Update an existing calendar event"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Update:** Calendar integration not configured."
+    
+    try:
+        # Find the event
+        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
+        
+        if not found_event:
+            available_calendars = [name for name, _, _ in accessible_calendars]
+            return f"❌ **Event Not Found:** '{event_search}' not found in any accessible calendar.\n📅 **Searched:** {', '.join(available_calendars)}"
+        
+        # Update fields as needed
+        updated_fields = []
+        
+        if new_title:
+            found_event['summary'] = new_title
+            updated_fields.append(f"Title → {new_title}")
+        
+        if new_start_time or new_end_time:
+            toronto_tz = pytz.timezone('America/Toronto')
+            
+            # Parse new times
+            if new_start_time:
+                try:
+                    if "T" not in new_start_time:
+                        new_start_time = f"{new_start_time}T{found_event['start']['dateTime'].split('T')[1]}"
+                    new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
+                    if new_start_dt.tzinfo is None:
+                        new_start_dt = toronto_tz.localize(new_start_dt)
+                    found_event['start'] = {
+                        'dateTime': new_start_dt.isoformat(),
+                        'timeZone': 'America/Toronto',
+                    }
+                    updated_fields.append(f"Start time → {new_start_dt.strftime('%m/%d at %I:%M %p')}")
+                except ValueError as e:
+                    return f"❌ **Invalid Start Time:** {e}"
+            
+            if new_end_time:
+                try:
+                    if "T" not in new_end_time:
+                        new_end_time = f"{new_end_time}T{found_event['end']['dateTime'].split('T')[1]}"
+                    new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
+                    if new_end_dt.tzinfo is None:
+                        new_end_dt = toronto_tz.localize(new_end_dt)
+                    found_event['end'] = {
+                        'dateTime': new_end_dt.isoformat(),
+                        'timeZone': 'America/Toronto',
+                    }
+                    updated_fields.append(f"End time → {new_end_dt.strftime('%m/%d at %I:%M %p')}")
+                except ValueError as e:
+                    return f"❌ **Invalid End Time:** {e}"
+        
+        if new_description is not None:
+            found_event['description'] = new_description
+            updated_fields.append("Description updated")
+        
+        # Update the event
+        updated_event = calendar_service.events().update(
+            calendarId=found_calendar_id,
+            eventId=found_event['id'],
+            body=found_event
+        ).execute()
+        
+        return f"✅ **Event Updated:** {updated_event['summary']}\n🔄 **Changes:** {', '.join(updated_fields)}\n🗓️ **Calendar:** {found_calendar_name}\n🔗 **Link:** {updated_event.get('htmlLink', 'Available in calendar')}"
+        
+    except Exception as e:
+        print(f"❌ Error updating event: {e}")
+        return f"❌ **Update Failed:** Unable to update '{event_search}' - {str(e)}"
+
+def reschedule_event(event_search, new_start_time, new_end_time=None):
+    """Reschedule an existing calendar event to new time"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Rescheduling:** Calendar integration not configured."
+    
+    try:
+        # Find the event
+        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
+        
+        if not found_event:
+            return f"❌ **Event Not Found:** '{event_search}' not found in accessible calendars"
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Parse new start time
+        try:
+            if "T" not in new_start_time:
+                # Try to extract time from original event
+                original_time = found_event['start']['dateTime'].split('T')[1] if 'dateTime' in found_event['start'] else '15:00:00'
+                new_start_time = f"{new_start_time}T{original_time}"
+            
+            new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
+            if new_start_dt.tzinfo is None:
+                new_start_dt = toronto_tz.localize(new_start_dt)
+                
+        except ValueError:
+            return "❌ **Invalid Time Format:** Please use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS format."
+        
+        # Calculate new end time
+        if new_end_time:
+            try:
+                if "T" not in new_end_time:
+                    original_time = found_event['end']['dateTime'].split('T')[1] if 'dateTime' in found_event['end'] else '16:00:00'
+                    new_end_time = f"{new_end_time}T{original_time}"
+                new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
+                if new_end_dt.tzinfo is None:
+                    new_end_dt = toronto_tz.localize(new_end_dt)
+            except ValueError:
+                return "❌ **Invalid End Time Format**"
+        else:
+            # Calculate duration from original event
+            original_start = datetime.fromisoformat(found_event['start']['dateTime'].replace('Z', '+00:00'))
+            original_end = datetime.fromisoformat(found_event['end']['dateTime'].replace('Z', '+00:00'))
+            duration = original_end - original_start
+            new_end_dt = new_start_dt + duration
+        
+        # Update the event
+        found_event['start'] = {
+            'dateTime': new_start_dt.isoformat(),
+            'timeZone': 'America/Toronto',
+        }
+        found_event['end'] = {
+            'dateTime': new_end_dt.isoformat(),
+            'timeZone': 'America/Toronto',
+        }
+        
+        updated_event = calendar_service.events().update(
+            calendarId=found_calendar_id,
+            eventId=found_event['id'],
+            body=found_event
+        ).execute()
+        
+        # Format confirmation
+        display_start_dt = new_start_dt.astimezone(toronto_tz)
+        display_end_dt = new_end_dt.astimezone(toronto_tz)
+        
+        return f"✅ **Event Rescheduled:** {updated_event['summary']}\n📅 **New Time:** {display_start_dt.strftime('%A, %B %d at %I:%M %p')} - {display_end_dt.strftime('%I:%M %p')}\n🗓️ **Calendar:** {found_calendar_name}\n🔗 **Link:** {updated_event.get('htmlLink', 'Available in calendar')}"
+        
+    except Exception as e:
+        print(f"❌ Error rescheduling event: {e}")
+        return f"❌ **Rescheduling Failed:** Unable to reschedule '{event_search}' - {str(e)}"
+
+def move_task_between_calendars(task_search, target_calendar="tasks"):
+    """Move tasks/events between different Google calendars"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Task Moving:** Calendar integration not configured."
+    
+    try:
+        # Find the event
+        found_event, found_calendar_id, found_calendar_name = find_calendar_event(task_search)
+        
+        if not found_event:
+            available_calendars = [name for name, _, _ in accessible_calendars]
+            return f"❌ **Task Not Found:** '{task_search}' not found in any accessible calendar.\n📅 **Searched:** {', '.join(available_calendars)}"
+        
+        # Find target calendar
+        target_calendar_id = None
+        target_calendar_name = None
+        
+        for name, cal_id, cal_type in accessible_calendars:
+            if target_calendar == "tasks" and cal_type == "tasks":
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+            elif target_calendar == "calendar" and cal_type == "calendar":
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+            elif target_calendar.lower() in name.lower():
+                target_calendar_id = cal_id
+                target_calendar_name = name
+                break
+        
+        if not target_calendar_id:
+            available_types = [f"{name} ({cal_type})" for name, _, cal_type in accessible_calendars]
+            return f"❌ **Target Calendar Not Found:** '{target_calendar}' calendar not accessible.\n📅 **Available:** {', '.join(available_types)}"
+        
+        if found_calendar_id == target_calendar_id:
+            return f"📅 **Already There:** '{found_event['summary']}' is already in {target_calendar_name}"
+        
+        # Create event copy for target calendar
+        event_copy = {
+            'summary': found_event.get('summary'),
+            'description': found_event.get('description', ''),
+            'start': found_event.get('start'),
+            'end': found_event.get('end'),
+            'location': found_event.get('location', ''),
+        }
+        
+        # Remove read-only fields
+        for field in ['id', 'htmlLink', 'iCalUID', 'created', 'updated', 'creator', 'organizer']:
+            event_copy.pop(field, None)
+        
+        # Create in target calendar
+        created_event = calendar_service.events().insert(
+            calendarId=target_calendar_id,
+            body=event_copy
+        ).execute()
+        
+        # Delete from original calendar
+        calendar_service.events().delete(
+            calendarId=found_calendar_id,
+            eventId=found_event['id']
+        ).execute()
+        
+        return f"✅ **Task Moved Successfully:**\n📋 **Task:** {found_event['summary']}\n📍 **From:** {found_calendar_name}\n📍 **To:** {target_calendar_name}\n🔗 **New Link:** {created_event.get('htmlLink', 'Available in Google Calendar')}"
+        
+    except HttpError as e:
+        return f"❌ **Google Calendar Error:** {e.resp.status} - {e}"
+    except Exception as e:
+        print(f"❌ Error moving task: {e}")
+        return f"❌ **Move Failed:** Unable to move '{task_search}' - {str(e)}"
+
+def delete_calendar_event(event_search):
+    """Delete a calendar event"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Event Deletion:** Calendar integration not configured."
+    
+    try:
+        # Find the event
+        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
+        
+        if not found_event:
+            return f"❌ **Event Not Found:** '{event_search}' not found in accessible calendars"
+        
+        # Store event details before deletion
+        event_title = found_event.get('summary', 'Unknown Event')
+        
+        # Delete the event
+        calendar_service.events().delete(
+            calendarId=found_calendar_id,
+            eventId=found_event['id']
+        ).execute()
+        
+        return f"✅ **Event Deleted:** '{event_title}' from {found_calendar_name}"
+        
+    except Exception as e:
+        print(f"❌ Error deleting event: {e}")
+        return f"❌ **Deletion Failed:** Unable to delete '{event_search}' - {str(e)}"
+
+def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=None, days_ahead=7):
+    """Find free time slots in the calendar"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Free Time Search:** Calendar integration not configured."
+    
+    try:
+        if preferred_days is None:
+            preferred_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        if preferred_hours is None:
+            preferred_hours = list(range(9, 17))  # 9 AM to 5 PM
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        now = datetime.now(toronto_tz)
+        search_end = now + timedelta(days=days_ahead)
+        
+        # Get all existing events to find gaps
+        all_busy_times = []
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, now, search_end)
+            for event in events:
+                start_str = event['start'].get('dateTime', event['start'].get('date'))
+                end_str = event['end'].get('dateTime', event['end'].get('date'))
+                
+                if 'T' in start_str:  # DateTime event
+                    start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00')).astimezone(toronto_tz)
+                    end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00')).astimezone(toronto_tz)
+                    all_busy_times.append((start_dt, end_dt))
+        
+        # Find available slots
+        available_slots = []
+        current_date = now.date()
+        
+        for day_offset in range(days_ahead):
+            check_date = current_date + timedelta(days=day_offset)
+            weekday = check_date.strftime('%A')
+            
+            if weekday not in preferred_days:
+                continue
+            
+            for hour in preferred_hours:
+                slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour)).replace(tzinfo=toronto_tz)
+                slot_end = slot_start + timedelta(minutes=duration_minutes)
+                
+                # Skip past times
+                if slot_start <= now:
+                    continue
+                
+                # Check for conflicts
+                has_conflict = False
+                for busy_start, busy_end in all_busy_times:
+                    if (slot_start < busy_end and slot_end > busy_start):
+                        has_conflict = True
+                        break
+                
+                if not has_conflict:
+                    available_slots.append({
+                        'start': slot_start,
+                        'end': slot_end,
+                        'date': check_date.strftime('%A, %B %d'),
+                        'time': slot_start.strftime('%I:%M %p')
+                    })
+        
+        if not available_slots:
+            return f"❌ **No Available Slots:** No {duration_minutes}-minute slots found in the next {days_ahead} days.\n💡 **Suggestion:** Try reducing duration or expanding preferred hours."
+        
+        # Return top 5 slots
+        result = f"📅 **Available {duration_minutes}-minute slots:**\n\n"
+        for i, slot in enumerate(available_slots[:5]):
+            result += f"**{i+1}.** {slot['date']} at {slot['time']}\n"
+        
+        if len(available_slots) > 5:
+            result += f"\n*...and {len(available_slots) - 5} more slots available*"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error finding free time: {e}")
+        return f"❌ **Free Time Search Failed:** {str(e)}"
+
 # ============================================================================
 # ENHANCED PLANNING SEARCH
 # ============================================================================
@@ -467,7 +895,78 @@ async def handle_rose_functions_enhanced(run, thread_id):
         print(f"📋 Arguments: {arguments}")
         
         try:
-            if function_name == "planning_search":
+            # CALENDAR VIEWING FUNCTIONS
+            if function_name == "get_today_schedule":
+                output = get_today_schedule()
+                    
+            elif function_name == "get_upcoming_events":
+                days = arguments.get('days', 7)
+                output = get_upcoming_events(days)
+                
+            elif function_name == "get_morning_briefing":
+                output = get_morning_briefing()
+                
+            elif function_name == "find_free_time":
+                duration_minutes = arguments.get('duration_minutes', 60)
+                preferred_days = arguments.get('preferred_days', None)
+                preferred_hours = arguments.get('preferred_hours', None)
+                days_ahead = arguments.get('days_ahead', 7)
+                output = find_free_time(duration_minutes, preferred_days, preferred_hours, days_ahead)
+            
+            # CALENDAR MODIFICATION FUNCTIONS
+            elif function_name == "create_calendar_event":
+                title = arguments.get('title', '')
+                start_time = arguments.get('start_time', '')
+                end_time = arguments.get('end_time', '')
+                calendar_type = arguments.get('calendar_type', 'calendar')
+                description = arguments.get('description', '')
+                
+                if title and start_time and end_time:
+                    output = create_calendar_event(title, start_time, end_time, calendar_type, description)
+                else:
+                    output = "❌ Missing required parameters: title, start_time, end_time"
+                    
+            elif function_name == "update_calendar_event":
+                event_search = arguments.get('event_search', '')
+                new_title = arguments.get('new_title', None)
+                new_start_time = arguments.get('new_start_time', None)
+                new_end_time = arguments.get('new_end_time', None)
+                new_description = arguments.get('new_description', None)
+                
+                if event_search:
+                    output = update_calendar_event(event_search, new_title, new_start_time, new_end_time, new_description)
+                else:
+                    output = "❌ Missing required parameter: event_search"
+                    
+            elif function_name == "reschedule_event":
+                event_search = arguments.get('event_search', '')
+                new_start_time = arguments.get('new_start_time', '')
+                new_end_time = arguments.get('new_end_time', None)
+                
+                if event_search and new_start_time:
+                    output = reschedule_event(event_search, new_start_time, new_end_time)
+                else:
+                    output = "❌ Missing required parameters: event_search, new_start_time"
+                    
+            elif function_name == "move_task_between_calendars":
+                task_search = arguments.get('task_search', '')
+                target_calendar = arguments.get('target_calendar', 'tasks')
+                
+                if task_search:
+                    output = move_task_between_calendars(task_search, target_calendar)
+                else:
+                    output = "❌ Missing required parameter: task_search"
+                    
+            elif function_name == "delete_calendar_event":
+                event_search = arguments.get('event_search', '')
+                
+                if event_search:
+                    output = delete_calendar_event(event_search)
+                else:
+                    output = "❌ Missing required parameter: event_search"
+            
+            # PLANNING RESEARCH FUNCTIONS
+            elif function_name == "planning_search":
                 query = arguments.get('query', '')
                 focus = arguments.get('focus', 'general')
                 num_results = arguments.get('num_results', 3)
@@ -482,29 +981,20 @@ async def handle_rose_functions_enhanced(run, thread_id):
                             output += f"({source['number']}) {source['title']} - {source['domain']}\n"
                 else:
                     output = "🔍 No planning research query provided"
-                    
-            elif function_name == "get_today_schedule":
-                output = get_today_schedule()
-                    
-            elif function_name == "get_upcoming_events":
-                days = arguments.get('days', 7)
-                output = get_upcoming_events(days)
-                
-            elif function_name == "get_morning_briefing":
-                output = get_morning_briefing()
                 
             else:
-                output = f"❓ Function {function_name} not fully implemented yet"
+                output = f"❓ Function {function_name} not implemented yet"
                 
         except Exception as e:
             print(f"❌ Function execution error: {e}")
-            output = f"❌ Error executing {function_name}: Please try again"
+            output = f"❌ Error executing {function_name}: {str(e)}"
         
         tool_outputs.append({
             "tool_call_id": tool_call.id,
-            "output": output[:1500]
+            "output": output[:1500]  # Keep within reasonable limits
         })
     
+    # Submit tool outputs
     try:
         if tool_outputs:
             client.beta.threads.runs.submit_tool_outputs(
