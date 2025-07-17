@@ -1686,16 +1686,6 @@ async def overview_command(ctx):
 # STANDARDIZED COMMANDS FOLLOWING TEAM PATTERNS
 # ============================================================================
 
-@bot.command(name='ping')
-async def ping_command(ctx):
-    """Test Rose's connectivity with executive flair"""
-    try:
-        latency = round(bot.latency * 1000)
-        await ctx.send(f"👑 Pong! Executive response time: {latency}ms")
-    except Exception as e:
-        print(f"❌ Ping command error: {e}")
-        await ctx.send("👑 Executive ping experiencing issues.")
-
 @bot.command(name='help')
 async def help_command(ctx):
     """Enhanced help command with complete calendar management features"""
@@ -2055,24 +2045,6 @@ async def reschedule_command(ctx, *, reschedule_details: str = None):
     except Exception as e:
         print(f"❌ Reschedule command error: {e}")
         await ctx.send("👑 Event rescheduling unavailable. Please try again.")
-
-@bot.command(name='smart')
-async def smart_command(ctx, *, smart_details: str = None):
-    """Smart event scheduling command"""
-    try:
-        if not smart_details:
-            await ctx.send("👑 **Smart Scheduling Usage:** `!smart <event title and preferences>`\n\nExamples:\n• `!smart quarterly review meeting 2 hours`\n• `!smart deep work session weekday mornings`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            smart_query = f"smart schedule event with optimal timing: {smart_details}"
-            response = await get_rose_response(smart_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Smart scheduling command error: {e}")
-        await ctx.send("👑 Smart scheduling unavailable. Please try again.")
 
 # ============================================================================
 # ERROR HANDLING
