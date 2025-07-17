@@ -1682,30 +1682,6 @@ async def overview_command(ctx):
         print(f"❌ Overview command error: {e}")
         await ctx.send("👑 Executive overview unavailable. Please try again.")
 
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            # Limit days to reasonable range
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await ctx.send(events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("👑 Upcoming events unavailable. Please try again.")
-
-@bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Morning briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("👑 Executive briefing unavailable. Please try again.")
-
 # ============================================================================
 # STANDARDIZED COMMANDS FOLLOWING TEAM PATTERNS
 # ============================================================================
@@ -1846,65 +1822,6 @@ async def status_command(ctx):
         print(f"❌ Status command error: {e}")
         await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")
 
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            # Limit days to reasonable range
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await ctx.send(events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("👑 Upcoming events unavailable. Please try again.")
-
-@bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("👑 Executive briefing unavailable. Please try again.")
-
-@bot.command(name='daily')
-async def daily_command(ctx):
-    """Daily executive briefing - alias for briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Daily briefing command error: {e}")
-        await ctx.send("👑 Daily executive briefing unavailable. Please try again.")
-
-@bot.command(name='morning')
-async def morning_command(ctx):
-    """Morning briefing command - alias for briefing"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Morning briefing command error: {e}")
-        await ctx.send("👑 Morning executive briefing unavailable. Please try again.")
-
-@bot.command(name='calendar')
-async def calendar_command(ctx):
-    """Quick calendar overview command"""
-    try:
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            calendar_query = "what's on my calendar today and upcoming strategic overview executive summary"
-            response = await get_rose_response(calendar_query, user_id)
-            await send_long_message(ctx.message, response)
-    except Exception as e:
-        print(f"❌ Calendar command error: {e}")
-        await ctx.send("👑 Calendar overview unavailable. Please try again.")
-
 @bot.command(name='schedule')
 async def schedule_command(ctx, *, timeframe: str = "today"):
     """Flexible schedule command - can show today, upcoming, or specific timeframes"""
@@ -1976,24 +1893,6 @@ async def overview_command(ctx):
         print(f"❌ Overview command error: {e}")
         await ctx.send("👑 Executive overview unavailable. Please try again.")
 
-@bot.command(name='create')
-async def create_command(ctx, *, event_details: str = None):
-    """Create calendar event command"""
-    try:
-        if not event_details:
-            await ctx.send("👑 **Create Event Usage:** `!create <event details>`\n\nExamples:\n• `!create Team meeting tomorrow at 2pm for 1 hour`\n• `!create Doctor appointment Friday at 10am`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            create_query = f"create a calendar event: {event_details}"
-            response = await get_rose_response(create_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Create command error: {e}")
-        await ctx.send("👑 Event creation unavailable. Please try again.")
-
 @bot.command(name='move')
 async def move_command(ctx, *, move_details: str = None):
     """Move task between calendars command"""
@@ -2011,24 +1910,6 @@ async def move_command(ctx, *, move_details: str = None):
     except Exception as e:
         print(f"❌ Move command error: {e}")
         await ctx.send("👑 Task moving unavailable. Please try again.")
-
-@bot.command(name='reschedule')
-async def reschedule_command(ctx, *, reschedule_details: str = None):
-    """Reschedule event command"""
-    try:
-        if not reschedule_details:
-            await ctx.send("👑 **Reschedule Usage:** `!reschedule <event details>`\n\nExamples:\n• `!reschedule team meeting to tomorrow at 3pm`\n• `!reschedule doctor appointment to next Friday`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            reschedule_query = f"reschedule event: {reschedule_details}"
-            response = await get_rose_response(reschedule_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Reschedule command error: {e}")
-        await ctx.send("👑 Event rescheduling unavailable. Please try again.")
 
 @bot.command(name='delete')
 async def delete_command(ctx, *, delete_details: str = None):
@@ -2157,24 +2038,6 @@ async def create_command(ctx, *, event_details: str = None):
         print(f"❌ Create command error: {e}")
         await ctx.send("👑 Event creation unavailable. Please try again.")
 
-@bot.command(name='move')
-async def move_command(ctx, *, move_details: str = None):
-    """Move task between calendars command"""
-    try:
-        if not move_details:
-            await ctx.send("👑 **Move Task Usage:** `!move <task details>`\n\nExamples:\n• `!move dentist appointment to tasks calendar`\n• `!move team meeting to main calendar`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            move_query = f"move task between calendars: {move_details}"
-            response = await get_rose_response(move_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Move command error: {e}")
-        await ctx.send("👑 Task moving unavailable. Please try again.")
-
 @bot.command(name='reschedule')
 async def reschedule_command(ctx, *, reschedule_details: str = None):
     """Reschedule event command"""
@@ -2192,42 +2055,6 @@ async def reschedule_command(ctx, *, reschedule_details: str = None):
     except Exception as e:
         print(f"❌ Reschedule command error: {e}")
         await ctx.send("👑 Event rescheduling unavailable. Please try again.")
-
-@bot.command(name='delete')
-async def delete_command(ctx, *, delete_details: str = None):
-    """Delete calendar event command"""
-    try:
-        if not delete_details:
-            await ctx.send("👑 **Delete Event Usage:** `!delete <event details>`\n\nExamples:\n• `!delete cancelled lunch meeting`\n• `!delete old team standup`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            delete_query = f"delete calendar event: {delete_details}"
-            response = await get_rose_response(delete_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Delete command error: {e}")
-        await ctx.send("👑 Event deletion unavailable. Please try again.")
-
-@bot.command(name='bulk')
-async def bulk_command(ctx, *, bulk_details: str = None):
-    """Bulk reschedule events command"""
-    try:
-        if not bulk_details:
-            await ctx.send("👑 **Bulk Reschedule Usage:** `!bulk <bulk operation details>`\n\nExamples:\n• `!bulk move all team meetings forward by 2 hours`\n• `!bulk reschedule client calls to next week`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            bulk_query = f"bulk reschedule events: {bulk_details}"
-            response = await get_rose_response(bulk_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Bulk command error: {e}")
-        await ctx.send("👑 Bulk operations unavailable. Please try again.")
 
 @bot.command(name='smart')
 async def smart_command(ctx, *, smart_details: str = None):
