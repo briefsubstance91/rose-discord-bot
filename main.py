@@ -1717,6 +1717,395 @@ async def briefing_command(ctx):
         print(f"❌ Briefing command error: {e}")
         await ctx.send("👑 Executive briefing unavailable. Please try again.")
 
+# ============================================================================
+# STANDARDIZED COMMANDS FOLLOWING TEAM PATTERNS
+# ============================================================================
+
+@bot.command(name='ping')
+async def ping_command(ctx):
+    """Test Rose's connectivity with executive flair"""
+    try:
+        latency = round(bot.latency * 1000)
+        await ctx.send(f"👑 Pong! Executive response time: {latency}ms")
+    except Exception as e:
+        print(f"❌ Ping command error: {e}")
+        await ctx.send("👑 Executive ping experiencing issues.")
+
+@bot.command(name='help')
+async def help_command(ctx):
+    """Enhanced help command with complete calendar management features"""
+    try:
+        help_text = f"""👑 **{ASSISTANT_NAME} - Complete Executive Assistant Commands**
+
+**📅 Calendar & Scheduling:**
+• `!today` - Today's executive schedule
+• `!upcoming [days]` - Upcoming events (default 7 days)
+• `!briefing` / `!daily` / `!morning` - Morning executive briefing
+• `!calendar` - Quick calendar overview with AI insights
+• `!schedule [timeframe]` - Flexible schedule view (today/week/month/[number])
+• `!agenda` - Comprehensive executive agenda overview
+• `!overview` - Complete executive overview (briefing + 3-day outlook)
+
+**🔧 Task & Event Management:**
+• `!create` - Create new calendar events
+• `!move` - Move tasks between calendars
+• `!reschedule` - Reschedule existing events
+• `!delete` - Delete calendar events
+• `!bulk` - Bulk reschedule multiple events
+
+**🔍 Planning & Research:**
+• `!research <query>` - Strategic planning research
+• `!planning <topic>` - Productivity insights
+• `!smart <event title>` - Smart event scheduling
+
+**💼 Executive Functions:**
+• `!status` - System and calendar status
+• `!ping` - Test connectivity
+• `!help` - This command menu
+
+**🎯 Enhanced Features:**
+• **Smart Scheduling:** AI-powered optimal time finding
+• **Bulk Operations:** Reschedule multiple events at once
+• **Cross-Calendar Management:** Move tasks between BG Calendar ↔ BG Tasks
+• **Conflict Detection:** Automatic scheduling conflict avoidance
+• **Strategic Planning Research:** Actionable productivity insights
+• **Toronto Timezone Support:** All times in America/Toronto
+
+**📱 Usage:**
+• Mention @{bot.user.name if bot.user else 'Rose'} in any message
+• Use executive keywords: calendar, schedule, planning, strategy, move, reschedule
+• Available in: {', '.join(ALLOWED_CHANNELS)}
+
+**💡 Example Commands:**
+• `!briefing` or `!daily` - Get comprehensive morning briefing
+• `!today` - See today's complete schedule
+• `!overview` - Complete executive overview with 3-day outlook
+• `!schedule week` - View this week's agenda
+• `!upcoming 3` - See next 3 days of events
+• `!agenda` - Comprehensive agenda overview
+• "Give me my morning briefing" - Natural language briefing request
+• "What's my day like?" - Natural language schedule request
+• "Move my dentist appointment to my tasks calendar"
+• "Reschedule all team meetings to next Tuesday"
+• "Find me 2 hours this week for deep work"
+"""
+        
+        await ctx.send(help_text)
+        
+    except Exception as e:
+        print(f"❌ Help command error: {e}")
+        await ctx.send("👑 Help system needs calibration. Please try again.")
+
+@bot.command(name='status')
+async def status_command(ctx):
+    """Executive system status with comprehensive diagnostics"""
+    try:
+        # Calendar status
+        calendar_status = "❌ No calendars accessible"
+        if accessible_calendars:
+            calendar_names = [name for name, _, _ in accessible_calendars]
+            calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
+        
+        # Research status
+        research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
+        
+        # Assistant status
+        assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
+        
+        # Service account info
+        sa_info = "Not configured"
+        if service_account_email:
+            sa_info = f"✅ {service_account_email}"
+        
+        # Calendar capabilities
+        capabilities = []
+        if accessible_calendars:
+            capabilities = [
+                "📅 Read Events", "✅ Create Events", "🔄 Reschedule Events",
+                "📋 Move Tasks", "🗑️ Delete Events", "🔄 Bulk Operations",
+                "🎯 Smart Scheduling", "⚠️ Conflict Detection"
+            ]
+        
+        status_text = f"""👑 **{ASSISTANT_NAME} Complete Executive Status**
+
+**🤖 Core Systems:**
+• Discord: ✅ Connected as {bot.user.name if bot.user else 'Unknown'}
+• OpenAI Assistant: {assistant_status}
+• Service Account: {sa_info}
+
+**📅 Calendar Integration:**
+• Status: {calendar_status}
+• Timezone: 🇨🇦 Toronto (America/Toronto)
+• Capabilities: {', '.join(capabilities) if capabilities else 'Limited'}
+
+**🔍 Planning Research:**
+• Brave Search API: {research_status}
+
+**💼 Executive Features:**
+• Active conversations: {len(user_conversations)}
+• Channels: {', '.join(ALLOWED_CHANNELS)}
+• Enhanced Functions: Complete Calendar Management, Smart Scheduling, Bulk Operations
+
+**⚡ Performance:**
+• Uptime: Ready for complete executive assistance
+• Memory: {len(processing_messages)} processing
+• Calendar Access: Full Google Calendar API integration"""
+        
+        await ctx.send(status_text)
+        
+    except Exception as e:
+        print(f"❌ Status command error: {e}")
+        await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")
+
+@bot.command(name='today')
+async def today_command(ctx):
+    """Today's executive schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await ctx.send(schedule)
+    except Exception as e:
+        print(f"❌ Today command error: {e}")
+        await ctx.send("👑 Today's schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            # Limit days to reasonable range
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await ctx.send(events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("👑 Upcoming events unavailable. Please try again.")
+
+@bot.command(name='briefing')
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("👑 Executive briefing unavailable. Please try again.")
+
+@bot.command(name='daily')
+async def daily_command(ctx):
+    """Daily executive briefing - alias for briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Daily briefing command error: {e}")
+        await ctx.send("👑 Daily executive briefing unavailable. Please try again.")
+
+@bot.command(name='morning')
+async def morning_command(ctx):
+    """Morning briefing command - alias for briefing"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await ctx.send(briefing)
+    except Exception as e:
+        print(f"❌ Morning briefing command error: {e}")
+        await ctx.send("👑 Morning executive briefing unavailable. Please try again.")
+
+@bot.command(name='calendar')
+async def calendar_command(ctx):
+    """Quick calendar overview command"""
+    try:
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            calendar_query = "what's on my calendar today and upcoming strategic overview executive summary"
+            response = await get_rose_response(calendar_query, user_id)
+            await send_long_message(ctx.message, response)
+    except Exception as e:
+        print(f"❌ Calendar command error: {e}")
+        await ctx.send("👑 Calendar overview unavailable. Please try again.")
+
+@bot.command(name='schedule')
+async def schedule_command(ctx, *, timeframe: str = "today"):
+    """Flexible schedule command - can show today, upcoming, or specific timeframes"""
+    try:
+        async with ctx.typing():
+            timeframe_lower = timeframe.lower()
+            
+            if any(word in timeframe_lower for word in ["today", "now", "current"]):
+                response = get_today_schedule()
+            elif any(word in timeframe_lower for word in ["tomorrow", "next"]):
+                response = get_upcoming_events(1)
+            elif any(word in timeframe_lower for word in ["week", "7"]):
+                response = get_upcoming_events(7)
+            elif any(word in timeframe_lower for word in ["month", "30"]):
+                response = get_upcoming_events(30)
+            elif timeframe_lower.isdigit():
+                days = int(timeframe_lower)
+                days = max(1, min(days, 30))  # Limit range
+                response = get_upcoming_events(days)
+            else:
+                # Default to today
+                response = get_today_schedule()
+            
+            await ctx.send(response)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("👑 Schedule view unavailable. Please try again.")
+
+@bot.command(name='agenda')
+async def agenda_command(ctx):
+    """Executive agenda command - comprehensive view"""
+    try:
+        async with ctx.typing():
+            # Get comprehensive agenda view
+            today_schedule = get_today_schedule()
+            tomorrow_events = get_upcoming_events(1)
+            
+            agenda = f"📋 **Executive Agenda Overview**\n\n{today_schedule}\n\n**Tomorrow:**\n{tomorrow_events}"
+            
+            # Limit response length
+            if len(agenda) > 1900:
+                agenda = agenda[:1900] + "\n\n👑 *Use `!today` and `!upcoming` for detailed views*"
+            
+            await ctx.send(agenda)
+    except Exception as e:
+        print(f"❌ Agenda command error: {e}")
+        await ctx.send("👑 Executive agenda unavailable. Please try again.")
+
+@bot.command(name='overview')
+async def overview_command(ctx):
+    """Executive overview command - comprehensive briefing"""
+    try:
+        async with ctx.typing():
+            # Get comprehensive overview
+            briefing = get_morning_briefing()
+            upcoming = get_upcoming_events(3)
+            
+            overview = f"{briefing}\n\n📋 **3-Day Executive Outlook:**\n{upcoming}"
+            
+            # Manage length
+            if len(overview) > 1900:
+                # Send briefing first, then upcoming
+                await ctx.send(briefing)
+                await ctx.send(f"📋 **3-Day Executive Outlook:**\n{upcoming}")
+            else:
+                await ctx.send(overview)
+                
+    except Exception as e:
+        print(f"❌ Overview command error: {e}")
+        await ctx.send("👑 Executive overview unavailable. Please try again.")
+
+@bot.command(name='create')
+async def create_command(ctx, *, event_details: str = None):
+    """Create calendar event command"""
+    try:
+        if not event_details:
+            await ctx.send("👑 **Create Event Usage:** `!create <event details>`\n\nExamples:\n• `!create Team meeting tomorrow at 2pm for 1 hour`\n• `!create Doctor appointment Friday at 10am`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            create_query = f"create a calendar event: {event_details}"
+            response = await get_rose_response(create_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Create command error: {e}")
+        await ctx.send("👑 Event creation unavailable. Please try again.")
+
+@bot.command(name='move')
+async def move_command(ctx, *, move_details: str = None):
+    """Move task between calendars command"""
+    try:
+        if not move_details:
+            await ctx.send("👑 **Move Task Usage:** `!move <task details>`\n\nExamples:\n• `!move dentist appointment to tasks calendar`\n• `!move team meeting to main calendar`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            move_query = f"move task between calendars: {move_details}"
+            response = await get_rose_response(move_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Move command error: {e}")
+        await ctx.send("👑 Task moving unavailable. Please try again.")
+
+@bot.command(name='reschedule')
+async def reschedule_command(ctx, *, reschedule_details: str = None):
+    """Reschedule event command"""
+    try:
+        if not reschedule_details:
+            await ctx.send("👑 **Reschedule Usage:** `!reschedule <event details>`\n\nExamples:\n• `!reschedule team meeting to tomorrow at 3pm`\n• `!reschedule doctor appointment to next Friday`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            reschedule_query = f"reschedule event: {reschedule_details}"
+            response = await get_rose_response(reschedule_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Reschedule command error: {e}")
+        await ctx.send("👑 Event rescheduling unavailable. Please try again.")
+
+@bot.command(name='delete')
+async def delete_command(ctx, *, delete_details: str = None):
+    """Delete calendar event command"""
+    try:
+        if not delete_details:
+            await ctx.send("👑 **Delete Event Usage:** `!delete <event details>`\n\nExamples:\n• `!delete cancelled lunch meeting`\n• `!delete old team standup`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            delete_query = f"delete calendar event: {delete_details}"
+            response = await get_rose_response(delete_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Delete command error: {e}")
+        await ctx.send("👑 Event deletion unavailable. Please try again.")
+
+@bot.command(name='bulk')
+async def bulk_command(ctx, *, bulk_details: str = None):
+    """Bulk reschedule events command"""
+    try:
+        if not bulk_details:
+            await ctx.send("👑 **Bulk Reschedule Usage:** `!bulk <bulk operation details>`\n\nExamples:\n• `!bulk move all team meetings forward by 2 hours`\n• `!bulk reschedule client calls to next week`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            bulk_query = f"bulk reschedule events: {bulk_details}"
+            response = await get_rose_response(bulk_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Bulk command error: {e}")
+        await ctx.send("👑 Bulk operations unavailable. Please try again.")
+
+@bot.command(name='smart')
+async def smart_command(ctx, *, smart_details: str = None):
+    """Smart event scheduling command"""
+    try:
+        if not smart_details:
+            await ctx.send("👑 **Smart Scheduling Usage:** `!smart <event title and preferences>`\n\nExamples:\n• `!smart quarterly review meeting 2 hours`\n• `!smart deep work session weekday mornings`")
+            return
+        
+        async with ctx.typing():
+            user_id = str(ctx.author.id)
+            smart_query = f"smart schedule event with optimal timing: {smart_details}"
+            response = await get_rose_response(smart_query, user_id)
+            await send_long_message(ctx.message, response)
+            
+    except Exception as e:
+        print(f"❌ Smart scheduling command error: {e}")
+        await ctx.send("👑 Smart scheduling unavailable. Please try again.")
+
 @bot.command(name='research')
 async def research_command(ctx, *, query: str = None):
     """Planning research command"""
