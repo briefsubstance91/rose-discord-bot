@@ -1682,17 +1682,6 @@ async def overview_command(ctx):
         print(f"❌ Overview command error: {e}")
         await ctx.send("👑 Executive overview unavailable. Please try again.")
 
-@bot.command(name='today')
-async def today_command(ctx):
-    """Today's schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await ctx.send(schedule)
-    except Exception as e:
-        print(f"❌ Today command error: {e}")
-        await ctx.send("👑 Today's schedule unavailable. Please try again.")
-
 @bot.command(name='upcoming')
 async def upcoming_command(ctx, days: int = 7):
     """Upcoming events command"""
@@ -1856,17 +1845,6 @@ async def status_command(ctx):
     except Exception as e:
         print(f"❌ Status command error: {e}")
         await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")
-
-@bot.command(name='today')
-async def today_command(ctx):
-    """Today's executive schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await ctx.send(schedule)
-    except Exception as e:
-        print(f"❌ Today command error: {e}")
-        await ctx.send("👑 Today's schedule unavailable. Please try again.")
 
 @bot.command(name='upcoming')
 async def upcoming_command(ctx, days: int = 7):
