@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Update Rose Assistant with Calendar Management Functions
-Run this script to add the new functions to your OpenAI assistant
+Update Rose Assistant with Calendar Management Functions - CLEAN VERSION
+Run this script to add calendar functions while keeping file search and code interpreter
 """
 
 import os
@@ -13,8 +13,13 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID")
 
-# Define the new calendar management functions
-calendar_functions = [
+# Define ALL tools (preserving existing + adding new calendar functions)
+all_tools = [
+    # PRESERVE EXISTING TOOLS
+    {"type": "file_search"},
+    {"type": "code_interpreter"},
+    
+    # ADD NEW CALENDAR MANAGEMENT FUNCTIONS
     {
         "type": "function",
         "function": {
@@ -41,25 +46,8 @@ calendar_functions = [
         "type": "function",
         "function": {
             "name": "get_morning_briefing",
-            "description": "Get comprehensive morning executive briefing with today + tomorrow preview.",
+            "description": "Get comprehensive morning executive briefing.",
             "parameters": {"type": "object", "properties": {}, "required": []}
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "find_free_time",
-            "description": "Find available time slots in the calendar for scheduling.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "duration_minutes": {"type": "integer", "description": "Duration in minutes", "default": 60},
-                    "preferred_days": {"type": "array", "items": {"type": "string"}, "description": "Preferred days of week"},
-                    "preferred_hours": {"type": "array", "items": {"type": "integer"}, "description": "Preferred hours (24-hour format)"},
-                    "days_ahead": {"type": "integer", "description": "How many days to search ahead", "default": 7}
-                },
-                "required": []
-            }
         }
     },
     {
@@ -83,24 +71,6 @@ calendar_functions = [
     {
         "type": "function",
         "function": {
-            "name": "update_calendar_event",
-            "description": "Update an existing calendar event's details.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "event_search": {"type": "string", "description": "Search term to find the event"},
-                    "new_title": {"type": "string", "description": "New event title (optional)"},
-                    "new_start_time": {"type": "string", "description": "New start time in YYYY-MM-DDTHH:MM:SS format (optional)"},
-                    "new_end_time": {"type": "string", "description": "New end time in YYYY-MM-DDTHH:MM:SS format (optional)"},
-                    "new_description": {"type": "string", "description": "New event description (optional)"}
-                },
-                "required": ["event_search"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "reschedule_event",
             "description": "Reschedule an existing calendar event to a new time.",
             "parameters": {
@@ -108,7 +78,7 @@ calendar_functions = [
                 "properties": {
                     "event_search": {"type": "string", "description": "Search term to find the event"},
                     "new_start_time": {"type": "string", "description": "New start time in YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS format"},
-                    "new_end_time": {"type": "string", "description": "New end time (optional, will calculate from original duration)"}
+                    "new_end_time": {"type": "string", "description": "New end time (optional)"}
                 },
                 "required": ["event_search", "new_start_time"]
             }
@@ -118,12 +88,12 @@ calendar_functions = [
         "type": "function",
         "function": {
             "name": "move_task_between_calendars",
-            "description": "Move a task/event between different calendars (e.g., from BG Calendar to BG Tasks).",
+            "description": "Move a task/event between different calendars.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "task_search": {"type": "string", "description": "Search term to find the task/event"},
-                    "target_calendar": {"type": "string", "description": "Target calendar: 'tasks', 'calendar', or calendar name", "default": "tasks"}
+                    "target_calendar": {"type": "string", "description": "Target calendar: 'tasks' or 'calendar'", "default": "tasks"}
                 },
                 "required": ["task_search"]
             }
@@ -147,13 +117,13 @@ calendar_functions = [
         "type": "function",
         "function": {
             "name": "planning_search",
-            "description": "Search for planning, productivity, and executive information.",
+            "description": "Search for planning and productivity information.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query for planning/productivity research"},
-                    "focus": {"type": "string", "description": "Focus area (e.g., 'time management', 'productivity')", "default": "general"},
-                    "num_results": {"type": "integer", "description": "Number of results (1-5)", "default": 3}
+                    "query": {"type": "string", "description": "Search query for planning research"},
+                    "focus": {"type": "string", "description": "Focus area", "default": "general"},
+                    "num_results": {"type": "integer", "description": "Number of results", "default": 3}
                 },
                 "required": ["query"]
             }
@@ -162,44 +132,28 @@ calendar_functions = [
 ]
 
 # Updated instructions for Rose
-updated_instructions = """You are Rose Ashcombe, executive assistant specialist with complete Google Calendar API integration and advanced task management capabilities.
-
-EXECUTIVE APPROACH:
-- Use executive calendar functions to provide comprehensive scheduling insights
-- Apply strategic planning perspective with productivity optimization
-- Include actionable recommendations with clear timelines
-- Focus on high-impact activity identification and time management
-- Leverage advanced calendar management: create, update, reschedule, move, delete events
-- BRIEFING INTELLIGENCE: For briefing requests, automatically use get_morning_briefing() function
+updated_instructions = """You are Rose Ashcombe, executive assistant specialist with complete Google Calendar integration.
 
 CALENDAR CAPABILITIES:
-- create_calendar_event: Create new events in any accessible calendar
-- update_calendar_event: Modify existing event details
-- reschedule_event: Move events to new times (maintains duration)
-- move_task_between_calendars: Move between BG Calendar ↔ BG Tasks
-- delete_calendar_event: Remove unnecessary events
-- find_free_time: Find optimal time slots for scheduling
-- Smart conflict detection and availability checking
+- create_calendar_event: Create new events
+- reschedule_event: Move events to new times
+- move_task_between_calendars: Move between calendars
+- delete_calendar_event: Remove events
+- get_today_schedule: View today's schedule
+- get_upcoming_events: View upcoming events
+- get_morning_briefing: Comprehensive briefing
 
 USAGE PATTERNS:
 - For "move X to tomorrow": use reschedule_event
 - For "create meeting": use create_calendar_event  
 - For "move to tasks calendar": use move_task_between_calendars
-- For "delete old event": use delete_calendar_event
-- For "when am I free": use find_free_time
-- For "change meeting title": use update_calendar_event
 
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼) and provide organized, action-oriented guidance.
+FORMATTING: Use professional executive formatting with headers (👑 📊 📅 🎯).
 
-STRUCTURE:
-👑 **Executive Summary:** [strategic overview with calendar insights]
-📊 **Strategic Analysis:** [research-backed recommendations]
-🎯 **Action Items:** [specific next steps with timing]
-
-Keep core content focused and always provide strategic context with calendar coordination. Leverage all available calendar management functions to provide comprehensive executive assistance. All times are in Toronto timezone (America/Toronto)."""
+Keep responses focused and actionable. All times in Toronto timezone."""
 
 def update_assistant():
-    """Update the Rose assistant with new calendar functions"""
+    """Update Rose with calendar functions while preserving existing features"""
     
     if not ASSISTANT_ID:
         print("❌ ROSE_ASSISTANT_ID not found in environment variables")
@@ -208,25 +162,33 @@ def update_assistant():
     try:
         print(f"🔄 Updating Rose Assistant {ASSISTANT_ID}...")
         
-        # Update the assistant with new tools and instructions
+        # Update the assistant
         updated_assistant = client.beta.assistants.update(
             assistant_id=ASSISTANT_ID,
-            tools=calendar_functions,
+            tools=all_tools,
             instructions=updated_instructions
         )
         
         print("✅ Rose Assistant updated successfully!")
-        print(f"📋 Functions added: {len(calendar_functions)}")
-        print(f"🤖 Assistant ID: {updated_assistant.id}")
-        print(f"📝 Name: {updated_assistant.name}")
+        print(f"🔧 Total Tools: {len(updated_assistant.tools)}")
         
-        # List the new functions
-        print("\n🔧 New Calendar Functions:")
-        for tool in calendar_functions:
-            if tool["type"] == "function":
-                func_name = tool["function"]["name"]
-                func_desc = tool["function"]["description"]
-                print(f"  • {func_name}: {func_desc}")
+        # Count tools
+        file_search = False
+        code_interpreter = False
+        function_count = 0
+        
+        for tool in updated_assistant.tools:
+            if tool.type == "file_search":
+                file_search = True
+            elif tool.type == "code_interpreter":
+                code_interpreter = True
+            elif tool.type == "function":
+                function_count += 1
+        
+        print(f"\n📊 Tool Summary:")
+        print(f"   📁 File Search: {'✅' if file_search else '❌'}")
+        print(f"   🐍 Code Interpreter: {'✅' if code_interpreter else '❌'}")
+        print(f"   ⚡ Calendar Functions: {function_count}")
         
         return True
         
@@ -235,18 +197,13 @@ def update_assistant():
         return False
 
 if __name__ == "__main__":
-    print("🚀 Rose Assistant Calendar Function Updater")
-    print("==========================================")
+    print("🚀 Rose Assistant Update - Clean Version")
+    print("=======================================")
     
     if update_assistant():
-        print("\n🎉 Update completed! Rose now has full calendar management capabilities.")
-        print("\n💡 Rose can now:")
-        print("  • Create calendar events")
-        print("  • Update existing events") 
-        print("  • Reschedule events to new times")
-        print("  • Move tasks between calendars")
-        print("  • Delete calendar events")
-        print("  • Find free time slots")
-        print("\n👑 Ready for advanced executive assistance!")
+        print(f"\n🎉 Success! Rose now has:")
+        print(f"   ✅ File Search & Code Interpreter")
+        print(f"   ✅ Full Calendar Management")
+        print(f"\n👑 Ready for executive assistance!")
     else:
-        print("\n❌ Update failed. Please check your environment variables and try again.")
+        print(f"\n❌ Update failed. Check your environment variables.")
