@@ -1029,21 +1029,7 @@ async def get_rose_response(message, user_id):
         
         clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
         
-        # Get current date context for Rose
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        today_formatted = now.strftime('%A, %B %d, %Y')
-        today_date = now.strftime('%Y-%m-%d')
-        tomorrow = now + timedelta(days=1)
-        tomorrow_formatted = tomorrow.strftime('%A, %B %d, %Y') 
-        tomorrow_date = tomorrow.strftime('%Y-%m-%d')
-
         enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
-
-CURRENT DATE & TIME CONTEXT:
-- TODAY: {today_formatted} ({today_date})
-- TOMORROW: {tomorrow_formatted} ({tomorrow_date})
-- TIMEZONE: America/Toronto
 
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
@@ -1051,8 +1037,6 @@ RESPONSE GUIDELINES:
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
-- When user says "tomorrow" use {tomorrow_date} ({tomorrow_formatted})
-- When user says "today" use {today_date} ({today_formatted})
 - All times are in Toronto timezone (America/Toronto)"""
         
         try:
