@@ -741,35 +741,25 @@ async def get_rose_response(message, user_id):
         tomorrow_formatted = tomorrow.strftime('%A, %B %d, %Y') 
         tomorrow_date = tomorrow.strftime('%Y-%m-%d')
 
-        enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
-
-CURRENT DATE & TIME CONTEXT:
-- TODAY: {today_formatted} ({today_date})
-- TOMORROW: {tomorrow_formatted} ({tomorrow_date})
-- TIMEZONE: America/Toronto
-
-RESPONSE GUIDELINES:
-- Use professional executive formatting with strategic headers
-- AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
-- GMAIL STATUS: {'Enabled' if gmail_service else 'Disabled'}
-        enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
-
-CURRENT DATE & TIME CONTEXT:
-- TODAY: {today_formatted} ({today_date})
-- TOMORROW: {tomorrow_formatted} ({tomorrow_date})
-- TIMEZONE: America/Toronto
-
-RESPONSE GUIDELINES:
-- Use professional executive formatting with strategic headers
-- AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
-- GMAIL STATUS: {'Enabled' if gmail_service else 'Disabled'}
-- Apply executive assistant tone: strategic, organized, action-oriented
-- Keep main content under 1200 characters for Discord efficiency
-- Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
-- When user says "tomorrow" use {tomorrow_date} ({tomorrow_formatted})
-- When user says "today" use {today_date} ({today_formatted})
-- All times are in Toronto timezone (America/Toronto)
-- Use 24-hour time format (14:30, not 2:30 PM)"""
+        # Properly formatted string with safe concatenation
+        enhanced_message = (
+            f"USER EXECUTIVE REQUEST: {clean_message}\n\n"
+            f"CURRENT DATE & TIME CONTEXT:\n"
+            f"- TODAY: {today_formatted} ({today_date})\n"
+            f"- TOMORROW: {tomorrow_formatted} ({tomorrow_date})\n"
+            f"- TIMEZONE: America/Toronto\n\n"
+            f"RESPONSE GUIDELINES:\n"
+            f"- Use professional executive formatting with strategic headers\n"
+            f"- AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}\n"
+            f"- GMAIL STATUS: {'Enabled' if gmail_service else 'Disabled'}\n"
+            f"- Apply executive assistant tone: strategic, organized, action-oriented\n"
+            f"- Keep main content under 1200 characters for Discord efficiency\n"
+            f"- Use headers like: Crown Executive Summary: or Chart Strategic Analysis:\n"
+            f"- When user says 'tomorrow' use {tomorrow_date} ({tomorrow_formatted})\n"
+            f"- When user says 'today' use {today_date} ({today_formatted})\n"
+            f"- All times are in Toronto timezone (America/Toronto)\n"
+            f"- Use 24-hour time format (14:30, not 2:30 PM)"
+        )
         
         try:
             client.beta.threads.messages.create(
@@ -805,12 +795,12 @@ EXECUTIVE APPROACH:
 - Apply strategic planning perspective with productivity optimization
 - Include actionable recommendations with clear timelines
 
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼 📧) and provide organized, action-oriented guidance.
+FORMATTING: Use professional executive formatting with strategic headers (Crown Chart Calendar Target Office Email) and provide organized, action-oriented guidance.
 
 STRUCTURE:
-👑 **Executive Summary:** [strategic overview with calendar and email insights]
-📊 **Strategic Analysis:** [research-backed recommendations]
-🎯 **Action Items:** [specific next steps with timing]
+Crown **Executive Summary:** [strategic overview with calendar and email insights]
+Chart **Strategic Analysis:** [research-backed recommendations]
+Target **Action Items:** [specific next steps with timing]
 
 Keep core content focused and always provide strategic context with calendar and email coordination."""
             )
