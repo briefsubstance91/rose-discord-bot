@@ -1062,57 +1062,51 @@ def format_calendar_response_simple(response_text):
     
     # Extract Executive Summary
     executive_summary = ""
-    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*([^👑📊🎯📅]*)', response_text, re.DOTALL)
+    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*([^👑📊🎯📅💼🗓️]*)', response_text, re.DOTALL)
     if summary_match:
         executive_summary = summary_match.group(1).strip()
     
-    # Extract Calendar Details
-    calendar_details = ""
-    detail_patterns = [
-        r'📅\s*\*\*Calendar Coordination:\*\*\s*([^👑📊🎯📅]*)',
-        r'💼\s*\*\*Meeting Details:\*\*\s*([^👑📊🎯📅]*)',
-        r'📋\s*\*\*Event Details:\*\*\s*([^👑📊🎯📅]*)'
-    ]
+    # Extract Meeting Details section (look for the original format)
+    meeting_details = ""
     
-    for pattern in detail_patterns:
-        details_match = re.search(pattern, response_text, re.DOTALL)
-        if details_match:
-            calendar_details = details_match.group(1).strip()
-            break
+    # Look for Meeting Details section with Google Calendar link
+    meeting_details_match = re.search(r'💼\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|$)', response_text, re.DOTALL)
+    if meeting_details_match:
+        meeting_details = meeting_details_match.group(1).strip()
     
-    # If no details found, extract basic info
-    if not calendar_details:
-        detail_lines = []
-        for line in response_text.split('\n'):
-            if any(word in line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:']):
-                detail_lines.append(f"• {line.strip()}")
-        calendar_details = "\n".join(detail_lines) if detail_lines else "Meeting details confirmed"
+    # Look for the Google Calendar link section
+    calendar_link = ""
+    link_match = re.search(r'🔗\s*View Event.*?Google Calendar.*?(?:\n.*?)*', response_text, re.DOTALL)
+    if link_match:
+        calendar_link = link_match.group(0).strip()
     
-    # Return ONLY Executive Summary + Calendar Coordination
-    return f"""👑 **Executive Summary:**
+    # If no Meeting Details found, try to extract from other sections
+    if not meeting_details:
+        # Try Calendar Coordination section
+        coord_match = re.search(r'📅\s*\*\*Calendar Coordination:\*\*\s*([^👑📊🎯📅💼🗓️]*)', response_text, re.DOTALL)
+        if coord_match:
+            meeting_details = coord_match.group(1).strip()
+        
+        # If still nothing, extract basic meeting info
+        if not meeting_details:
+            detail_lines = []
+            for line in response_text.split('\n'):
+                if any(word in line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:', 'description:']):
+                    detail_lines.append(f"• {line.strip()}")
+            meeting_details = "\n".join(detail_lines) if detail_lines else "Meeting details confirmed"
+    
+    # Build the response with Meeting Details header
+    simplified_response = f"""👑 **Executive Summary:**
 {executive_summary}
 
-📅 **Calendar Coordination:**
-{calendar_details}"""
-
-async def get_rose_response(message, user_id):
-    """Get response from Rose's enhanced OpenAI assistant"""
-    try:
-        if not ASSISTANT_ID:
-            return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
-        
-        if user_id in user_conversations and user_conversations[user_id].get('active', False):
-            return "👑 Rose is currently analyzing your executive strategy. Please wait a moment..."
-        
-        if user_id not in user_conversations:
-            thread = client.beta.threads.create()
-            user_conversations[user_id] = {'thread_id': thread.id, 'active': False}
-            print(f"👑 Created executive thread for user {user_id}")
-        
-        user_conversations[user_id]['active'] = True
-        thread_id = user_conversations[user_id]['thread_id']
-        
-        clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
+💼 **Meeting Details:**
+{meeting_details}"""
+    
+    # Add the calendar link if found
+    if calendar_link:
+        simplified_response += f"\n\n{calendar_link}"
+    
+    return simplified_response.strip()
         
         # Get current date context for Rose
         toronto_tz = pytz.timezone('America/Toronto')
