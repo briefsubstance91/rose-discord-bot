@@ -1,8 +1,3 @@
-        if len(emails) > 10:
-            summary_parts.append(f"\n... and {len(emails) - 10} more emails")
-        
-        return "\n\n".join(summary_parts)
-    
     async def send_email(self, to_email, subject, body, from_name="Rose Ashcombe"):
         """Send email through Gmail API"""
         if not self.service:
@@ -1892,4 +1887,10 @@ class GmailManager:
         summary_parts.extend(email_lines)
         
         if len(emails) > 10:
-            summary_parts.append(f"\n... and {len(emails) -
+            summary_parts.append(f"\n... and {len(emails) - 10} more emails")
+        
+        return "\n\n".join(summary_parts)
+    
+    async def send_email(self, to_email, subject, body, from_name="Rose Ashcombe"):
+        """Send email through Gmail API"""
+        if not
