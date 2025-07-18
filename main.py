@@ -144,14 +144,29 @@ try:
         service_account_email = credentials_info.get('client_email')
         print(f"📧 Service Account: {service_account_email}")
         
-        # Initialize Gmail service with domain-wide delegation
+        # Initialize Gmail service with proper error handling and testing
         if GMAIL_USER_EMAIL:
-            delegated_credentials = credentials.with_subject(GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL)
-            gmail_service = build('gmail', 'v1', credentials=delegated_credentials)
-            gmail_user_email = GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL
-            print(f"✅ Gmail service initialized for: {gmail_user_email}")
+            try:
+                delegated_credentials = credentials.with_subject(GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL)
+                test_gmail_service = build('gmail', 'v1', credentials=delegated_credentials)
+                
+                # Test basic Gmail access
+                test_result = test_gmail_service.users().getProfile(userId='me').execute()
+                
+                # If test succeeds, set up Gmail service
+                gmail_service = test_gmail_service
+                gmail_user_email = GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL
+                print(f"✅ Gmail service initialized and tested for: {gmail_user_email}")
+                
+            except Exception as gmail_error:
+                print(f"⚠️ Gmail delegation failed: {gmail_error}")
+                print("📧 Gmail features will be disabled - Calendar functions will work normally")
+                gmail_service = None
+                gmail_user_email = None
         else:
             print("⚠️ GMAIL_USER_EMAIL not configured - Gmail features disabled")
+            gmail_service = None
+            gmail_user_email = None
         
         working_calendars = [
             ("BG Calendar", GOOGLE_CALENDAR_ID, "calendar"),
