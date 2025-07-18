@@ -372,7 +372,7 @@ def get_morning_briefing():
         return "🌅 **Morning Briefing:** Error generating briefing"
 
 def create_calendar_event(title, start_time, end_time, calendar_type="calendar", description=""):
-    """Create a new calendar event in specified Google Calendar with concise confirmation"""
+    """Create a new calendar event in specified Google Calendar with detailed confirmation"""
     if not calendar_service or not accessible_calendars:
         return "📅 Calendar integration not available"
     
@@ -474,7 +474,7 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
             body=event
         ).execute()
         
-        # CONCISE CONFIRMATION with 24-hour time format
+        # ENHANCED CONFIRMATION with detailed meeting info
         display_start_dt = start_dt.astimezone(toronto_tz)
         display_end_dt = end_dt.astimezone(toronto_tz)
         
@@ -483,7 +483,18 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
         start_time_24h = display_start_dt.strftime('%H:%M')
         end_time_24h = display_end_dt.strftime('%H:%M')
         
-        return f"✅ **{title}** created\n📅 {day_date}, {start_time_24h} - {end_time_24h}\n🗓️ {target_calendar_name}\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
+        # Build detailed response matching the desired format
+        response = f"📅 **Meeting Details:**\n"
+        response += f"• **Title:** {title}\n"
+        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
+        response += f"• **Location:** {target_calendar_name}\n"
+        
+        if description:
+            response += f"• **Description:** {description}\n"
+        
+        response += f"\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
+        
+        return response
         
     except Exception as e:
         print(f"❌ Error creating calendar event: {e}")
@@ -515,7 +526,7 @@ def find_calendar_event(search_term, days_range=30):
         return None, None, None
 
 def update_calendar_event(event_search, new_title=None, new_start_time=None, new_end_time=None, new_description=None):
-    """Update an existing calendar event"""
+    """Update an existing calendar event with detailed confirmation"""
     if not calendar_service or not accessible_calendars:
         return "📅 Calendar integration not available"
     
@@ -577,8 +588,26 @@ def update_calendar_event(event_search, new_title=None, new_start_time=None, new
             body=found_event
         ).execute()
         
-        # Concise confirmation with 24-hour time
-        return f"✅ **{updated_event['summary']}** updated\n🔄 {', '.join(updated_fields)}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
+        # Enhanced confirmation with detailed meeting info
+        start_dt = datetime.fromisoformat(updated_event['start']['dateTime'].replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(updated_event['end']['dateTime'].replace('Z', '+00:00'))
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        display_start_dt = start_dt.astimezone(toronto_tz)
+        display_end_dt = end_dt.astimezone(toronto_tz)
+        
+        day_date = display_start_dt.strftime('%A, %B %d, %Y')
+        start_time_24h = display_start_dt.strftime('%H:%M')
+        end_time_24h = display_end_dt.strftime('%H:%M')
+        
+        response = f"📅 **Meeting Details:**\n"
+        response += f"• **Title:** {updated_event['summary']}\n"
+        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
+        response += f"• **Location:** {found_calendar_name}\n"
+        response += f"• **Changes:** {', '.join(updated_fields)}\n"
+        response += f"\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
+        
+        return response
         
     except Exception as e:
         print(f"❌ Error updating event: {e}")
@@ -645,15 +674,22 @@ def reschedule_event(event_search, new_start_time, new_end_time=None):
             body=found_event
         ).execute()
         
-        # Concise confirmation with 24-hour time
+        # Enhanced confirmation with detailed meeting info
         display_start_dt = new_start_dt.astimezone(toronto_tz)
         display_end_dt = new_end_dt.astimezone(toronto_tz)
         
-        day_date = display_start_dt.strftime('%A, %B %d')
+        day_date = display_start_dt.strftime('%A, %B %d, %Y')
         start_time_24h = display_start_dt.strftime('%H:%M')
         end_time_24h = display_end_dt.strftime('%H:%M')
         
-        return f"✅ **{updated_event['summary']}** rescheduled\n📅 {day_date}, {start_time_24h} - {end_time_24h}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
+        response = f"📅 **Meeting Details:**\n"
+        response += f"• **Title:** {updated_event['summary']}\n"
+        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
+        response += f"• **Location:** {found_calendar_name}\n"
+        response += f"• **Status:** Rescheduled\n"
+        response += f"\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
+        
+        return response
         
     except Exception as e:
         print(f"❌ Error rescheduling event: {e}")
@@ -722,8 +758,26 @@ def move_task_between_calendars(task_search, target_calendar="tasks"):
             eventId=found_event['id']
         ).execute()
         
-        # Concise confirmation
-        return f"✅ **{found_event['summary']}** moved\n📍 {found_calendar_name} → {target_calendar_name}\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
+        # Enhanced confirmation with detailed meeting info
+        start_dt = datetime.fromisoformat(created_event['start']['dateTime'].replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(created_event['end']['dateTime'].replace('Z', '+00:00'))
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        display_start_dt = start_dt.astimezone(toronto_tz)
+        display_end_dt = end_dt.astimezone(toronto_tz)
+        
+        day_date = display_start_dt.strftime('%A, %B %d, %Y')
+        start_time_24h = display_start_dt.strftime('%H:%M')
+        end_time_24h = display_end_dt.strftime('%H:%M')
+        
+        response = f"📅 **Meeting Details:**\n"
+        response += f"• **Title:** {found_event['summary']}\n"
+        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
+        response += f"• **Location:** {target_calendar_name}\n"
+        response += f"• **Status:** Moved from {found_calendar_name}\n"
+        response += f"\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
+        
+        return response
         
     except HttpError as e:
         return f"❌ Calendar error: {e.resp.status}"
@@ -732,7 +786,7 @@ def move_task_between_calendars(task_search, target_calendar="tasks"):
         return f"❌ Failed to move '{task_search}': {str(e)}"
 
 def delete_calendar_event(event_search):
-    """Delete a calendar event"""
+    """Delete a calendar event with detailed confirmation"""
     if not calendar_service or not accessible_calendars:
         return "📅 Calendar integration not available"
     
@@ -745,6 +799,16 @@ def delete_calendar_event(event_search):
         
         # Store event details before deletion
         event_title = found_event.get('summary', 'Unknown Event')
+        start_dt = datetime.fromisoformat(found_event['start']['dateTime'].replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(found_event['end']['dateTime'].replace('Z', '+00:00'))
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        display_start_dt = start_dt.astimezone(toronto_tz)
+        display_end_dt = end_dt.astimezone(toronto_tz)
+        
+        day_date = display_start_dt.strftime('%A, %B %d, %Y')
+        start_time_24h = display_start_dt.strftime('%H:%M')
+        end_time_24h = display_end_dt.strftime('%H:%M')
         
         # Delete the event
         calendar_service.events().delete(
@@ -752,8 +816,14 @@ def delete_calendar_event(event_search):
             eventId=found_event['id']
         ).execute()
         
-        # Concise confirmation
-        return f"✅ **{event_title}** deleted from {found_calendar_name}"
+        # Enhanced confirmation with meeting details
+        response = f"📅 **Meeting Details:**\n"
+        response += f"• **Title:** {event_title}\n"
+        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
+        response += f"• **Location:** {found_calendar_name}\n"
+        response += f"• **Status:** Successfully deleted\n"
+        
+        return response
         
     except Exception as e:
         print(f"❌ Error deleting event: {e}")
@@ -1049,58 +1119,88 @@ async def handle_rose_functions_enhanced(run, thread_id):
 # MAIN CONVERSATION HANDLER
 # ============================================================================
 
-def format_calendar_response_simple(response_text):
-    """Simplify calendar responses by removing Strategic Analysis and Action Items"""
+def format_calendar_response_enhanced(response_text):
+    """Enhanced calendar response formatting that preserves meeting details"""
     import re
     
     # Check if this is a calendar-related response
-    calendar_keywords = ["calendar", "meeting", "event", "scheduled", "appointment", "briefing"]
+    calendar_keywords = ["calendar", "meeting", "event", "scheduled", "appointment", "briefing", "created", "updated", "deleted", "rescheduled"]
     is_calendar_response = any(keyword in response_text.lower() for keyword in calendar_keywords)
     
     if not is_calendar_response:
         return response_text  # Return unchanged for non-calendar responses
     
+    # Check if this is already a simple confirmation response (✅ Meeting created, etc.)
+    simple_confirmation_patterns = [
+        r'✅\s*\*\*.*?\*\*\s*(created|updated|deleted|rescheduled|moved)',
+        r'📅.*?\d{4}-\d{2}-\d{2}.*?\d{2}:\d{2}',
+        r'🗓️.*?Calendar',
+        r'🔗.*?View Event'
+    ]
+    
+    # If it's already a simple confirmation format, return as is
+    if any(re.search(pattern, response_text, re.IGNORECASE) for pattern in simple_confirmation_patterns):
+        return response_text
+    
     # Extract Executive Summary
     executive_summary = ""
-    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*([^👑📊🎯📅💼🗓️]*)', response_text, re.DOTALL)
+    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*(.*?)(?=📊|🎯|📅|💼|🗓️|$)', response_text, re.DOTALL)
     if summary_match:
         executive_summary = summary_match.group(1).strip()
     
-    # Extract Meeting Details section (look for the original format)
+    # Extract detailed meeting information
     meeting_details = ""
     
-    # Look for Meeting Details section with Google Calendar link
-    meeting_details_match = re.search(r'💼\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|$)', response_text, re.DOTALL)
-    if meeting_details_match:
-        meeting_details = meeting_details_match.group(1).strip()
+    # Look for Meeting Details section
+    meeting_details_patterns = [
+        r'💼\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)',
+        r'📅\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)',
+        r'📋\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)'
+    ]
     
-    # Look for the Google Calendar link section
-    calendar_link = ""
-    link_match = re.search(r'🔗\s*View Event.*?Google Calendar.*?(?:\n.*?)*', response_text, re.DOTALL)
-    if link_match:
-        calendar_link = link_match.group(0).strip()
+    for pattern in meeting_details_patterns:
+        match = re.search(pattern, response_text, re.DOTALL)
+        if match:
+            meeting_details = match.group(1).strip()
+            break
     
-    # If no Meeting Details found, try to extract from other sections
+    # If no Meeting Details found, extract specific details
     if not meeting_details:
-        # Try Calendar Coordination section
-        coord_match = re.search(r'📅\s*\*\*Calendar Coordination:\*\*\s*([^👑📊🎯📅💼🗓️]*)', response_text, re.DOTALL)
-        if coord_match:
-            meeting_details = coord_match.group(1).strip()
+        detail_lines = []
+        for line in response_text.split('\n'):
+            clean_line = line.strip()
+            if any(word in clean_line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:', 'description:']):
+                detail_lines.append(f"• {clean_line}")
+            elif clean_line.startswith('•') and any(word in clean_line.lower() for word in ['title', 'date', 'time', 'location', 'calendar', 'description']):
+                detail_lines.append(clean_line)
         
-        # If still nothing, extract basic meeting info
-        if not meeting_details:
-            detail_lines = []
-            for line in response_text.split('\n'):
-                if any(word in line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:', 'description:']):
-                    detail_lines.append(f"• {line.strip()}")
-            meeting_details = "\n".join(detail_lines) if detail_lines else "Meeting details confirmed"
+        if detail_lines:
+            meeting_details = "\n".join(detail_lines)
+        else:
+            meeting_details = "Meeting details confirmed"
     
-    # Build the response with Meeting Details header
-    simplified_response = f"""👑 **Executive Summary:**
-{executive_summary}
-
-💼 **Meeting Details:**
-{meeting_details}"""
+    # Look for calendar links
+    calendar_link = ""
+    link_patterns = [
+        r'🔗\s*\[View Event\].*',
+        r'🔗.*?View Event.*',
+        r'🔗.*?Google Calendar.*'
+    ]
+    
+    for pattern in link_patterns:
+        match = re.search(pattern, response_text, re.DOTALL)
+        if match:
+            calendar_link = match.group(0).strip()
+            break
+    
+    # Build the response
+    if executive_summary:
+        simplified_response = f"👑 **Executive Summary:**\n{executive_summary}\n\n"
+    else:
+        simplified_response = ""
+    
+    # Add meeting details with proper header
+    simplified_response += f"📅 **Meeting Details:**\n{meeting_details}"
     
     # Add the calendar link if found
     if calendar_link:
@@ -1233,8 +1333,8 @@ Keep core content focused and always provide strategic context with calendar coo
                 if msg.role == "assistant":
                     response = msg.content[0].text.value
                     
-                    # NEW: Apply calendar response simplification
-                    response = format_calendar_response_simple(response)
+                    # FIXED: Apply enhanced calendar response formatting
+                    response = format_calendar_response_enhanced(response)
                     
                     return format_for_discord_rose(response)
         except Exception as e:
