@@ -1,3 +1,7 @@
+@bot.command(name='status')
+async def status_command(ctx):
+    """Executive system status with comprehensive diagnostics"""
+    try:
         calendar_status = "❌ No calendars accessible"
         if accessible_calendars:
             calendar_names = [name for name, _, _ in accessible_calendars]
@@ -37,7 +41,13 @@
 
 **⚡ Performance:**
 • Uptime: Ready for executive assistance
-• Memory: {len(processing_messages)} processing"""#!/usr/bin/env python3
+• Memory: {len(processing_messages)} processing"""
+        
+        await ctx.send(status_text)
+        
+    except Exception as e:
+        print(f"❌ Status command error: {e}")
+        await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")#!/usr/bin/env python3
 """
 ROSE ASHCOMBE - DISCORD BOT (FIXED VERSION)
 Executive Assistant with Full Google Calendar API Integration & Advanced Task Management
