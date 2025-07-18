@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (FIXED VERSION)
-Executive Assistant with Full Google Calendar API Integration & Advanced Task Management
+ROSE ASHCOMBE - REFACTORED VERSION
+Clean response formatting, standardized error handling, consolidated calendar functions
 """
 import pytz
 import discord
@@ -20,13 +20,14 @@ from googleapiclient.errors import HttpError
 import traceback
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+from typing import Dict, List, Optional, Tuple, Union
 
 # Load environment variables
 load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Complete Enhanced)"
+ASSISTANT_ROLE = "Executive Assistant (Refactored)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -35,10 +36,11 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Google Calendar integration
+# Enhanced calendar integration
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
+BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')
 
 # Validate critical environment variables
 if not DISCORD_TOKEN:
@@ -52,6 +54,467 @@ if not OPENAI_API_KEY:
 if not ASSISTANT_ID:
     print("❌ CRITICAL: ROSE_ASSISTANT_ID not found in environment variables")
     exit(1)
+
+# ============================================================================
+# STANDARDIZED ERROR HANDLING CLASS
+# ============================================================================
+
+class RoseErrorHandler:
+    """Centralized error handling for consistent user experience"""
+    
+    @staticmethod
+    def handle_discord_error(error: Exception, context: str = "Discord operation") -> str:
+        """Handle Discord-related errors with user-friendly messages"""
+        error_str = str(error).lower()
+        error_msg = f"❌ {context}: {str(error)[:100]}"
+        print(f"{error_msg}\nFull traceback: {traceback.format_exc()}")
+        
+        if "rate limit" in error_str or "429" in error_str:
+            return "⏳ Rose is handling multiple requests. Please try again in a moment."
+        elif "timeout" in error_str:
+            return "⏱️ Request timed out. Please try a more specific query."
+        elif "permission" in error_str or "403" in error_str:
+            return "🔐 Permission issue detected. Contact administrator if this persists."
+        elif "not found" in error_str or "404" in error_str:
+            return "🔍 Requested resource not found. Please check your request."
+        else:
+            return "👑 Executive assistance temporarily unavailable. Please try again."
+    
+    @staticmethod
+    def handle_api_error(error: Exception, service: str = "API") -> str:
+        """Handle API-related errors"""
+        error_str = str(error).lower()
+        
+        if "quota" in error_str or "limit" in error_str:
+            return f"📊 {service} quota reached. Executive capabilities temporarily reduced."
+        elif "unauthorized" in error_str or "authentication" in error_str:
+            return f"🔐 {service} authentication issue. Contact administrator."
+        elif "timeout" in error_str:
+            return f"⏱️ {service} timeout. Please try again."
+        else:
+            return f"🔧 {service} temporarily unavailable. ({str(error)[:50]})"
+    
+    @staticmethod
+    def handle_calendar_error(error: Exception, operation: str = "Calendar operation") -> str:
+        """Handle calendar-specific errors"""
+        if isinstance(error, HttpError):
+            status_code = error.resp.status
+            if status_code == 404:
+                return "📅 Calendar not found. Please check calendar permissions."
+            elif status_code == 403:
+                return "🔐 Calendar access denied. Share calendar with service account."
+            elif status_code == 400:
+                return "⚠️ Invalid calendar request. Please check your query."
+            else:
+                return f"📅 Calendar error ({status_code}). Please try again."
+        else:
+            return RoseErrorHandler.handle_api_error(error, "Calendar")
+    
+    @staticmethod
+    def log_error(error: Exception, context: str, details: Dict = None):
+        """Log detailed error information for debugging"""
+        print(f"❌ ERROR in {context}:")
+        print(f"   Type: {type(error).__name__}")
+        print(f"   Message: {str(error)}")
+        if details:
+            print(f"   Details: {details}")
+        print(f"   Traceback: {traceback.format_exc()}")
+
+# ============================================================================
+# IMPROVED RESPONSE FORMATTING CLASS
+# ============================================================================
+
+class ResponseFormatter:
+    """Clean, structured response formatting without complex regex"""
+    
+    SECTION_PATTERNS = {
+        'executive_summary': [
+            r'👑\s*\*\*Executive Summary:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)',
+            r'Executive Summary:?\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)',
+            r'Summary:?\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)'
+        ],
+        'calendar_details': [
+            r'📅\s*\*\*(?:Calendar Coordination|Meeting Details):?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)',
+            r'📅\s*\*\*Calendar:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)',
+            r'💼\s*\*\*Meeting Details:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)'
+        ],
+        'strategic_analysis': [
+            r'📊\s*\*\*Strategic Analysis:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n🎯|\n📅|\n💼|$)',
+            r'📊\s*\*\*Analysis:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n🎯|\n📅|\n💼|$)'
+        ],
+        'action_items': [
+            r'🎯\s*\*\*Action Items:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n📅|\n💼|$)',
+            r'🎯\s*\*\*Actions:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n📅|\n💼|$)'
+        ]
+    }
+    
+    @classmethod
+    def format_response(cls, response_text: str, response_type: str = "general") -> str:
+        """Main formatting method that routes to specific formatters"""
+        try:
+            if not response_text or not response_text.strip():
+                return "👑 Executive response processing... Please try again."
+            
+            # Determine response type if not specified
+            if response_type == "general":
+                response_type = cls._detect_response_type(response_text)
+            
+            # Route to appropriate formatter
+            if response_type == "calendar":
+                return cls._format_calendar_response(response_text)
+            elif response_type == "planning":
+                return cls._format_planning_response(response_text)
+            else:
+                return cls._format_general_response(response_text)
+                
+        except Exception as e:
+            RoseErrorHandler.log_error(e, "Response formatting")
+            return "👑 Executive message formatting... Please try again."
+    
+    @classmethod
+    def _detect_response_type(cls, text: str) -> str:
+        """Detect response type based on content"""
+        text_lower = text.lower()
+        
+        # Calendar indicators
+        calendar_indicators = ['meeting', 'event', 'calendar', 'schedule', 'appointment', 'time:', 'date:']
+        if any(indicator in text_lower for indicator in calendar_indicators):
+            return "calendar"
+        
+        # Planning indicators  
+        planning_indicators = ['strategy', 'plan', 'analysis', 'research', 'action item']
+        if any(indicator in text_lower for indicator in planning_indicators):
+            return "planning"
+        
+        return "general"
+    
+    @classmethod
+    def _extract_section(cls, text: str, section_key: str) -> str:
+        """Extract specific section using multiple pattern attempts"""
+        patterns = cls.SECTION_PATTERNS.get(section_key, [])
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                content = match.group(1).strip()
+                # Clean up the content
+                content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)  # Remove excessive newlines
+                content = re.sub(r'^\*\*|\*\*$', '', content)  # Remove leading/trailing **
+                return content.strip()
+        
+        return ""
+    
+    @classmethod
+    def _extract_links(cls, text: str) -> str:
+        """Extract calendar or other links"""
+        link_patterns = [
+            r'🔗\s*\[View Event\][^)]*\)',
+            r'🔗[^)]*View Event[^)]*\)',
+            r'🔗[^)]*Google Calendar[^)]*\)',
+            r'🔗.*?https://calendar\.google\.com[^\s)]*'
+        ]
+        
+        for pattern in link_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(0).strip()
+        
+        return ""
+    
+    @classmethod
+    def _format_calendar_response(cls, text: str) -> str:
+        """Format calendar-specific responses (simplified)"""
+        summary = cls._extract_section(text, 'executive_summary')
+        details = cls._extract_section(text, 'calendar_details')
+        links = cls._extract_links(text)
+        
+        # Build response with only essential sections
+        response_parts = []
+        
+        if summary:
+            response_parts.append(f"👑 **Executive Summary:**\n{summary}")
+        
+        if details:
+            response_parts.append(f"📅 **Calendar Coordination:**\n{details}")
+        elif not summary:  # Fallback if no clear sections
+            # Try to extract key calendar info from the full text
+            calendar_info = cls._extract_calendar_fallback(text)
+            if calendar_info:
+                response_parts.append(f"📅 **Calendar Coordination:**\n{calendar_info}")
+        
+        if links:
+            response_parts.append(links)
+        
+        if not response_parts:
+            # Final fallback - clean up the original text
+            return cls._clean_response_text(text)
+        
+        return "\n\n".join(response_parts)
+    
+    @classmethod
+    def _format_planning_response(cls, text: str) -> str:
+        """Format planning/strategic responses (full format)"""
+        summary = cls._extract_section(text, 'executive_summary')
+        analysis = cls._extract_section(text, 'strategic_analysis')
+        actions = cls._extract_section(text, 'action_items')
+        calendar = cls._extract_section(text, 'calendar_details')
+        
+        response_parts = []
+        
+        if summary:
+            response_parts.append(f"👑 **Executive Summary:**\n{summary}")
+        
+        if analysis:
+            response_parts.append(f"📊 **Strategic Analysis:**\n{analysis}")
+        
+        if actions:
+            response_parts.append(f"🎯 **Action Items:**\n{actions}")
+        
+        if calendar:
+            response_parts.append(f"📅 **Calendar Coordination:**\n{calendar}")
+        
+        if not response_parts:
+            return cls._clean_response_text(text)
+        
+        return "\n\n".join(response_parts)
+    
+    @classmethod
+    def _format_general_response(cls, text: str) -> str:
+        """Format general responses"""
+        # For general responses, try to preserve structure but clean up
+        return cls._clean_response_text(text)
+    
+    @classmethod
+    def _extract_calendar_fallback(cls, text: str) -> str:
+        """Fallback method to extract calendar info when sections aren't clear"""
+        # Look for common calendar patterns
+        calendar_lines = []
+        
+        for line in text.split('\n'):
+            line = line.strip()
+            if any(keyword in line.lower() for keyword in ['title:', 'date:', 'time:', 'location:', 'calendar:', 'created']):
+                if not line.startswith('**') or not line.endswith('**'):
+                    calendar_lines.append(f"• {line}")
+                else:
+                    calendar_lines.append(line)
+        
+        return "\n".join(calendar_lines) if calendar_lines else ""
+    
+    @classmethod
+    def _clean_response_text(cls, text: str) -> str:
+        """Clean up response text while preserving structure"""
+        # Remove excessive newlines
+        cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        
+        # Ensure proper Discord character limits
+        if len(cleaned) > 1900:
+            cleaned = cleaned[:1900] + "\n\n👑 *(Executive insights continue)*"
+        
+        return cleaned.strip()
+
+# ============================================================================
+# CONSOLIDATED CALENDAR MANAGEMENT CLASS
+# ============================================================================
+
+class CalendarManager:
+    """Unified calendar operations with consistent error handling"""
+    
+    def __init__(self, calendar_service, accessible_calendars):
+        self.service = calendar_service
+        self.calendars = accessible_calendars or []
+        self.toronto_tz = pytz.timezone('America/Toronto')
+    
+    def _get_time_range(self, timeframe: str) -> Tuple[str, str]:
+        """Get ISO time range for different timeframes"""
+        now = datetime.now(self.toronto_tz)
+        
+        if timeframe == "today":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif timeframe == "tomorrow":
+            tomorrow = now + timedelta(days=1)
+            start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif timeframe == "week":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=7)
+        elif timeframe == "month":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=30)
+        else:  # Default to today
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        return start.isoformat(), end.isoformat()
+    
+    async def get_events(self, 
+                        timeframe: str = "today",
+                        max_results: int = 10,
+                        calendar_filter: List[str] = None) -> Dict:
+        """Unified method to get events from all or filtered calendars"""
+        if not self.service:
+            return {
+                'success': False,
+                'error': 'Calendar service not available',
+                'events': [],
+                'summary': 'Calendar integration not configured'
+            }
+        
+        try:
+            time_min, time_max = self._get_time_range(timeframe)
+            all_events = []
+            calendars_searched = []
+            errors = []
+            
+            for calendar_id, calendar_name in self.calendars:
+                # Apply calendar filter if specified
+                if calendar_filter and calendar_name not in calendar_filter:
+                    continue
+                
+                try:
+                    events_result = self.service.events().list(
+                        calendarId=calendar_id,
+                        timeMin=time_min,
+                        timeMax=time_max,
+                        maxResults=max_results,
+                        singleEvents=True,
+                        orderBy='startTime'
+                    ).execute()
+                    
+                    events = events_result.get('items', [])
+                    
+                    # Add calendar source to each event
+                    for event in events:
+                        event['calendar_source'] = calendar_name
+                        event['calendar_id'] = calendar_id
+                    
+                    all_events.extend(events)
+                    calendars_searched.append(calendar_name)
+                    
+                except HttpError as e:
+                    error_msg = RoseErrorHandler.handle_calendar_error(e, f"Fetching {calendar_name}")
+                    errors.append(f"{calendar_name}: {error_msg}")
+                    RoseErrorHandler.log_error(e, f"Calendar fetch for {calendar_name}")
+                
+                except Exception as e:
+                    error_msg = RoseErrorHandler.handle_api_error(e, f"{calendar_name} Calendar")
+                    errors.append(f"{calendar_name}: {error_msg}")
+                    RoseErrorHandler.log_error(e, f"Calendar fetch for {calendar_name}")
+            
+            # Sort all events by start time
+            all_events.sort(key=lambda x: x.get('start', {}).get('dateTime', x.get('start', {}).get('date', '')))
+            
+            return {
+                'success': True,
+                'events': all_events[:max_results],
+                'total_found': len(all_events),
+                'timeframe': timeframe,
+                'calendars_searched': calendars_searched,
+                'errors': errors,
+                'summary': self._create_events_summary(all_events[:max_results], timeframe, calendars_searched, errors)
+            }
+            
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, "Calendar Manager")
+            RoseErrorHandler.log_error(e, "Calendar Manager get_events")
+            return {
+                'success': False,
+                'error': error_msg,
+                'events': [],
+                'summary': error_msg
+            }
+    
+    def _create_events_summary(self, events: List, timeframe: str, calendars: List[str], errors: List[str]) -> str:
+        """Create a formatted summary of calendar events"""
+        if not events and not errors:
+            return f"📅 No events found for {timeframe}"
+        
+        if not events and errors:
+            return f"📅 Calendar access issues:\n" + "\n".join(f"• {error}" for error in errors)
+        
+        # Format events
+        event_lines = []
+        for event in events:
+            try:
+                summary = event.get('summary', 'Untitled Event')
+                start = event.get('start', {})
+                calendar_source = event.get('calendar_source', 'Unknown')
+                
+                # Format time
+                if start.get('dateTime'):
+                    # Parse datetime
+                    start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
+                    if start_dt.tzinfo:
+                        start_dt = start_dt.astimezone(self.toronto_tz)
+                    time_str = start_dt.strftime('%I:%M %p').lower().lstrip('0')
+                elif start.get('date'):
+                    time_str = "All day"
+                else:
+                    time_str = "Unknown time"
+                
+                event_lines.append(f"• **{time_str}** - {summary} *({calendar_source})*")
+                
+            except Exception as e:
+                RoseErrorHandler.log_error(e, "Event formatting", {'event': event})
+                event_lines.append(f"• Event formatting error")
+        
+        # Build summary
+        header = f"📅 **{timeframe.title()} Schedule** ({len(events)} event{'s' if len(events) != 1 else ''})"
+        
+        summary_parts = [header]
+        if calendars:
+            summary_parts.append(f"📋 *Searched: {', '.join(calendars)}*")
+        
+        summary_parts.extend(event_lines)
+        
+        if errors:
+            summary_parts.append(f"\n⚠️ **Calendar Issues:**")
+            summary_parts.extend(f"• {error}" for error in errors)
+        
+        return "\n".join(summary_parts)
+    
+    async def create_event(self, event_data: Dict) -> Dict:
+        """Create a new calendar event"""
+        if not self.service:
+            return {
+                'success': False,
+                'error': 'Calendar service not available'
+            }
+        
+        try:
+            # Use primary calendar or first available
+            calendar_id = self.calendars[0][0] if self.calendars else 'primary'
+            
+            # Create event
+            created_event = self.service.events().insert(
+                calendarId=calendar_id,
+                body=event_data
+            ).execute()
+            
+            return {
+                'success': True,
+                'event_id': created_event.get('id'),
+                'event_link': created_event.get('htmlLink'),
+                'summary': f"✅ Event created: {event_data.get('summary', 'New Event')}"
+            }
+            
+        except HttpError as e:
+            error_msg = RoseErrorHandler.handle_calendar_error(e, "Event creation")
+            return {
+                'success': False,
+                'error': error_msg
+            }
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, "Calendar")
+            RoseErrorHandler.log_error(e, "Calendar event creation", {'event_data': event_data})
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
+# ============================================================================
+# INITIALIZE SERVICES WITH ENHANCED ERROR HANDLING
+# ============================================================================
 
 # Discord setup
 try:
@@ -72,42 +535,8 @@ except Exception as e:
 # Google Calendar setup
 calendar_service = None
 accessible_calendars = []
-service_account_email = None
+calendar_manager = None
 
-def test_calendar_access(calendar_id, calendar_name):
-    """Test calendar access with comprehensive error handling"""
-    if not calendar_service or not calendar_id:
-        return False
-    
-    try:
-        calendar_info = calendar_service.calendars().get(calendarId=calendar_id).execute()
-        print(f"✅ {calendar_name} accessible")
-        
-        now = datetime.now(pytz.UTC)
-        past_24h = now - timedelta(hours=24)
-        
-        events_result = calendar_service.events().list(
-            calendarId=calendar_id,
-            timeMin=past_24h.isoformat(),
-            timeMax=now.isoformat(),
-            maxResults=5,
-            singleEvents=True
-        ).execute()
-        
-        events = events_result.get('items', [])
-        print(f"✅ {calendar_name} events: {len(events)} found")
-        
-        return True
-        
-    except HttpError as e:
-        error_code = e.resp.status
-        print(f"❌ {calendar_name} HTTP Error {error_code}")
-        return False
-    except Exception as e:
-        print(f"❌ {calendar_name} error: {e}")
-        return False
-
-# Initialize Google Calendar service
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
@@ -115,869 +544,140 @@ try:
             credentials_info,
             scopes=[
                 'https://www.googleapis.com/auth/calendar.readonly',
-                'https://www.googleapis.com/auth/calendar.events',
-                'https://www.googleapis.com/auth/calendar'
+                'https://www.googleapis.com/auth/calendar.events'
             ]
         )
         calendar_service = build('calendar', 'v3', credentials=credentials)
-        print("✅ Google Calendar service initialized")
         
-        service_account_email = credentials_info.get('client_email')
-        print(f"📧 Service Account: {service_account_email}")
+        # Initialize calendar manager
+        # Get accessible calendars (simplified from original)
+        calendar_list = calendar_service.calendarList().list().execute()
+        for calendar in calendar_list.get('items', []):
+            accessible_calendars.append((calendar['id'], calendar.get('summary', 'Unnamed')))
         
-        working_calendars = [
-            ("BG Calendar", GOOGLE_CALENDAR_ID, "calendar"),
-            ("BG Tasks", GOOGLE_TASKS_CALENDAR_ID, "tasks")
-        ]
-        
-        for name, calendar_id, calendar_type in working_calendars:
-            if calendar_id and test_calendar_access(calendar_id, name):
-                accessible_calendars.append((name, calendar_id, calendar_type))
-        
-        if not accessible_calendars:
-            print("⚠️ No configured calendars accessible, testing primary...")
-            if test_calendar_access('primary', "Primary"):
-                accessible_calendars.append(("Primary", "primary", "calendar"))
-        
-        print(f"\n📅 Final accessible calendars: {len(accessible_calendars)}")
-        for name, _, _ in accessible_calendars:
-            print(f"   ✅ {name}")
-            
-    else:
-        print("⚠️ Google Calendar credentials not found")
+        calendar_manager = CalendarManager(calendar_service, accessible_calendars)
+        print(f"✅ Google Calendar initialized with {len(accessible_calendars)} calendars")
         
 except Exception as e:
-    print(f"❌ Google Calendar setup error: {e}")
-    calendar_service = None
-    accessible_calendars = []
+    print(f"⚠️ Google Calendar initialization failed: {e}")
+    calendar_manager = CalendarManager(None, [])
 
-# Memory and duplicate prevention systems
+# Global state management
 user_conversations = {}
-processing_messages = set()
+active_runs = {}
 last_response_time = {}
-
-print(f"👑 Starting {ASSISTANT_NAME} - {ASSISTANT_ROLE}...")
+processing_messages = set()
 
 # ============================================================================
-# CORE CALENDAR FUNCTIONS
+# CONSOLIDATED CALENDAR FUNCTIONS (Replace multiple similar functions)
 # ============================================================================
 
-def get_calendar_events(calendar_id, start_time, end_time, max_results=100):
-    """Get events from a specific calendar"""
-    if not calendar_service:
-        return []
+async def get_calendar_events_unified(timeframe="today", max_results=10, calendar_filter=None):
+    """Unified calendar function replacing get_today_schedule, get_upcoming_events, etc."""
+    if not calendar_manager:
+        return "📅 Calendar integration not available"
     
     try:
-        events_result = calendar_service.events().list(
-            calendarId=calendar_id,
-            timeMin=start_time.isoformat(),
-            timeMax=end_time.isoformat(),
-            maxResults=max_results,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
+        result = await calendar_manager.get_events(
+            timeframe=timeframe,
+            max_results=max_results,
+            calendar_filter=calendar_filter
+        )
         
-        events = events_result.get('items', [])
-        return events
-        
-    except Exception as e:
-        print(f"❌ Error getting events from {calendar_id}: {e}")
-        return []
-
-def format_event(event, calendar_type="", user_timezone=None):
-    """Format a single event with Toronto timezone"""
-    if user_timezone is None:
-        user_timezone = pytz.timezone('America/Toronto')
-    
-    start = event['start'].get('dateTime', event['start'].get('date'))
-    title = event.get('summary', 'Untitled Event')
-    
-    if calendar_type == "tasks":
-        title = f"✅ {title}"
-    elif calendar_type == "calendar":
-        title = f"📅 {title}"
-    
-    if 'T' in start:  # Has time
-        try:
-            utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-            local_time = utc_time.astimezone(user_timezone)
-            time_str = local_time.strftime('%H:%M')  # 24-hour format
-            return f"• {time_str}: {title}"
-        except Exception as e:
-            print(f"❌ Error formatting event: {e}")
-            return f"• {title}"
-    else:  # All day event
-        return f"• All Day: {title}"
-
-def get_today_schedule():
-    """Get today's schedule with enhanced formatting"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 **Today's Schedule:** Calendar integration not available\n\n🎯 **Manual Planning:** Review your calendar apps directly"
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow_toronto = today_toronto.replace(hour=23, minute=59, second=59)
-        
-        today_utc = today_toronto.astimezone(pytz.UTC)
-        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
-        
-        all_events = []
-        
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, today_utc, tomorrow_utc)
-            for event in events:
-                formatted = format_event(event, calendar_type, toronto_tz)
-                all_events.append((event, formatted, calendar_type, calendar_name))
-        
-        if not all_events:
-            calendar_list = ", ".join([name for name, _, _ in accessible_calendars])
-            return f"📅 **Today's Schedule:** No events found\n\n🎯 **Executive Opportunity:** Clear schedule across {calendar_list}"
-        
-        def get_event_time(event_tuple):
-            event = event_tuple[0]
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            try:
-                if 'T' in start:
-                    utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    return utc_time.astimezone(toronto_tz)
-                else:
-                    return datetime.fromisoformat(start)
-            except:
-                return datetime.now(toronto_tz)
-        
-        all_events.sort(key=get_event_time)
-        
-        formatted_events = [event_tuple[1] for event_tuple in all_events]
-        
-        calendar_counts = {}
-        for _, _, calendar_type, calendar_name in all_events:
-            calendar_counts[calendar_name] = calendar_counts.get(calendar_name, 0) + 1
-        
-        header = f"📅 **Today's Executive Schedule:** {len(all_events)} events"
-        
-        if calendar_counts:
-            breakdown = []
-            for calendar_name, count in calendar_counts.items():
-                breakdown.append(f"{count} {calendar_name}")
-            header += f" ({', '.join(breakdown)})"
-        
-        return header + "\n\n" + "\n".join(formatted_events[:15])
-        
-    except Exception as e:
-        print(f"❌ Calendar error: {e}")
-        return "📅 **Today's Schedule:** Error retrieving calendar data"
-
-def get_upcoming_events(days=7):
-    """Get upcoming events with enhanced formatting"""
-    if not calendar_service or not accessible_calendars:
-        return f"📅 **Upcoming {days} Days:** Calendar integration not available"
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        start_toronto = datetime.now(toronto_tz)
-        end_toronto = start_toronto + timedelta(days=days)
-        
-        start_utc = start_toronto.astimezone(pytz.UTC)
-        end_utc = end_toronto.astimezone(pytz.UTC)
-        
-        all_events = []
-        
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, start_utc, end_utc)
-            for event in events:
-                all_events.append((event, calendar_type, calendar_name))
-        
-        if not all_events:
-            calendar_list = ", ".join([name for name, _, _ in accessible_calendars])
-            return f"📅 **Upcoming {days} Days:** No events found"
-        
-        events_by_date = defaultdict(list)
-        
-        for event, calendar_type, calendar_name in all_events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            
-            try:
-                if 'T' in start:
-                    utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    toronto_time = utc_time.astimezone(toronto_tz)
-                    date_str = toronto_time.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type, toronto_tz)
-                    events_by_date[date_str].append(formatted)
-                else:
-                    date_obj = datetime.fromisoformat(start)
-                    date_str = date_obj.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type, toronto_tz)
-                    events_by_date[date_str].append(formatted)
-            except Exception as e:
-                print(f"❌ Date parsing error: {e}")
-                continue
-        
-        formatted = []
-        total_events = len(all_events)
-        
-        for date, day_events in list(events_by_date.items())[:7]:
-            formatted.append(f"**{date}**")
-            formatted.extend(day_events[:6])
-        
-        header = f"📅 **Upcoming {days} Days:** {total_events} total events"
-        
-        return header + "\n\n" + "\n".join(formatted)
-        
-    except Exception as e:
-        print(f"❌ Calendar error: {e}")
-        return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
-
-def get_morning_briefing():
-    """Morning briefing with enhanced formatting"""
-    if not calendar_service or not accessible_calendars:
-        return "🌅 **Morning Briefing:** Calendar integration not available"
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        today_schedule = get_today_schedule()
-        
-        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow_toronto = today_toronto + timedelta(days=1)
-        day_after_toronto = tomorrow_toronto + timedelta(days=1)
-        
-        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
-        day_after_utc = day_after_toronto.astimezone(pytz.UTC)
-        
-        tomorrow_events = []
-        
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, calendar_type, calendar_name) for event in events])
-        
-        if tomorrow_events:
-            tomorrow_formatted = []
-            for event, calendar_type, calendar_name in tomorrow_events[:4]:
-                formatted = format_event(event, calendar_type, toronto_tz)
-                tomorrow_formatted.append(formatted)
-            tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
+        if result['success']:
+            return result['summary']
         else:
-            tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - strategic planning day"
-        
-        current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
-        briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_preview}\n\n💼 **Executive Focus:** Prioritize high-impact activities"
-        
-        return briefing
-        
+            return result.get('error', 'Calendar error occurred')
+            
     except Exception as e:
-        print(f"❌ Morning briefing error: {e}")
-        return "🌅 **Morning Briefing:** Error generating briefing"
+        return RoseErrorHandler.handle_calendar_error(e, "Calendar events retrieval")
 
-def create_calendar_event(title, start_time, end_time, calendar_type="calendar", description=""):
-    """Create a new calendar event in specified Google Calendar with detailed confirmation"""
-    if not calendar_service or not accessible_calendars:
+async def create_calendar_event_unified(event_data):
+    """Unified event creation function"""
+    if not calendar_manager:
         return "📅 Calendar integration not available"
     
     try:
-        # Enhanced calendar selection logic
-        target_calendar_id = None
-        target_calendar_name = None
+        result = await calendar_manager.create_event(event_data)
         
-        print(f"🔍 Looking for calendar type: {calendar_type}")
-        print(f"📅 Available calendars: {[(name, cal_type) for name, _, cal_type in accessible_calendars]}")
-        
-        # First, try exact calendar type match
-        for name, cal_id, cal_type in accessible_calendars:
-            if calendar_type == cal_type:
-                target_calendar_id = cal_id
-                target_calendar_name = name
-                print(f"✅ Exact match found: {name} ({cal_type})")
-                break
-        
-        # If no exact match, try keyword matching
-        if not target_calendar_id:
-            for name, cal_id, cal_type in accessible_calendars:
-                if calendar_type.lower() in name.lower() or calendar_type.lower() in cal_type.lower():
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    print(f"✅ Keyword match found: {name} ({cal_type})")
-                    break
-        
-        # Last resort: use tasks calendar if available for task-related requests
-        if not target_calendar_id and calendar_type == "tasks":
-            for name, cal_id, cal_type in accessible_calendars:
-                if "task" in name.lower() or cal_type == "tasks":
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    print(f"✅ Task calendar found: {name} ({cal_type})")
-                    break
-        
-        # Final fallback to primary calendar only if no specific calendar found
-        if not target_calendar_id:
-            for name, cal_id, cal_type in accessible_calendars:
-                if "primary" in name.lower() or cal_id == "primary":
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    print(f"⚠️ Using primary fallback: {name} ({cal_type})")
-                    break
-        
-        # If still no calendar found, use first available
-        if not target_calendar_id and accessible_calendars:
-            target_calendar_id = accessible_calendars[0][1]
-            target_calendar_name = accessible_calendars[0][0]
-            print(f"⚠️ Using first available: {target_calendar_name}")
-        
-        if not target_calendar_id:
-            return "❌ No suitable calendar found"
-        
-        print(f"🎯 Creating event in: {target_calendar_name} ({target_calendar_id})")
-        
-        # Parse times
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        try:
-            # Handle different time formats
-            if "T" not in start_time:
-                start_time = f"{start_time}T15:00:00"
-            if "T" not in end_time:
-                end_time = f"{end_time}T16:00:00"
-                
-            start_dt = datetime.fromisoformat(start_time.replace('Z', ''))
-            end_dt = datetime.fromisoformat(end_time.replace('Z', ''))
-            
-            if start_dt.tzinfo is None:
-                start_dt = toronto_tz.localize(start_dt)
-            if end_dt.tzinfo is None:
-                end_dt = toronto_tz.localize(end_dt)
-            
-            start_iso = start_dt.isoformat()
-            end_iso = end_dt.isoformat()
-            
-        except ValueError as e:
-            return f"❌ Invalid time format: {e}"
-        
-        # Create event object
-        event = {
-            'summary': title,
-            'start': {
-                'dateTime': start_iso,
-                'timeZone': 'America/Toronto',
-            },
-            'end': {
-                'dateTime': end_iso,
-                'timeZone': 'America/Toronto',
-            },
-            'description': description,
-        }
-        
-        # Create the event
-        created_event = calendar_service.events().insert(
-            calendarId=target_calendar_id,
-            body=event
-        ).execute()
-        
-        # ENHANCED CONFIRMATION with detailed meeting info
-        display_start_dt = start_dt.astimezone(toronto_tz)
-        display_end_dt = end_dt.astimezone(toronto_tz)
-        
-        # Format day and date
-        day_date = display_start_dt.strftime('%A, %B %d, %Y')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        # Build detailed response matching the desired format
-        response = f"📅 **Meeting Details:**\n"
-        response += f"• **Title:** {title}\n"
-        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
-        response += f"• **Location:** {target_calendar_name}\n"
-        
-        if description:
-            response += f"• **Description:** {description}\n"
-        
-        response += f"\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error creating calendar event: {e}")
-        return f"❌ Failed to create '{title}': {str(e)}"
-
-def find_calendar_event(search_term, days_range=30):
-    """Find calendar events matching a search term"""
-    if not calendar_service or not accessible_calendars:
-        return None, None, None
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        past_search = now - timedelta(days=7)  # Search past week
-        future_search = now + timedelta(days=days_range)  # Search ahead
-        
-        # Search all accessible calendars
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, past_search, future_search, max_results=200)
-            for event in events:
-                event_title = event.get('summary', '').lower()
-                if search_term.lower() in event_title:
-                    return event, calendar_id, calendar_name
-        
-        return None, None, None
-        
-    except Exception as e:
-        print(f"❌ Error finding event: {e}")
-        return None, None, None
-
-def update_calendar_event(event_search, new_title=None, new_start_time=None, new_end_time=None, new_description=None):
-    """Update an existing calendar event with detailed confirmation"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        # Update fields as needed
-        updated_fields = []
-        
-        if new_title:
-            found_event['summary'] = new_title
-            updated_fields.append(f"Title → {new_title}")
-        
-        if new_start_time or new_end_time:
-            toronto_tz = pytz.timezone('America/Toronto')
-            
-            if new_start_time:
-                try:
-                    if "T" not in new_start_time:
-                        new_start_time = f"{new_start_time}T{found_event['start']['dateTime'].split('T')[1]}"
-                    new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
-                    if new_start_dt.tzinfo is None:
-                        new_start_dt = toronto_tz.localize(new_start_dt)
-                    found_event['start'] = {
-                        'dateTime': new_start_dt.isoformat(),
-                        'timeZone': 'America/Toronto',
-                    }
-                    updated_fields.append(f"Start → {new_start_dt.strftime('%m/%d %H:%M')}")
-                except ValueError as e:
-                    return f"❌ Invalid start time: {e}"
-            
-            if new_end_time:
-                try:
-                    if "T" not in new_end_time:
-                        new_end_time = f"{new_end_time}T{found_event['end']['dateTime'].split('T')[1]}"
-                    new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
-                    if new_end_dt.tzinfo is None:
-                        new_end_dt = toronto_tz.localize(new_end_dt)
-                    found_event['end'] = {
-                        'dateTime': new_end_dt.isoformat(),
-                        'timeZone': 'America/Toronto',
-                    }
-                    updated_fields.append(f"End → {new_end_dt.strftime('%m/%d %H:%M')}")
-                except ValueError as e:
-                    return f"❌ Invalid end time: {e}"
-        
-        if new_description is not None:
-            found_event['description'] = new_description
-            updated_fields.append("Description updated")
-        
-        # Update the event
-        updated_event = calendar_service.events().update(
-            calendarId=found_calendar_id,
-            eventId=found_event['id'],
-            body=found_event
-        ).execute()
-        
-        # Enhanced confirmation with detailed meeting info
-        start_dt = datetime.fromisoformat(updated_event['start']['dateTime'].replace('Z', '+00:00'))
-        end_dt = datetime.fromisoformat(updated_event['end']['dateTime'].replace('Z', '+00:00'))
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        display_start_dt = start_dt.astimezone(toronto_tz)
-        display_end_dt = end_dt.astimezone(toronto_tz)
-        
-        day_date = display_start_dt.strftime('%A, %B %d, %Y')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        response = f"📅 **Meeting Details:**\n"
-        response += f"• **Title:** {updated_event['summary']}\n"
-        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
-        response += f"• **Location:** {found_calendar_name}\n"
-        response += f"• **Changes:** {', '.join(updated_fields)}\n"
-        response += f"\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error updating event: {e}")
-        return f"❌ Failed to update '{event_search}': {str(e)}"
-
-def reschedule_event(event_search, new_start_time, new_end_time=None):
-    """Reschedule an existing calendar event to new time"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        # Parse new start time
-        try:
-            if "T" not in new_start_time:
-                original_time = found_event['start']['dateTime'].split('T')[1] if 'dateTime' in found_event['start'] else '15:00:00'
-                new_start_time = f"{new_start_time}T{original_time}"
-            
-            new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
-            if new_start_dt.tzinfo is None:
-                new_start_dt = toronto_tz.localize(new_start_dt)
-                
-        except ValueError:
-            return "❌ Invalid time format"
-        
-        # Calculate new end time
-        if new_end_time:
-            try:
-                if "T" not in new_end_time:
-                    original_time = found_event['end']['dateTime'].split('T')[1] if 'dateTime' in found_event['end'] else '16:00:00'
-                    new_end_time = f"{new_end_time}T{original_time}"
-                new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
-                if new_end_dt.tzinfo is None:
-                    new_end_dt = toronto_tz.localize(new_end_dt)
-            except ValueError:
-                return "❌ Invalid end time format"
+        if result['success']:
+            return result['summary']
         else:
-            # Calculate duration from original event
-            original_start = datetime.fromisoformat(found_event['start']['dateTime'].replace('Z', '+00:00'))
-            original_end = datetime.fromisoformat(found_event['end']['dateTime'].replace('Z', '+00:00'))
-            duration = original_end - original_start
-            new_end_dt = new_start_dt + duration
-        
-        # Update the event
-        found_event['start'] = {
-            'dateTime': new_start_dt.isoformat(),
-            'timeZone': 'America/Toronto',
-        }
-        found_event['end'] = {
-            'dateTime': new_end_dt.isoformat(),
-            'timeZone': 'America/Toronto',
-        }
-        
-        updated_event = calendar_service.events().update(
-            calendarId=found_calendar_id,
-            eventId=found_event['id'],
-            body=found_event
-        ).execute()
-        
-        # Enhanced confirmation with detailed meeting info
-        display_start_dt = new_start_dt.astimezone(toronto_tz)
-        display_end_dt = new_end_dt.astimezone(toronto_tz)
-        
-        day_date = display_start_dt.strftime('%A, %B %d, %Y')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        response = f"📅 **Meeting Details:**\n"
-        response += f"• **Title:** {updated_event['summary']}\n"
-        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
-        response += f"• **Location:** {found_calendar_name}\n"
-        response += f"• **Status:** Rescheduled\n"
-        response += f"\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error rescheduling event: {e}")
-        return f"❌ Failed to reschedule '{event_search}': {str(e)}"
-
-def move_task_between_calendars(task_search, target_calendar="tasks"):
-    """Move tasks/events between different Google calendars"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(task_search)
-        
-        if not found_event:
-            return f"❌ '{task_search}' not found"
-        
-        # Find target calendar with enhanced logic
-        target_calendar_id = None
-        target_calendar_name = None
-        
-        # Try exact type match first
-        for name, cal_id, cal_type in accessible_calendars:
-            if target_calendar == cal_type:
-                target_calendar_id = cal_id
-                target_calendar_name = name
-                break
-        
-        # Try keyword matching
-        if not target_calendar_id:
-            for name, cal_id, cal_type in accessible_calendars:
-                if target_calendar.lower() in name.lower() or target_calendar.lower() in cal_type.lower():
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    break
-        
-        if not target_calendar_id:
-            available_types = [f"{name} ({cal_type})" for name, _, cal_type in accessible_calendars]
-            return f"❌ '{target_calendar}' calendar not found\n📅 Available: {', '.join(available_types)}"
-        
-        if found_calendar_id == target_calendar_id:
-            return f"📅 '{found_event['summary']}' already in {target_calendar_name}"
-        
-        # Create event copy for target calendar
-        event_copy = {
-            'summary': found_event.get('summary'),
-            'description': found_event.get('description', ''),
-            'start': found_event.get('start'),
-            'end': found_event.get('end'),
-            'location': found_event.get('location', ''),
-        }
-        
-        # Remove read-only fields
-        for field in ['id', 'htmlLink', 'iCalUID', 'created', 'updated', 'creator', 'organizer']:
-            event_copy.pop(field, None)
-        
-        # Create in target calendar
-        created_event = calendar_service.events().insert(
-            calendarId=target_calendar_id,
-            body=event_copy
-        ).execute()
-        
-        # Delete from original calendar
-        calendar_service.events().delete(
-            calendarId=found_calendar_id,
-            eventId=found_event['id']
-        ).execute()
-        
-        # Enhanced confirmation with detailed meeting info
-        start_dt = datetime.fromisoformat(created_event['start']['dateTime'].replace('Z', '+00:00'))
-        end_dt = datetime.fromisoformat(created_event['end']['dateTime'].replace('Z', '+00:00'))
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        display_start_dt = start_dt.astimezone(toronto_tz)
-        display_end_dt = end_dt.astimezone(toronto_tz)
-        
-        day_date = display_start_dt.strftime('%A, %B %d, %Y')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        response = f"📅 **Meeting Details:**\n"
-        response += f"• **Title:** {found_event['summary']}\n"
-        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
-        response += f"• **Location:** {target_calendar_name}\n"
-        response += f"• **Status:** Moved from {found_calendar_name}\n"
-        response += f"\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
-        
-        return response
-        
-    except HttpError as e:
-        return f"❌ Calendar error: {e.resp.status}"
-    except Exception as e:
-        print(f"❌ Error moving task: {e}")
-        return f"❌ Failed to move '{task_search}': {str(e)}"
-
-def delete_calendar_event(event_search):
-    """Delete a calendar event with detailed confirmation"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        # Store event details before deletion
-        event_title = found_event.get('summary', 'Unknown Event')
-        start_dt = datetime.fromisoformat(found_event['start']['dateTime'].replace('Z', '+00:00'))
-        end_dt = datetime.fromisoformat(found_event['end']['dateTime'].replace('Z', '+00:00'))
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        display_start_dt = start_dt.astimezone(toronto_tz)
-        display_end_dt = end_dt.astimezone(toronto_tz)
-        
-        day_date = display_start_dt.strftime('%A, %B %d, %Y')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        # Delete the event
-        calendar_service.events().delete(
-            calendarId=found_calendar_id,
-            eventId=found_event['id']
-        ).execute()
-        
-        # Enhanced confirmation with meeting details
-        response = f"📅 **Meeting Details:**\n"
-        response += f"• **Title:** {event_title}\n"
-        response += f"• **Date & Time:** {day_date}, {start_time_24h} - {end_time_24h}\n"
-        response += f"• **Location:** {found_calendar_name}\n"
-        response += f"• **Status:** Successfully deleted\n"
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error deleting event: {e}")
-        return f"❌ Failed to delete '{event_search}': {str(e)}"
-
-def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=None, days_ahead=7):
-    """Find free time slots in the calendar"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 **Free Time Search:** Calendar integration not configured."
-    
-    try:
-        if preferred_days is None:
-            preferred_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-        if preferred_hours is None:
-            preferred_hours = list(range(9, 17))  # 9 AM to 5 PM
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        search_end = now + timedelta(days=days_ahead)
-        
-        # Get all existing events to find gaps
-        all_busy_times = []
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, now, search_end)
-            for event in events:
-                start_str = event['start'].get('dateTime', event['start'].get('date'))
-                end_str = event['end'].get('dateTime', event['end'].get('date'))
-                
-                if 'T' in start_str:  # DateTime event
-                    start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00')).astimezone(toronto_tz)
-                    end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00')).astimezone(toronto_tz)
-                    all_busy_times.append((start_dt, end_dt))
-        
-        # Find available slots
-        available_slots = []
-        current_date = now.date()
-        
-        for day_offset in range(days_ahead):
-            check_date = current_date + timedelta(days=day_offset)
-            weekday = check_date.strftime('%A')
+            return result.get('error', 'Event creation failed')
             
-            if weekday not in preferred_days:
-                continue
-            
-            for hour in preferred_hours:
-                slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour)).replace(tzinfo=toronto_tz)
-                slot_end = slot_start + timedelta(minutes=duration_minutes)
-                
-                # Skip past times
-                if slot_start <= now:
-                    continue
-                
-                # Check for conflicts
-                has_conflict = False
-                for busy_start, busy_end in all_busy_times:
-                    if (slot_start < busy_end and slot_end > busy_start):
-                        has_conflict = True
-                        break
-                
-                if not has_conflict:
-                    available_slots.append({
-                        'start': slot_start,
-                        'end': slot_end,
-                        'date': check_date.strftime('%A, %B %d'),
-                        'time': slot_start.strftime('%H:%M')  # 24-hour format
-                    })
-        
-        if not available_slots:
-            return f"❌ **No Available Slots:** No {duration_minutes}-minute slots found in the next {days_ahead} days.\n💡 **Suggestion:** Try reducing duration or expanding preferred hours."
-        
-        # Return top 5 slots with 24-hour time
-        result = f"📅 **Available {duration_minutes}-minute slots:**\n\n"
-        for i, slot in enumerate(available_slots[:5]):
-            result += f"**{i+1}.** {slot['date']} at {slot['time']}\n"
-        
-        if len(available_slots) > 5:
-            result += f"\n*...and {len(available_slots) - 5} more slots available*"
-        
-        return result
-        
     except Exception as e:
-        print(f"❌ Error finding free time: {e}")
-        return f"❌ **Free Time Search Failed:** {str(e)}"
+        return RoseErrorHandler.handle_calendar_error(e, "Event creation")
 
 # ============================================================================
-# ENHANCED PLANNING SEARCH
+# IMPROVED SEARCH FUNCTION WITH ERROR HANDLING
 # ============================================================================
 
-async def planning_search_enhanced(query, focus_area="general", num_results=3):
-    """Enhanced planning and productivity research with comprehensive error handling"""
+async def planning_search_enhanced(query, max_results=5):
+    """Enhanced search with better error handling"""
     if not BRAVE_API_KEY:
-        return "🔍 Planning research requires Brave Search API configuration", []
+        return "🔍 Search not available - API key not configured", []
     
     try:
-        planning_query = f"{query} {focus_area} productivity executive planning time management 2025"
-        
-        headers = {
-            'X-Subscription-Token': BRAVE_API_KEY,
-            'Accept': 'application/json'
-        }
-        
-        params = {
-            'q': planning_query,
-            'count': num_results,
-            'country': 'US',
-            'search_lang': 'en',
-            'ui_lang': 'en',
-            'safesearch': 'moderate'
-        }
-        
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            params = {
+                'q': query,
+                'count': max_results,
+                'mkt': 'en-CA',
+                'safesearch': 'moderate'
+            }
+            
+            headers = {
+                'X-Subscription-Token': BRAVE_API_KEY,
+                'Accept': 'application/json'
+            }
+            
             async with session.get('https://api.search.brave.com/res/v1/web/search', 
-                                   headers=headers, params=params, timeout=10) as response:
+                                 params=params, headers=headers) as response:
+                
                 if response.status == 200:
                     data = await response.json()
                     results = data.get('web', {}).get('results', [])
                     
                     if not results:
-                        return "🔍 No planning research results found for this query", []
+                        return "🔍 No search results found for your query", []
                     
                     formatted_results = []
                     sources = []
                     
-                    for i, result in enumerate(results[:num_results]):
-                        title = result.get('title', 'No title')
-                        snippet = result.get('description', 'No description')
+                    for i, result in enumerate(results[:max_results]):
+                        title = result.get('title', 'No title')[:80]
+                        snippet = result.get('description', 'No description')[:150]
                         url = result.get('url', '')
-                        
-                        domain = url.split('/')[2] if len(url.split('/')) > 2 else 'Unknown'
                         
                         formatted_results.append(f"**{i+1}. {title}**\n{snippet}")
                         sources.append({
                             'number': i+1,
                             'title': title,
-                            'url': url,
-                            'domain': domain
+                            'url': url
                         })
                     
                     return "\n\n".join(formatted_results), sources
+                    
+                elif response.status == 429:
+                    return "⏳ Search rate limit reached. Please try again later.", []
+                elif response.status == 401:
+                    return "🔐 Search authentication error. Contact administrator.", []
                 else:
-                    return f"🔍 Planning search error: HTTP {response.status}", []
+                    return f"🔍 Search service error (HTTP {response.status})", []
                     
     except asyncio.TimeoutError:
-        return "🔍 Planning search timed out", []
+        return "⏱️ Search request timed out. Please try again.", []
     except Exception as e:
-        print(f"❌ Planning search error: {e}")
-        return f"🔍 Planning search error: Please try again", []
+        error_msg = RoseErrorHandler.handle_api_error(e, "Search")
+        RoseErrorHandler.log_error(e, "Planning search", {'query': query})
+        return error_msg, []
 
 # ============================================================================
-# ENHANCED FUNCTION HANDLING
+# ENHANCED FUNCTION HANDLING WITH UNIFIED FUNCTIONS
 # ============================================================================
 
 async def handle_rose_functions_enhanced(run, thread_id):
-    """Enhanced function handling with complete calendar management"""
+    """Enhanced function handling using consolidated functions"""
     
     if not run or not hasattr(run, 'required_action') or not run.required_action:
         return
@@ -994,402 +694,258 @@ async def handle_rose_functions_enhanced(run, thread_id):
         function_name = getattr(tool_call.function, 'name', 'unknown')
         
         try:
-            arguments_str = getattr(tool_call.function, 'arguments', '{}')
-            arguments = json.loads(arguments_str) if arguments_str else {}
-        except (json.JSONDecodeError, AttributeError) as e:
-            print(f"❌ Error parsing function arguments: {e}")
-            arguments = {}
-        
-        print(f"👑 Rose Function: {function_name}")
-        print(f"📋 Arguments: {arguments}")
-        
-        try:
-            # CALENDAR VIEWING FUNCTIONS
-            if function_name == "get_today_schedule":
-                output = get_today_schedule()
-                    
-            elif function_name == "get_upcoming_events":
-                days = arguments.get('days', 7)
-                output = get_upcoming_events(days)
+            # Calendar functions (unified)
+            if function_name in ["get_today_schedule", "get_upcoming_events", "get_calendar_events_detailed"]:
+                args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
                 
-            elif function_name == "get_morning_briefing":
-                output = get_morning_briefing()
+                # Map old function names to new unified approach
+                if function_name == "get_today_schedule":
+                    timeframe = "today"
+                elif function_name == "get_upcoming_events":
+                    timeframe = args.get('days', 'week')
+                    if timeframe == 7:
+                        timeframe = "week"
+                    elif timeframe == 30:
+                        timeframe = "month"
+                else:
+                    timeframe = args.get('timeframe', 'today')
                 
-            elif function_name == "find_free_time":
-                duration_minutes = arguments.get('duration_minutes', 60)
-                preferred_days = arguments.get('preferred_days', None)
-                preferred_hours = arguments.get('preferred_hours', None)
-                days_ahead = arguments.get('days_ahead', 7)
-                output = find_free_time(duration_minutes, preferred_days, preferred_hours, days_ahead)
+                max_results = args.get('max_results', 10)
+                result = await get_calendar_events_unified(timeframe, max_results)
+                
+                tool_outputs.append({
+                    "tool_call_id": tool_call.id,
+                    "output": result
+                })
             
-            # CALENDAR MODIFICATION FUNCTIONS
             elif function_name == "create_calendar_event":
-                title = arguments.get('title', '')
-                start_time = arguments.get('start_time', '')
-                end_time = arguments.get('end_time', '')
-                calendar_type = arguments.get('calendar_type', 'calendar')
-                description = arguments.get('description', '')
+                args = json.loads(tool_call.function.arguments)
+                result = await create_calendar_event_unified(args)
                 
-                if title and start_time and end_time:
-                    output = create_calendar_event(title, start_time, end_time, calendar_type, description)
-                else:
-                    output = "❌ Missing required parameters: title, start_time, end_time"
-                    
-            elif function_name == "update_calendar_event":
-                event_search = arguments.get('event_search', '')
-                new_title = arguments.get('new_title', None)
-                new_start_time = arguments.get('new_start_time', None)
-                new_end_time = arguments.get('new_end_time', None)
-                new_description = arguments.get('new_description', None)
-                
-                if event_search:
-                    output = update_calendar_event(event_search, new_title, new_start_time, new_end_time, new_description)
-                else:
-                    output = "❌ Missing required parameter: event_search"
-                    
-            elif function_name == "reschedule_event":
-                event_search = arguments.get('event_search', '')
-                new_start_time = arguments.get('new_start_time', '')
-                new_end_time = arguments.get('new_end_time', None)
-                
-                if event_search and new_start_time:
-                    output = reschedule_event(event_search, new_start_time, new_end_time)
-                else:
-                    output = "❌ Missing required parameters: event_search, new_start_time"
-                    
-            elif function_name == "move_task_between_calendars":
-                task_search = arguments.get('task_search', '')
-                target_calendar = arguments.get('target_calendar', 'tasks')
-                
-                if task_search:
-                    output = move_task_between_calendars(task_search, target_calendar)
-                else:
-                    output = "❌ Missing required parameter: task_search"
-                    
-            elif function_name == "delete_calendar_event":
-                event_search = arguments.get('event_search', '')
-                
-                if event_search:
-                    output = delete_calendar_event(event_search)
-                else:
-                    output = "❌ Missing required parameter: event_search"
+                tool_outputs.append({
+                    "tool_call_id": tool_call.id,
+                    "output": result
+                })
             
-            # PLANNING RESEARCH FUNCTIONS
             elif function_name == "planning_search":
-                query = arguments.get('query', '')
-                focus = arguments.get('focus', 'general')
-                num_results = arguments.get('num_results', 3)
+                args = json.loads(tool_call.function.arguments)
+                query = args.get('query', '')
+                max_results = args.get('max_results', 5)
                 
-                if query:
-                    search_results, sources = await planning_search_enhanced(query, focus, num_results)
-                    output = f"📊 **Planning Research:** {query}\n\n{search_results}"
-                    
-                    if sources:
-                        output += "\n\n📚 **Sources:**\n"
-                        for source in sources:
-                            output += f"({source['number']}) {source['title']} - {source['domain']}\n"
+                if not query:
+                    result = "🔍 Search query required"
                 else:
-                    output = "🔍 No planning research query provided"
+                    result, sources = await planning_search_enhanced(query, max_results)
                 
+                tool_outputs.append({
+                    "tool_call_id": tool_call.id,
+                    "output": result
+                })
+            
             else:
-                output = f"❓ Function {function_name} not implemented yet"
-                
-        except Exception as e:
-            print(f"❌ Function execution error: {e}")
-            output = f"❌ Error executing {function_name}: {str(e)}"
+                # Handle unknown functions gracefully
+                tool_outputs.append({
+                    "tool_call_id": tool_call.id,
+                    "output": f"⚠️ Function '{function_name}' not recognized"
+                })
         
-        tool_outputs.append({
-            "tool_call_id": tool_call.id,
-            "output": output[:1500]  # Keep within reasonable limits
-        })
+        except json.JSONDecodeError as e:
+            error_msg = "⚠️ Invalid function arguments format"
+            RoseErrorHandler.log_error(e, f"Function {function_name} JSON decode", 
+                                     {'arguments': tool_call.function.arguments})
+            tool_outputs.append({
+                "tool_call_id": tool_call.id,
+                "output": error_msg
+            })
+        
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, f"Function {function_name}")
+            RoseErrorHandler.log_error(e, f"Function {function_name} execution")
+            tool_outputs.append({
+                "tool_call_id": tool_call.id,
+                "output": error_msg
+            })
     
     # Submit tool outputs
-    try:
-        if tool_outputs:
+    if tool_outputs:
+        try:
             client.beta.threads.runs.submit_tool_outputs(
                 thread_id=thread_id,
                 run_id=run.id,
                 tool_outputs=tool_outputs
             )
-            print(f"✅ Submitted {len(tool_outputs)} tool outputs successfully")
-    except Exception as e:
-        print(f"❌ Error submitting tool outputs: {e}")
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, "OpenAI tool outputs")
+            RoseErrorHandler.log_error(e, "Tool outputs submission")
+            print(f"❌ Failed to submit tool outputs: {error_msg}")
 
 # ============================================================================
-# MAIN CONVERSATION HANDLER
+# MAIN RESPONSE FUNCTION WITH IMPROVED FORMATTING
 # ============================================================================
-
-def format_calendar_response_enhanced(response_text):
-    """Enhanced calendar response formatting that preserves meeting details"""
-    import re
-    
-    # Check if this is a calendar-related response
-    calendar_keywords = ["calendar", "meeting", "event", "scheduled", "appointment", "briefing", "created", "updated", "deleted", "rescheduled"]
-    is_calendar_response = any(keyword in response_text.lower() for keyword in calendar_keywords)
-    
-    if not is_calendar_response:
-        return response_text  # Return unchanged for non-calendar responses
-    
-    # Check if this is already a simple confirmation response (✅ Meeting created, etc.)
-    simple_confirmation_patterns = [
-        r'✅\s*\*\*.*?\*\*\s*(created|updated|deleted|rescheduled|moved)',
-        r'📅.*?\d{4}-\d{2}-\d{2}.*?\d{2}:\d{2}',
-        r'🗓️.*?Calendar',
-        r'🔗.*?View Event'
-    ]
-    
-    # If it's already a simple confirmation format, return as is
-    if any(re.search(pattern, response_text, re.IGNORECASE) for pattern in simple_confirmation_patterns):
-        return response_text
-    
-    # Extract Executive Summary
-    executive_summary = ""
-    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*(.*?)(?=📊|🎯|📅|💼|🗓️|$)', response_text, re.DOTALL)
-    if summary_match:
-        executive_summary = summary_match.group(1).strip()
-    
-    # Extract detailed meeting information
-    meeting_details = ""
-    
-    # Look for Meeting Details section
-    meeting_details_patterns = [
-        r'💼\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)',
-        r'📅\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)',
-        r'📋\s*\*\*Meeting Details:\*\*\s*(.*?)(?=🔗|👑|📊|🎯|$)'
-    ]
-    
-    for pattern in meeting_details_patterns:
-        match = re.search(pattern, response_text, re.DOTALL)
-        if match:
-            meeting_details = match.group(1).strip()
-            break
-    
-    # If no Meeting Details found, extract specific details
-    if not meeting_details:
-        detail_lines = []
-        for line in response_text.split('\n'):
-            clean_line = line.strip()
-            if any(word in clean_line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:', 'description:']):
-                detail_lines.append(f"• {clean_line}")
-            elif clean_line.startswith('•') and any(word in clean_line.lower() for word in ['title', 'date', 'time', 'location', 'calendar', 'description']):
-                detail_lines.append(clean_line)
-        
-        if detail_lines:
-            meeting_details = "\n".join(detail_lines)
-        else:
-            meeting_details = "Meeting details confirmed"
-    
-    # Look for calendar links
-    calendar_link = ""
-    link_patterns = [
-        r'🔗\s*\[View Event\].*',
-        r'🔗.*?View Event.*',
-        r'🔗.*?Google Calendar.*'
-    ]
-    
-    for pattern in link_patterns:
-        match = re.search(pattern, response_text, re.DOTALL)
-        if match:
-            calendar_link = match.group(0).strip()
-            break
-    
-    # Build the response
-    if executive_summary:
-        simplified_response = f"👑 **Executive Summary:**\n{executive_summary}\n\n"
-    else:
-        simplified_response = ""
-    
-    # Add meeting details with proper header
-    simplified_response += f"📅 **Meeting Details:**\n{meeting_details}"
-    
-    # Add the calendar link if found
-    if calendar_link:
-        simplified_response += f"\n\n{calendar_link}"
-    
-    return simplified_response.strip()
 
 async def get_rose_response(message, user_id):
-    """Get response from Rose's enhanced OpenAI assistant with fixed API calls"""
+    """Main response function with enhanced formatting and error handling"""
     try:
         if not ASSISTANT_ID:
             return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
         
-        # Create user thread if needed
-        if user_id not in user_conversations:
-            thread = client.beta.threads.create()
-            user_conversations[user_id] = thread.id
-            print(f"👑 Created executive thread for user {user_id}")
+        # Rate limiting check
+        current_time = time.time()
+        if user_id in last_response_time:
+            if current_time - last_response_time[user_id] < 3:
+                return "⏳ Please wait a moment between requests."
         
-        thread_id = user_conversations[user_id]
+        # Check for active runs
+        if user_id in active_runs and active_runs[user_id]:
+            return "⏳ Executive analysis in progress. Please wait..."
         
-        # Clean message
-        clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
+        # Mark user as having active run
+        active_runs[user_id] = True
         
-        # Get current date context for Rose
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        today_formatted = now.strftime('%A, %B %d, %Y')
-        today_date = now.strftime('%Y-%m-%d')
-        tomorrow = now + timedelta(days=1)
-        tomorrow_formatted = tomorrow.strftime('%A, %B %d, %Y') 
-        tomorrow_date = tomorrow.strftime('%Y-%m-%d')
-
-        enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
-
-CURRENT DATE & TIME CONTEXT:
-- TODAY: {today_formatted} ({today_date})
-- TOMORROW: {tomorrow_formatted} ({tomorrow_date})
-- TIMEZONE: America/Toronto
+        try:
+            # Get user's thread
+            if user_id not in user_conversations:
+                thread = client.beta.threads.create()
+                user_conversations[user_id] = thread.id
+                print(f"👑 Created executive thread for user {user_id}")
+            
+            thread_id = user_conversations[user_id]
+            
+            # Clean message
+            clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
+            
+            # Enhanced message with executive planning focus
+            enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
 
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
-- AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
+- SMART CALENDAR DETECTION: Automatically detect if this is a general or specific calendar query
+- GENERAL CALENDAR QUERIES (auto-include full schedule): "what's on my calendar", "what's my schedule", "what do I have today", "how does my day look", "what's happening today"
+- SPECIFIC CALENDAR QUERIES (answer directly): "what do I have after 5pm", "am I free at 2pm", "what's my first meeting", "when is my next call"
+- When using calendar functions, provide insights from accessible calendars
+- For planning research, include actionable productivity recommendations
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
-- When user says "tomorrow" use {tomorrow_date} ({tomorrow_formatted})
-- When user says "today" use {today_date} ({today_formatted})
-- All times are in Toronto timezone (America/Toronto)
-- Use 24-hour time format (14:30, not 2:30 PM)"""
-        
-        try:
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=enhanced_message
-            )
-        except Exception as e:
-            if "while a run" in str(e) and "is active" in str(e):
-                print("⏳ Waiting for previous executive analysis to complete...")
-                await asyncio.sleep(3)
-                try:
-                    client.beta.threads.messages.create(
-                        thread_id=thread_id,
-                        role="user",
-                        content=enhanced_message
-                    )
-                except Exception as e2:
-                    print(f"❌ Still can't add message: {e2}")
-                    return "👑 Executive office is busy. Please try again in a moment."
-            else:
-                print(f"❌ Message creation error: {e}")
-                return "❌ Error creating executive message. Please try again."
-        
-        try:
-            run = client.beta.threads.runs.create(
-                thread_id=thread_id,
-                assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant specialist with Google Calendar integration.
-
-EXECUTIVE APPROACH:
-- Use executive calendar functions to provide comprehensive scheduling insights
-- Apply strategic planning perspective with productivity optimization
-- Include actionable recommendations with clear timelines
-
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼) and provide organized, action-oriented guidance.
-
-STRUCTURE:
-👑 **Executive Summary:** [strategic overview with calendar insights]
-📊 **Strategic Analysis:** [research-backed recommendations]
-🎯 **Action Items:** [specific next steps with timing]
-
-Keep core content focused and always provide strategic context with calendar coordination."""
-            )
-        except Exception as e:
-            print(f"❌ Run creation error: {e}")
-            return "❌ Error starting executive analysis. Please try again."
-        
-        print(f"👑 Rose run created: {run.id}")
-        
-        for attempt in range(20):
+- IMPORTANT: Always provide strategic context and actionable next steps
+- All times are in Toronto timezone (America/Toronto)"""
+            
+            # Create message
             try:
-                run_status = client.beta.threads.runs.retrieve(
+                client.beta.threads.messages.create(
                     thread_id=thread_id,
-                    run_id=run.id
+                    role="user",
+                    content=enhanced_message
                 )
             except Exception as e:
-                print(f"❌ Error retrieving run status: {e}")
-                await asyncio.sleep(2)
-                continue
+                if "while a run" in str(e) and "is active" in str(e):
+                    print("⏳ Waiting for previous executive analysis to complete...")
+                    await asyncio.sleep(3)
+                    try:
+                        client.beta.threads.messages.create(
+                            thread_id=thread_id,
+                            role="user",
+                            content=enhanced_message
+                        )
+                    except Exception as e2:
+                        print(f"❌ Still can't add message: {e2}")
+                        return "👑 Executive office is busy. Please try again in a moment."
+                else:
+                    raise e
             
-            print(f"🔄 Status: {run_status.status} (attempt {attempt + 1})")
+            # Create and run assistant
+            run = client.beta.threads.runs.create(
+                thread_id=thread_id,
+                assistant_id=ASSISTANT_ID
+            )
             
-            if run_status.status == "completed":
-                break
-            elif run_status.status == "requires_action":
-                await handle_rose_functions_enhanced(run_status, thread_id)
-            elif run_status.status in ["failed", "cancelled", "expired"]:
-                print(f"❌ Run {run_status.status}")
-                return "❌ Executive analysis interrupted. Please try again."
+            # Wait for completion with timeout
+            start_time = time.time()
+            timeout = 45
             
-            await asyncio.sleep(2)
-        else:
-            print("⏱️ Run timed out")
-            return "⏱️ Executive office is busy. Please try again in a moment."
-        
-        try:
-            messages = client.beta.threads.messages.list(thread_id=thread_id, limit=5)
-            for msg in messages.data:
-                if msg.role == "assistant":
-                    response = msg.content[0].text.value
-                    
-                    # FIXED: Apply enhanced calendar response formatting
-                    response = format_calendar_response_enhanced(response)
-                    
-                    return format_for_discord_rose(response)
-        except Exception as e:
-            print(f"❌ Error retrieving messages: {e}")
-            return "❌ Error retrieving executive guidance. Please try again."
-        
-        return "👑 Executive analysis unclear. Please try again with a different approach."
-        
+            while run.status in ['queued', 'in_progress', 'requires_action']:
+                if time.time() - start_time > timeout:
+                    return "⏱️ Executive analysis taking longer than expected. Please try again."
+                
+                if run.status == 'requires_action':
+                    await handle_rose_functions_enhanced(run, thread_id)
+                
+                await asyncio.sleep(1)
+                try:
+                    run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+                except Exception as e:
+                    print(f"❌ Error retrieving run status: {e}")
+                    break
+            
+            # Handle run completion
+            if run.status == 'completed':
+                # Get messages
+                messages = client.beta.threads.messages.list(thread_id=thread_id, limit=1)
+                
+                if messages.data:
+                    assistant_message = messages.data[0]
+                    if hasattr(assistant_message, 'content') and assistant_message.content:
+                        response_text = assistant_message.content[0].text.value
+                        
+                        # Apply improved formatting
+                        formatted_response = ResponseFormatter.format_response(response_text)
+                        return formatted_response
+                    else:
+                        return "👑 Executive response processing... Please try again."
+                else:
+                    return "👑 Executive analysis complete. Please try again for results."
+            
+            elif run.status == 'failed':
+                error_info = getattr(run, 'last_error', None)
+                if error_info:
+                    return RoseErrorHandler.handle_api_error(Exception(str(error_info)), "OpenAI Assistant")
+                else:
+                    return "❌ Executive analysis failed. Please try again."
+            
+            else:
+                return f"⚠️ Executive analysis status: {run.status}. Please try again."
+                
+        finally:
+            # Always clear active run status
+            active_runs[user_id] = False
+            last_response_time[user_id] = current_time
+            
     except Exception as e:
-        print(f"❌ Rose error: {e}")
-        print(f"📋 Full traceback: {traceback.format_exc()}")
-        return "❌ Something went wrong with executive strategy. Please try again!"
-
-def format_for_discord_rose(response):
-    """Format response for Discord with error handling"""
-    try:
-        if not response or not isinstance(response, str):
-            return "👑 Executive strategy processing. Please try again."
-        
-        response = response.replace('\n\n\n\n', '\n\n')
-        response = response.replace('\n\n\n', '\n\n')
-        
-        if len(response) > 1900:
-            response = response[:1900] + "\n\n👑 *(Executive insights continue)*"
-        
-        return response.strip()
-        
-    except Exception as e:
-        print(f"❌ Discord formatting error: {e}")
-        return "👑 Executive message needs refinement. Please try again."
+        # Clear active run status on error
+        active_runs[user_id] = False
+        error_msg = RoseErrorHandler.handle_api_error(e, "Rose Assistant")
+        RoseErrorHandler.log_error(e, "get_rose_response", {'user_id': user_id, 'message': message[:100]})
+        return error_msg
 
 # ============================================================================
-# ENHANCED MESSAGE HANDLING
+# IMPROVED MESSAGE HANDLING
 # ============================================================================
 
 async def send_long_message(original_message, response):
-    """Send response with length handling and error recovery"""
+    """Send response with improved length handling and error recovery"""
     try:
         if len(response) <= 2000:
             await original_message.reply(response)
         else:
+            # Smart chunking that preserves formatting
             chunks = []
             current_chunk = ""
             
-            for line in response.split('\n'):
-                if len(current_chunk + line + '\n') > 1900:
+            # Split on double newlines first to preserve sections
+            sections = response.split('\n\n')
+            
+            for section in sections:
+                if len(current_chunk + section + '\n\n') > 1900:
                     if current_chunk:
                         chunks.append(current_chunk.strip())
-                    current_chunk = line + '\n'
+                    current_chunk = section + '\n\n'
                 else:
-                    current_chunk += line + '\n'
+                    current_chunk += section + '\n\n'
             
             if current_chunk:
                 chunks.append(current_chunk.strip())
             
+            # Send chunks
             for i, chunk in enumerate(chunks):
                 if i == 0:
                     await original_message.reply(chunk)
@@ -1397,13 +953,13 @@ async def send_long_message(original_message, response):
                     await original_message.channel.send(chunk)
                     
     except discord.HTTPException as e:
-        print(f"❌ Discord HTTP error: {e}")
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Message sending")
         try:
-            await original_message.reply("👑 Executive guidance too complex for Discord. Please try a more specific request.")
+            await original_message.reply(error_msg)
         except:
             pass
     except Exception as e:
-        print(f"❌ Message sending error: {e}")
+        RoseErrorHandler.log_error(e, "send_long_message")
 
 # ============================================================================
 # DISCORD BOT EVENT HANDLERS
@@ -1430,7 +986,7 @@ async def on_ready():
         print("👑 Rose is ready for complete executive assistance!")
         
     except Exception as e:
-        print(f"❌ Startup error: {e}")
+        RoseErrorHandler.log_error(e, "Bot startup")
 
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -1439,7 +995,7 @@ async def on_error(event, *args, **kwargs):
 
 @bot.event
 async def on_message(message):
-    """Enhanced message handling following team patterns"""
+    """Enhanced message handling with improved error handling"""
     try:
         if message.author == bot.user:
             return
@@ -1473,18 +1029,16 @@ async def on_message(message):
                     response = await get_rose_response(message.content, message.author.id)
                     await send_long_message(message, response)
             except Exception as e:
-                print(f"❌ Message error: {e}")
-                print(f"📋 Message traceback: {traceback.format_exc()}")
+                error_msg = RoseErrorHandler.handle_discord_error(e, "Message processing")
                 try:
-                    await message.reply("❌ Something went wrong with executive consultation. Please try again!")
+                    await message.reply(error_msg)
                 except:
                     pass
             finally:
                 processing_messages.discard(message_key)
                     
     except Exception as e:
-        print(f"❌ Message event error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
+        RoseErrorHandler.log_error(e, "on_message event")
 
 # ============================================================================
 # STANDARDIZED COMMANDS
@@ -1497,289 +1051,105 @@ async def ping_command(ctx):
         latency = round(bot.latency * 1000)
         await ctx.send(f"👑 Pong! Executive response time: {latency}ms")
     except Exception as e:
-        print(f"❌ Ping command error: {e}")
-        await ctx.send("👑 Executive ping experiencing issues.")
-
-@bot.command(name='help')
-async def help_command(ctx):
-    """Enhanced help command"""
-    try:
-        help_text = f"""👑 **{ASSISTANT_NAME} - Executive Assistant Commands**
-
-**📅 Calendar & Scheduling:**
-• `!today` - Today's executive schedule
-• `!upcoming [days]` - Upcoming events (default 7 days)
-• `!briefing` / `!daily` / `!morning` - Morning executive briefing
-• `!calendar` - Quick calendar overview with AI insights
-• `!schedule [timeframe]` - Flexible schedule view
-• `!agenda` - Comprehensive executive agenda overview
-• `!overview` - Complete executive overview
-
-**🔍 Planning & Research:**
-• `!research <query>` - Strategic planning research
-• `!planning <topic>` - Productivity insights
-
-**💼 Executive Functions:**
-• `!status` - System and calendar status
-• `!ping` - Test connectivity
-• `!help` - This command menu
-
-**📱 Usage:**
-• Mention @{bot.user.name if bot.user else 'Rose'} in any message
-• Available in: {', '.join(ALLOWED_CHANNELS)}
-
-**💡 Example Commands:**
-• `!briefing` - Get comprehensive morning briefing
-• `!today` - See today's complete schedule
-• `!overview` - Complete executive overview
-• `!upcoming 3` - See next 3 days of events
-• "What's my day like?" - Natural language schedule request
-"""
-        
-        await ctx.send(help_text)
-        
-    except Exception as e:
-        print(f"❌ Help command error: {e}")
-        await ctx.send("👑 Help system needs calibration. Please try again.")
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Ping command")
+        await ctx.send(error_msg)
 
 @bot.command(name='status')
 async def status_command(ctx):
-    """Executive system status with comprehensive diagnostics"""
+    """Show Rose's comprehensive status"""
     try:
-        calendar_status = "❌ No calendars accessible"
-        if accessible_calendars:
-            calendar_names = [name for name, _, _ in accessible_calendars]
-            calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Status",
+            description="Complete executive assistance system status",
+            color=0x9932CC
+        )
         
-        research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
-        assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
+        # System status
+        embed.add_field(
+            name="🤖 System Status",
+            value=f"✅ Online\n📡 Latency: {round(bot.latency * 1000)}ms",
+            inline=True
+        )
         
-        sa_info = "Not configured"
-        if service_account_email:
-            sa_info = f"✅ {service_account_email}"
+        # Calendar status
+        calendar_status = "✅ Active" if calendar_manager and calendar_manager.service else "❌ Unavailable"
+        embed.add_field(
+            name="📅 Calendar Integration",
+            value=f"{calendar_status}\n📋 Calendars: {len(accessible_calendars)}",
+            inline=True
+        )
         
-        status_text = f"""👑 **{ASSISTANT_NAME} Executive Status**
-
-**🤖 Core Systems:**
-• Discord: ✅ Connected as {bot.user.name if bot.user else 'Unknown'}
-• OpenAI Assistant: {assistant_status}
-• Service Account: {sa_info}
-
-**📅 Calendar Integration:**
-• Status: {calendar_status}
-• Timezone: 🇨🇦 Toronto (America/Toronto)
-
-**🔍 Planning Research:**
-• Brave Search API: {research_status}
-
-**💼 Executive Features:**
-• Active conversations: {len(user_conversations)}
-• Channels: {', '.join(ALLOWED_CHANNELS)}
-
-**⚡ Performance:**
-• Uptime: Ready for executive assistance
-• Memory: {len(processing_messages)} processing"""
+        # Search capability
+        search_status = "✅ Available" if BRAVE_API_KEY else "❌ Not configured"
+        embed.add_field(
+            name="🔍 Research Capability",
+            value=search_status,
+            inline=True
+        )
         
-        await ctx.send(status_text)
+        # Active conversations
+        embed.add_field(
+            name="📊 Executive Metrics",
+            value=f"👥 Active Threads: {len(user_conversations)}\n🏃 Processing: {len(processing_messages)}",
+            inline=False
+        )
+        
+        # Channels
+        embed.add_field(
+            name="🏢 Monitored Channels",
+            value=f"• {', '.join([f'#{ch}' for ch in ALLOWED_CHANNELS])}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
         
     except Exception as e:
-        print(f"❌ Status command error: {e}")
-        await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Status command")
+        await ctx.send(error_msg)
 
-@bot.command(name='today')
-async def today_command(ctx):
-    """Today's executive schedule command"""
+@bot.command(name='help')
+async def help_command(ctx):
+    """Show Rose's capabilities and usage"""
     try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await ctx.send(schedule)
-    except Exception as e:
-        print(f"❌ Today command error: {e}")
-        await ctx.send("👑 Today's schedule unavailable. Please try again.")
-
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await ctx.send(events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("👑 Upcoming events unavailable. Please try again.")
-
-@bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("👑 Executive briefing unavailable. Please try again.")
-
-@bot.command(name='calendar')
-async def calendar_command(ctx):
-    """Quick calendar overview command"""
-    try:
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            calendar_query = "what's on my calendar today and upcoming strategic overview"
-            response = await get_rose_response(calendar_query, user_id)
-            await send_long_message(ctx.message, response)
-    except Exception as e:
-        print(f"❌ Calendar command error: {e}")
-        await ctx.send("👑 Calendar overview unavailable. Please try again.")
-
-@bot.command(name='schedule')
-async def schedule_command(ctx, *, timeframe: str = "today"):
-    """Flexible schedule command"""
-    try:
-        async with ctx.typing():
-            timeframe_lower = timeframe.lower()
-            
-            if any(word in timeframe_lower for word in ["today", "now", "current"]):
-                response = get_today_schedule()
-            elif any(word in timeframe_lower for word in ["tomorrow", "next"]):
-                response = get_upcoming_events(1)
-            elif any(word in timeframe_lower for word in ["week", "7"]):
-                response = get_upcoming_events(7)
-            elif any(word in timeframe_lower for word in ["month", "30"]):
-                response = get_upcoming_events(30)
-            elif timeframe_lower.isdigit():
-                days = int(timeframe_lower)
-                days = max(1, min(days, 30))
-                response = get_upcoming_events(days)
-            else:
-                response = get_today_schedule()
-            
-            await ctx.send(response)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("👑 Schedule view unavailable. Please try again.")
-
-@bot.command(name='agenda')
-async def agenda_command(ctx):
-    """Executive agenda command"""
-    try:
-        async with ctx.typing():
-            today_schedule = get_today_schedule()
-            tomorrow_events = get_upcoming_events(1)
-            
-            agenda = f"📋 **Executive Agenda Overview**\n\n{today_schedule}\n\n**Tomorrow:**\n{tomorrow_events}"
-            
-            if len(agenda) > 1900:
-                agenda = agenda[:1900] + "\n\n👑 *Use `!today` and `!upcoming` for detailed views*"
-            
-            await ctx.send(agenda)
-    except Exception as e:
-        print(f"❌ Agenda command error: {e}")
-        await ctx.send("👑 Executive agenda unavailable. Please try again.")
-
-@bot.command(name='daily')
-async def daily_command(ctx):
-    """Daily executive briefing - alias for briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Daily briefing command error: {e}")
-        await ctx.send("👑 Daily executive briefing unavailable. Please try again.")
-
-@bot.command(name='morning')
-async def morning_command(ctx):
-    """Morning briefing command - alias for briefing"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Morning briefing command error: {e}")
-        await ctx.send("👑 Morning executive briefing unavailable. Please try again.")
-
-@bot.command(name='overview')
-async def overview_command(ctx):
-    """Executive overview command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            upcoming = get_upcoming_events(3)
-            
-            overview = f"{briefing}\n\n📋 **3-Day Executive Outlook:**\n{upcoming}"
-            
-            if len(overview) > 1900:
-                await ctx.send(briefing)
-                await ctx.send(f"📋 **3-Day Executive Outlook:**\n{upcoming}")
-            else:
-                await ctx.send(overview)
-                
-    except Exception as e:
-        print(f"❌ Overview command error: {e}")
-        await ctx.send("👑 Executive overview unavailable. Please try again.")
-
-@bot.command(name='research')
-async def research_command(ctx, *, query: str = None):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("👑 **Executive Research Usage:** `!research <your planning query>`\n\nExamples:\n• `!research time management strategies`\n• `!research productivity systems for executives`")
-            return
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Your strategic calendar management and planning specialist",
+            color=0x9932CC
+        )
         
-        async with ctx.typing():
-            results, sources = await planning_search_enhanced(query, "executive planning", 3)
-            
-            response = f"📊 **Executive Research:** {query}\n\n{results}"
-            
-            if sources:
-                response += "\n\n📚 **Strategic Sources:**\n"
-                for source in sources:
-                    response += f"({source['number']}) {source['title']} - {source['domain']}\n"
-            
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Research command error: {e}")
-        await ctx.send("👑 Executive research unavailable. Please try again.")
-
-@bot.command(name='planning')
-async def planning_command(ctx, *, topic: str = None):
-    """Quick planning insights command"""
-    try:
-        if not topic:
-            await ctx.send("👑 **Executive Planning Usage:** `!planning <planning topic>`\n\nExamples:\n• `!planning quarterly review`\n• `!planning meeting preparation`")
-            return
+        # How to use
+        embed.add_field(
+            name="💬 How to Use",
+            value="• Mention @Rose for executive assistance\n• Ask about calendar, scheduling, planning\n• Request strategic insights and coordination",
+            inline=False
+        )
         
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            planning_query = f"executive planning insights for {topic} productivity optimization"
-            response = await get_rose_response(planning_query, user_id)
-            await send_long_message(ctx.message, response)
-            
+        # Core capabilities
+        embed.add_field(
+            name="🎯 Core Capabilities",
+            value="• Calendar management & strategic scheduling\n• Executive briefings & dashboard views\n• Meeting coordination & optimization\n• Research-backed planning insights",
+            inline=False
+        )
+        
+        # Example requests
+        embed.add_field(
+            name="✨ Example Requests",
+            value="• \"What's on my calendar today?\"\n• \"Schedule a meeting for tomorrow at 2pm\"\n• \"Give me an executive briefing\"\n• \"Research productivity strategies\"",
+            inline=False
+        )
+        
+        # Commands
+        embed.add_field(
+            name="🔧 Commands",
+            value="• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
     except Exception as e:
-        print(f"❌ Planning command error: {e}")
-        await ctx.send("👑 Executive planning insights unavailable. Please try again.")
-
-# ============================================================================
-# ERROR HANDLING
-# ============================================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    """Enhanced error handling for all commands"""
-    if isinstance(error, commands.CommandNotFound):
-        return
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required information. Use `!help` for command usage.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Invalid argument. Use `!help` for command usage.")
-    elif isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f"👑 Executive office is busy. Please wait {error.retry_after:.1f} seconds.")
-    else:
-        print(f"❌ Command error: {error}")
-        await ctx.send("❌ Command error occurred. Please try again.")
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Help command")
+        await ctx.send(error_msg)
 
 # ============================================================================
 # MAIN EXECUTION
@@ -1787,17 +1157,9 @@ async def on_command_error(ctx, error):
 
 if __name__ == "__main__":
     try:
-        print(f"🚀 Launching {ASSISTANT_NAME}...")
-        print(f"📅 Google Calendar API: {bool(accessible_calendars)} calendars accessible")
-        print(f"🔍 Planning Research: {bool(BRAVE_API_KEY)}")
-        print(f"🇨🇦 Timezone: Toronto (America/Toronto)")
-        print("🎯 Starting Discord bot...")
-        
+        print("🚀 Starting Rose Ashcombe - Executive Assistant Bot (Refactored)")
         bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print("\n🛑 Rose shutdown requested")
     except Exception as e:
-        print(f"❌ Critical error starting Rose: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-    finally:
-        print("👑 Rose Ashcombe shutting down gracefully...")
+        print(f"❌ CRITICAL: Bot startup failed: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        exit(1)
