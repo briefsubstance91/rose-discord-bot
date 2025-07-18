@@ -1,262 +1,5 @@
-        # Build summary
-        header = f"📧 **Email Summary** ({len(emails)} total"
-        if unread_count > 0:
-            header += f", {unread_count} unread"
-        header += ")"
-        
-        summary_parts = [header]
-        if query != "in:inbox":
-            summary_parts.append(f"🔍 *Query: {query}*")
-        
-        summary_parts.extend(email_lines)
-        
-        if len(emails) > 10:
-            summary_parts.append(f"\n... and {len(emails) - 10} more emails")
-        
-        return "\n\n".join(summary_parts)
-    
-    async def send_email(self, to_email, subject, body, from_name="Rose Ashcombe"):
-        """Send email through Gmail API"""
-        if not self.service:
-            return {
-                'success': False,
-                'error': 'Gmail service not available'
-            }
-        
-        try:
-            # Create message
-            message = MIMEText(body)
-            message['to'] = to_email
-            message['subject'] = subject
-            message['from'] = from_name
-            
-            # Encode message
-            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
-            
-            # Send email
-            sent_message = self.service.users().messages().send(
-                userId=self.user_id,
-                body={'raw': raw_message}
-            ).execute()
-            
-            return {
-                'success': True,
-                'message_id': sent_message['id'],
-                'to': to_email,
-                'subject': subject,
-                'summary': f"✅ **Email Sent Successfully**\n📧 To: {to_email}\n📝 Subject: {subject}\n🆔 ID: {sent_message['id'][:8]}..."
-            }
-            
-        except Exception as e:
-            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Send")
-            return {
-                'success': False,
-                'error': error_msg,
-                'summary': f"❌ Failed to send email: {error_msg}"
-            }
-    
-    async def delete_email(self, email_id):
-        """Delete email (move to trash)"""
-        if not self.service:
-            return {
-                'success': False,
-                'error': 'Gmail service not available'
-            }
-        
-        try:
-            # Move to trash
-            self.service.users().messages().trash(
-                userId=self.user_id,
-                id=email_id
-            ).execute()
-            
-            return {
-                'success': True,
-                'summary': f"🗑️ Email {email_id[:8]}... moved to trash"
-            }
-            
-        except Exception as e:
-            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Delete")
-            return {
-                'success': False,
-                'error': error_msg,
-                'summary': f"❌ Failed to delete email: {error_msg}"
-            }
-    
-    async def archive_email(self, email_id):
-        """Archive email (remove from inbox)"""
-        if not self.service:
-            return {
-                'success': False,
-                'error': 'Gmail service not available'
-            }
-        
-        try:
-            # Remove inbox label
-            self.service.users().messages().modify(
-                userId=self.user_id,
-                id=email_id,
-                body={'removeLabelIds': ['INBOX']}
-            ).execute()
-            
-            return {
-                'success': True,
-                'summary': f"📁 Email {email_id[:8]}... archived"
-            }
-            
-        except Exception as e:
-            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Archive")
-            return {
-                'success': False,
-                'error': error_msg,
-                'summary': f"❌ Failed to archive email: {error_msg}"
-            }
-    
-    async def mark_as_read(self, email_id):
-        """Mark email as read"""
-        if not self.service:
-            return {
-                'success': False,
-                'error': 'Gmail service not available'
-            }
-        
-        try:
-            # Remove unread label
-            self.service.users().messages().modify(
-                userId=self.user_id,
-                id=email_id,
-                body={'removeLabelIds': ['UNREAD']}
-            ).execute()
-            
-            return {
-                'success': True,
-                'summary': f"✅ Email {email_id[:8]}... marked as read"
-            }
-            
-        except Exception as e:
-            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Mark Read")
-            return {
-                'success': False,
-                'error': error_msg,
-                'summary': f"❌ Failed to mark email as read: {error_msg}"
-            }
-    
-    async def get_email_stats(self):
-        """Get email statistics for executive dashboard"""
-        if not self.service:
-            return "📧 Gmail integration not available"
-        
-        try:
-            # Get various counts
-            unread = self.service.users().messages().list(
-                userId=self.user_id,
-                q='is:unread in:inbox',
-                maxResults=1
-            ).execute()
-            
-            today_emails = self.service.users().messages().list(
-                userId=self.user_id,
-                q='in:inbox newer_than:1d',
-                maxResults=1
-            ).execute()
-            
-            important = self.service.users().messages().list(
-                userId=self.user_id,
-                q='is:important is:unread',
-                maxResults=1
-            ).execute()
-            
-            unread_count = unread.get('resultSizeEstimate', 0)
-            today_count = today_emails.get('resultSizeEstimate', 0)
-            important_count = important.get('resultSizeEstimate', 0)
-            
-            stats = f"📊 **Email Dashboard**\n"
-            stats += f"📥 Unread: {unread_count}\n"
-            stats += f"📅 Today: {today_count}\n"
-            stats += f"⭐ Important: {important_count}"
-            
-            return stats
-            
-        except Exception as e:
-            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Stats")
-            return f"📧 Email statistics error: {error_msg}"
-
-# ============================================================================
-# INITIALIZE SERVICES WITH ENHANCED ERROR HANDLING
-# ============================================================================
-
-# Discord setup
-try:
-    intents = discord.Intents.default()
-    intents.message_content = True
-    bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
-except Exception as e:
-    print(f"❌ CRITICAL: Discord bot initialization failed: {e}")
-    exit(1)
-
-# OpenAI setup
-try:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-except Exception as e:
-    print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
-    exit(1)
-
-# Google Services setup (Calendar + Gmail)
-calendar_service = None
-gmail_service = None
-accessible_calendars = []
-calendar_manager = None
-gmail_manager = None
-
-# Updated scopes for both Calendar and Gmail
-GOOGLE_SCOPES = [
-    'https://www.googleapis.com/auth/calendar.readonly',
-    'https://www.googleapis.com/auth/calendar.events',
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.compose',
-    'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/gmail.modify'
-]
-
-try:
-    if GOOGLE_SERVICE_ACCOUNT_JSON:
-        credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-        credentials = Credentials.from_service_account_info(
-            credentials_info,
-            scopes=GOOGLE_SCOPES
-        )
-        
-        # Initialize Calendar service
-        calendar_service = build('calendar', 'v3', credentials=credentials)
-        calendar_list = calendar_service.calendarList().list().execute()
-        for calendar in calendar_list.get('items', []):
-            accessible_calendars.append((calendar['id'], calendar.get('summary', 'Unnamed')))
-        
-        calendar_manager = CalendarManager(calendar_service, accessible_calendars)
-        print(f"✅ Google Calendar initialized with {len(accessible_calendars)} calendars")
-        
-        # Initialize Gmail service
-        gmail_service = build('gmail', 'v1', credentials=credentials)
-        gmail_manager = GmailManager(gmail_service)
-        print("✅ Gmail service initialized")
-        
-except Exception as e:
-    print(f"⚠️ Google services initialization failed: {e}")
-    calendar_manager = CalendarManager(None, [])
-    gmail_manager = GmailManager(None)
-
-# Global state management
-user_conversations = {}
-active_runs = {}
-last_response_time = {}
-processing_messages = set()
-
-# ============================================================================
-# CONSOLIDATED CALENDAR FUNCTIONS (PRESERVED)
-# ============================================================================
-
 async def get_calendar_events_unified(timeframe="today", max_results=10, calendar_filter=None):
-    """Unified calendar function replacing get_today_schedule, get_upcoming_events, etc."""
+    """Unified calendar function"""
     if not calendar_manager:
         return "📅 Calendar integration not available"
     
@@ -292,7 +35,7 @@ async def create_calendar_event_unified(event_data):
         return RoseErrorHandler.handle_calendar_error(e, "Event creation")
 
 # ============================================================================
-# EMAIL FUNCTIONS FOR OPENAI ASSISTANT (PRESERVED)
+# EMAIL FUNCTIONS
 # ============================================================================
 
 async def get_recent_emails(count=10, query="in:inbox"):
@@ -316,7 +59,6 @@ async def search_emails(search_query, count=10):
         return "📧 Gmail search not available"
     
     try:
-        # Prepend in:inbox if not specified
         if not any(prefix in search_query.lower() for prefix in ['in:', 'from:', 'to:', 'subject:']):
             search_query = f"in:inbox {search_query}"
         
@@ -346,30 +88,8 @@ async def get_email_stats_function():
     except Exception as e:
         return RoseErrorHandler.handle_api_error(e, "Gmail Stats")
 
-async def delete_email_function(email_id):
-    """Delete/trash email"""
-    if not gmail_manager:
-        return "📧 Gmail integration not available"
-    
-    try:
-        result = await gmail_manager.delete_email(email_id)
-        return result['summary']
-    except Exception as e:
-        return RoseErrorHandler.handle_api_error(e, "Gmail Delete")
-
-async def archive_email_function(email_id):
-    """Archive email"""
-    if not gmail_manager:
-        return "📧 Gmail integration not available"
-    
-    try:
-        result = await gmail_manager.archive_email(email_id)
-        return result['summary']
-    except Exception as e:
-        return RoseErrorHandler.handle_api_error(e, "Gmail Archive")
-
 # ============================================================================
-# IMPROVED SEARCH FUNCTION WITH ERROR HANDLING
+# SEARCH FUNCTION
 # ============================================================================
 
 async def planning_search_enhanced(query, max_results=5):
@@ -420,8 +140,6 @@ async def planning_search_enhanced(query, max_results=5):
                     
                 elif response.status == 429:
                     return "⏳ Search rate limit reached. Please try again later.", []
-                elif response.status == 401:
-                    return "🔐 Search authentication error. Contact administrator.", []
                 else:
                     return f"🔍 Search service error (HTTP {response.status})", []
                     
@@ -429,11 +147,10 @@ async def planning_search_enhanced(query, max_results=5):
         return "⏱️ Search request timed out. Please try again.", []
     except Exception as e:
         error_msg = RoseErrorHandler.handle_api_error(e, "Search")
-        RoseErrorHandler.log_error(e, "Planning search", {'query': query})
         return error_msg, []
 
 # ============================================================================
-# ENHANCED FUNCTION HANDLING WITH EMAIL FUNCTIONS (PRESERVED)
+# FUNCTION HANDLING
 # ============================================================================
 
 async def handle_rose_functions_enhanced(run, thread_id):
@@ -454,33 +171,19 @@ async def handle_rose_functions_enhanced(run, thread_id):
         function_name = getattr(tool_call.function, 'name', 'unknown')
         
         try:
-            # Calendar functions (unified)
+            # Calendar functions
             if function_name in ["get_today_schedule", "get_upcoming_events", "get_calendar_events_detailed"]:
                 args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
                 
-                # Map old function names to new unified approach
                 if function_name == "get_today_schedule":
                     timeframe = "today"
                 elif function_name == "get_upcoming_events":
-                    timeframe = args.get('days', 'week')
-                    if timeframe == 7:
-                        timeframe = "week"
-                    elif timeframe == 30:
-                        timeframe = "month"
+                    timeframe = "week"
                 else:
                     timeframe = args.get('timeframe', 'today')
                 
                 max_results = args.get('max_results', 10)
                 result = await get_calendar_events_unified(timeframe, max_results)
-                
-                tool_outputs.append({
-                    "tool_call_id": tool_call.id,
-                    "output": result
-                })
-            
-            elif function_name == "create_calendar_event":
-                args = json.loads(tool_call.function.arguments)
-                result = await create_calendar_event_unified(args)
                 
                 tool_outputs.append({
                     "tool_call_id": tool_call.id,
@@ -509,67 +212,8 @@ async def handle_rose_functions_enhanced(run, thread_id):
                     "output": result
                 })
 
-            elif function_name == "search_emails":
-                args = json.loads(tool_call.function.arguments)
-                search_query = args.get('query', '')
-                count = args.get('count', 10)
-                
-                if not search_query:
-                    result = "🔍 Email search query required"
-                else:
-                    result = await search_emails(search_query, count)
-                
-                tool_outputs.append({
-                    "tool_call_id": tool_call.id,
-                    "output": result
-                })
-
-            elif function_name == "send_email":
-                args = json.loads(tool_call.function.arguments)
-                to_email = args.get('to_email', '')
-                subject = args.get('subject', '')
-                body = args.get('body', '')
-                
-                if not all([to_email, subject, body]):
-                    result = "📧 Missing required email parameters (to_email, subject, body)"
-                else:
-                    result = await send_email_function(to_email, subject, body)
-                
-                tool_outputs.append({
-                    "tool_call_id": tool_call.id,
-                    "output": result
-                })
-
             elif function_name == "get_email_stats":
                 result = await get_email_stats_function()
-                tool_outputs.append({
-                    "tool_call_id": tool_call.id,
-                    "output": result
-                })
-
-            elif function_name == "delete_email":
-                args = json.loads(tool_call.function.arguments)
-                email_id = args.get('email_id', '')
-                
-                if not email_id:
-                    result = "🗑️ Email ID required for deletion"
-                else:
-                    result = await delete_email_function(email_id)
-                
-                tool_outputs.append({
-                    "tool_call_id": tool_call.id,
-                    "output": result
-                })
-
-            elif function_name == "archive_email":
-                args = json.loads(tool_call.function.arguments)
-                email_id = args.get('email_id', '')
-                
-                if not email_id:
-                    result = "📁 Email ID required for archiving"
-                else:
-                    result = await archive_email_function(email_id)
-                
                 tool_outputs.append({
                     "tool_call_id": tool_call.id,
                     "output": result
@@ -591,7 +235,6 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 })
             
             else:
-                # Handle unknown functions gracefully
                 tool_outputs.append({
                     "tool_call_id": tool_call.id,
                     "output": f"⚠️ Function '{function_name}' not recognized"
@@ -599,8 +242,6 @@ async def handle_rose_functions_enhanced(run, thread_id):
         
         except json.JSONDecodeError as e:
             error_msg = "⚠️ Invalid function arguments format"
-            RoseErrorHandler.log_error(e, f"Function {function_name} JSON decode", 
-                                     {'arguments': tool_call.function.arguments})
             tool_outputs.append({
                 "tool_call_id": tool_call.id,
                 "output": error_msg
@@ -608,7 +249,6 @@ async def handle_rose_functions_enhanced(run, thread_id):
         
         except Exception as e:
             error_msg = RoseErrorHandler.handle_api_error(e, f"Function {function_name}")
-            RoseErrorHandler.log_error(e, f"Function {function_name} execution")
             tool_outputs.append({
                 "tool_call_id": tool_call.id,
                 "output": error_msg
@@ -624,11 +264,10 @@ async def handle_rose_functions_enhanced(run, thread_id):
             )
         except Exception as e:
             error_msg = RoseErrorHandler.handle_api_error(e, "OpenAI tool outputs")
-            RoseErrorHandler.log_error(e, "Tool outputs submission")
             print(f"❌ Failed to submit tool outputs: {error_msg}")
 
 # ============================================================================
-# MAIN RESPONSE FUNCTION WITH IMPROVED FORMATTING (PRESERVED)
+# MAIN RESPONSE FUNCTION
 # ============================================================================
 
 async def get_rose_response(message, user_id):
@@ -766,7 +405,7 @@ RESPONSE GUIDELINES:
         return error_msg
 
 # ============================================================================
-# IMPROVED MESSAGE HANDLING (PRESERVED)
+# MESSAGE HANDLING
 # ============================================================================
 
 async def send_long_message(original_message, response):
@@ -810,7 +449,7 @@ async def send_long_message(original_message, response):
         RoseErrorHandler.log_error(e, "send_long_message")
 
 # ============================================================================
-# DISCORD BOT EVENT HANDLERS (PRESERVED)
+# DISCORD BOT EVENT HANDLERS
 # ============================================================================
 
 @bot.event
@@ -890,7 +529,7 @@ async def on_message(message):
         RoseErrorHandler.log_error(e, "on_message event")
 
 # ============================================================================
-# ROSE'S EXECUTIVE COMMANDS (WITH EMAIL COMMANDS ADDED)
+# ROSE'S EXECUTIVE COMMANDS
 # ============================================================================
 
 @bot.command(name='ping')
@@ -1179,15 +818,14 @@ async def help_command(ctx):
 
 if __name__ == "__main__":
     try:
-        print("🚀 Starting Rose Ashcombe - Executive Assistant Bot (Complete with Email)")
+        print("🚀 Starting Rose Ashcombe - Executive Assistant Bot (Fixed Version)")
         bot.run(DISCORD_TOKEN)
     except Exception as e:
         print(f"❌ CRITICAL: Bot startup failed: {e}")
         print(f"Traceback: {traceback.format_exc()}")
-        exit(1)
-        #!/usr/bin/env python3
+        exit(1)#!/usr/bin/env python3
 """
-ROSE ASHCOMBE - COMPLETE CORRECTED VERSION
+ROSE ASHCOMBE - COMPLETE FIXED VERSION
 Executive Assistant with Full Google Calendar + Gmail Integration
 PRESERVES: Original CalendarManager, GmailManager, and calendar functions
 """
@@ -1317,233 +955,34 @@ class RoseErrorHandler:
         print(f"   Traceback: {traceback.format_exc()}")
 
 # ============================================================================
-# IMPROVED RESPONSE FORMATTING CLASS
+# RESPONSE FORMATTING CLASS
 # ============================================================================
 
 class ResponseFormatter:
-    """Clean, structured response formatting without complex regex"""
-    
-    SECTION_PATTERNS = {
-        'executive_summary': [
-            r'👑\s*\*\*Executive Summary:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)',
-            r'Executive Summary:?\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)',
-            r'Summary:?\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|\n💼|$)'
-        ],
-        'calendar_details': [
-            r'📅\s*\*\*(?:Calendar Coordination|Meeting Details):?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)',
-            r'📅\s*\*\*Calendar:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)',
-            r'💼\s*\*\*Meeting Details:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n🔗|$)'
-        ],
-        'email_details': [
-            r'📧\s*\*\*(?:Email|Email Summary|Email Management):?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|$)',
-            r'📧\s*\*\*(?:Email Coordination|Email Response):?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n🎯|\n📅|$)'
-        ],
-        'strategic_analysis': [
-            r'📊\s*\*\*Strategic Analysis:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n🎯|\n📅|\n💼|$)',
-            r'📊\s*\*\*Analysis:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n🎯|\n📅|\n💼|$)'
-        ],
-        'action_items': [
-            r'🎯\s*\*\*Action Items:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n📅|\n💼|$)',
-            r'🎯\s*\*\*Actions:?\*\*\s*(.*?)(?=\n\*\*|\n👑|\n📊|\n📅|\n💼|$)'
-        ]
-    }
+    """Clean, structured response formatting"""
     
     @classmethod
     def format_response(cls, response_text: str, response_type: str = "general") -> str:
-        """Main formatting method that routes to specific formatters"""
+        """Main formatting method"""
         try:
             if not response_text or not response_text.strip():
                 return "👑 Executive response processing... Please try again."
             
-            # Determine response type if not specified
-            if response_type == "general":
-                response_type = cls._detect_response_type(response_text)
+            # Clean up response text
+            cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', response_text)
             
-            # Route to appropriate formatter
-            if response_type == "calendar":
-                return cls._format_calendar_response(response_text)
-            elif response_type == "email":
-                return cls._format_email_response(response_text)
-            elif response_type == "planning":
-                return cls._format_planning_response(response_text)
-            else:
-                return cls._format_general_response(response_text)
+            # Ensure proper Discord character limits
+            if len(cleaned) > 1900:
+                cleaned = cleaned[:1900] + "\n\n👑 *(Executive insights continue)*"
+            
+            return cleaned.strip()
                 
         except Exception as e:
             RoseErrorHandler.log_error(e, "Response formatting")
             return "👑 Executive message formatting... Please try again."
-    
-    @classmethod
-    def _detect_response_type(cls, text: str) -> str:
-        """Detect response type based on content"""
-        text_lower = text.lower()
-        
-        # Email indicators
-        email_indicators = ['email', 'send', 'inbox', 'unread', 'message', 'reply']
-        if any(indicator in text_lower for indicator in email_indicators):
-            return "email"
-        
-        # Calendar indicators
-        calendar_indicators = ['meeting', 'event', 'calendar', 'schedule', 'appointment', 'time:', 'date:']
-        if any(indicator in text_lower for indicator in calendar_indicators):
-            return "calendar"
-        
-        # Planning indicators  
-        planning_indicators = ['strategy', 'plan', 'analysis', 'research', 'action item']
-        if any(indicator in text_lower for indicator in planning_indicators):
-            return "planning"
-        
-        return "general"
-    
-    @classmethod
-    def _extract_section(cls, text: str, section_key: str) -> str:
-        """Extract specific section using multiple pattern attempts"""
-        patterns = cls.SECTION_PATTERNS.get(section_key, [])
-        
-        for pattern in patterns:
-            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-            if match:
-                content = match.group(1).strip()
-                # Clean up the content
-                content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)  # Remove excessive newlines
-                content = re.sub(r'^\*\*|\*\*$', '', content)  # Remove leading/trailing **
-                return content.strip()
-        
-        return ""
-    
-    @classmethod
-    def _extract_links(cls, text: str) -> str:
-        """Extract calendar or other links"""
-        link_patterns = [
-            r'🔗\s*\[View Event\][^)]*\)',
-            r'🔗[^)]*View Event[^)]*\)',
-            r'🔗[^)]*Google Calendar[^)]*\)',
-            r'🔗.*?https://calendar\.google\.com[^\s)]*'
-        ]
-        
-        for pattern in link_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                return match.group(0).strip()
-        
-        return ""
-    
-    @classmethod
-    def _format_email_response(cls, text: str) -> str:
-        """Format email-specific responses"""
-        summary = cls._extract_section(text, 'executive_summary')
-        email_details = cls._extract_section(text, 'email_details')
-        actions = cls._extract_section(text, 'action_items')
-        
-        response_parts = []
-        
-        if summary:
-            response_parts.append(f"👑 **Executive Summary:**\n{summary}")
-        
-        if email_details:
-            response_parts.append(f"📧 **Email Management:**\n{email_details}")
-        
-        if actions:
-            response_parts.append(f"🎯 **Next Steps:**\n{actions}")
-        
-        if not response_parts:
-            return cls._clean_response_text(text)
-        
-        return "\n\n".join(response_parts)
-    
-    @classmethod
-    def _format_calendar_response(cls, text: str) -> str:
-        """Format calendar-specific responses (simplified)"""
-        summary = cls._extract_section(text, 'executive_summary')
-        details = cls._extract_section(text, 'calendar_details')
-        links = cls._extract_links(text)
-        
-        # Build response with only essential sections
-        response_parts = []
-        
-        if summary:
-            response_parts.append(f"👑 **Executive Summary:**\n{summary}")
-        
-        if details:
-            response_parts.append(f"📅 **Calendar Coordination:**\n{details}")
-        elif not summary:  # Fallback if no clear sections
-            # Try to extract key calendar info from the full text
-            calendar_info = cls._extract_calendar_fallback(text)
-            if calendar_info:
-                response_parts.append(f"📅 **Calendar Coordination:**\n{calendar_info}")
-        
-        if links:
-            response_parts.append(links)
-        
-        if not response_parts:
-            # Final fallback - clean up the original text
-            return cls._clean_response_text(text)
-        
-        return "\n\n".join(response_parts)
-    
-    @classmethod
-    def _format_planning_response(cls, text: str) -> str:
-        """Format planning/strategic responses (full format)"""
-        summary = cls._extract_section(text, 'executive_summary')
-        analysis = cls._extract_section(text, 'strategic_analysis')
-        actions = cls._extract_section(text, 'action_items')
-        calendar = cls._extract_section(text, 'calendar_details')
-        
-        response_parts = []
-        
-        if summary:
-            response_parts.append(f"👑 **Executive Summary:**\n{summary}")
-        
-        if analysis:
-            response_parts.append(f"📊 **Strategic Analysis:**\n{analysis}")
-        
-        if actions:
-            response_parts.append(f"🎯 **Action Items:**\n{actions}")
-        
-        if calendar:
-            response_parts.append(f"📅 **Calendar Coordination:**\n{calendar}")
-        
-        if not response_parts:
-            return cls._clean_response_text(text)
-        
-        return "\n\n".join(response_parts)
-    
-    @classmethod
-    def _format_general_response(cls, text: str) -> str:
-        """Format general responses"""
-        # For general responses, try to preserve structure but clean up
-        return cls._clean_response_text(text)
-    
-    @classmethod
-    def _extract_calendar_fallback(cls, text: str) -> str:
-        """Fallback method to extract calendar info when sections aren't clear"""
-        # Look for common calendar patterns
-        calendar_lines = []
-        
-        for line in text.split('\n'):
-            line = line.strip()
-            if any(keyword in line.lower() for keyword in ['title:', 'date:', 'time:', 'location:', 'calendar:', 'created']):
-                if not line.startswith('**') or not line.endswith('**'):
-                    calendar_lines.append(f"• {line}")
-                else:
-                    calendar_lines.append(line)
-        
-        return "\n".join(calendar_lines) if calendar_lines else ""
-    
-    @classmethod
-    def _clean_response_text(cls, text: str) -> str:
-        """Clean up response text while preserving structure"""
-        # Remove excessive newlines
-        cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
-        
-        # Ensure proper Discord character limits
-        if len(cleaned) > 1900:
-            cleaned = cleaned[:1900] + "\n\n👑 *(Executive insights continue)*"
-        
-        return cleaned.strip()
 
 # ============================================================================
-# CONSOLIDATED CALENDAR MANAGEMENT CLASS (PRESERVED)
+# CALENDAR MANAGER CLASS
 # ============================================================================
 
 class CalendarManager:
@@ -1571,16 +1010,13 @@ class CalendarManager:
         elif timeframe == "month":
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             end = start + timedelta(days=30)
-        else:  # Default to today
+        else:
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
         
         return start.isoformat(), end.isoformat()
     
-    async def get_events(self, 
-                        timeframe: str = "today",
-                        max_results: int = 10,
-                        calendar_filter: List[str] = None) -> Dict:
+    async def get_events(self, timeframe: str = "today", max_results: int = 10, calendar_filter: List[str] = None) -> Dict:
         """Unified method to get events from all or filtered calendars"""
         if not self.service:
             return {
@@ -1597,7 +1033,6 @@ class CalendarManager:
             errors = []
             
             for calendar_id, calendar_name in self.calendars:
-                # Apply calendar filter if specified
                 if calendar_filter and calendar_name not in calendar_filter:
                     continue
                 
@@ -1613,7 +1048,6 @@ class CalendarManager:
                     
                     events = events_result.get('items', [])
                     
-                    # Add calendar source to each event
                     for event in events:
                         event['calendar_source'] = calendar_name
                         event['calendar_id'] = calendar_id
@@ -1631,7 +1065,6 @@ class CalendarManager:
                     errors.append(f"{calendar_name}: {error_msg}")
                     RoseErrorHandler.log_error(e, f"Calendar fetch for {calendar_name}")
             
-            # Sort all events by start time
             all_events.sort(key=lambda x: x.get('start', {}).get('dateTime', x.get('start', {}).get('date', '')))
             
             return {
@@ -1662,7 +1095,6 @@ class CalendarManager:
         if not events and errors:
             return f"📅 Calendar access issues:\n" + "\n".join(f"• {error}" for error in errors)
         
-        # Format events
         event_lines = []
         for event in events:
             try:
@@ -1670,9 +1102,7 @@ class CalendarManager:
                 start = event.get('start', {})
                 calendar_source = event.get('calendar_source', 'Unknown')
                 
-                # Format time
                 if start.get('dateTime'):
-                    # Parse datetime
                     start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
                     if start_dt.tzinfo:
                         start_dt = start_dt.astimezone(self.toronto_tz)
@@ -1688,7 +1118,6 @@ class CalendarManager:
                 RoseErrorHandler.log_error(e, "Event formatting", {'event': event})
                 event_lines.append(f"• Event formatting error")
         
-        # Build summary
         header = f"📅 **{timeframe.title()} Schedule** ({len(events)} event{'s' if len(events) != 1 else ''})"
         
         summary_parts = [header]
@@ -1712,10 +1141,8 @@ class CalendarManager:
             }
         
         try:
-            # Use primary calendar or first available
             calendar_id = self.calendars[0][0] if self.calendars else 'primary'
             
-            # Create event
             created_event = self.service.events().insert(
                 calendarId=calendar_id,
                 body=event_data
@@ -1743,7 +1170,7 @@ class CalendarManager:
             }
 
 # ============================================================================
-# GMAIL MANAGER CLASS (PRESERVED)
+# GMAIL MANAGER CLASS
 # ============================================================================
 
 class GmailManager:
@@ -1764,7 +1191,6 @@ class GmailManager:
             }
         
         try:
-            # Search for messages
             messages_result = self.service.users().messages().list(
                 userId=self.user_id,
                 q=query,
@@ -1780,7 +1206,6 @@ class GmailManager:
                     'summary': f'📭 No emails found for query: "{query}"'
                 }
             
-            # Get detailed email info
             email_details = []
             for message in messages:
                 try:
@@ -1819,7 +1244,6 @@ class GmailManager:
         headers = {}
         payload = email_data.get('payload', {})
         
-        # Extract headers
         for header in payload.get('headers', []):
             headers[header['name'].lower()] = header['value']
         
@@ -1835,7 +1259,6 @@ class GmailManager:
             'is_unread': 'UNREAD' in email_data.get('labelIds', [])
         }
         
-        # Extract sender name
         from_email = email_info['from']
         if '<' in from_email:
             email_info['sender_name'] = from_email.split('<')[0].strip(' "')
@@ -1844,7 +1267,6 @@ class GmailManager:
             email_info['sender_name'] = from_email
             email_info['sender_email'] = from_email
         
-        # Extract body if requested
         if include_body:
             email_info['body'] = self._extract_body(payload)
         
@@ -1877,7 +1299,7 @@ class GmailManager:
         email_lines = []
         unread_count = 0
         
-        for email in emails[:10]:  # Limit display
+        for email in emails[:10]:
             try:
                 sender = email['sender_name'][:30]
                 subject = email['subject'][:50]
@@ -1893,5 +1315,162 @@ class GmailManager:
                 RoseErrorHandler.log_error(e, "Email summary formatting")
                 continue
         
-        # Build summary
-        header = f"📧 
+        header = f"📧 **Email Summary** ({len(emails)} total"
+        if unread_count > 0:
+            header += f", {unread_count} unread"
+        header += ")"
+        
+        summary_parts = [header]
+        if query != "in:inbox":
+            summary_parts.append(f"🔍 *Query: {query}*")
+        
+        summary_parts.extend(email_lines)
+        
+        if len(emails) > 10:
+            summary_parts.append(f"\n... and {len(emails) - 10} more emails")
+        
+        return "\n\n".join(summary_parts)
+    
+    async def send_email(self, to_email, subject, body, from_name="Rose Ashcombe"):
+        """Send email through Gmail API"""
+        if not self.service:
+            return {
+                'success': False,
+                'error': 'Gmail service not available'
+            }
+        
+        try:
+            message = MIMEText(body)
+            message['to'] = to_email
+            message['subject'] = subject
+            message['from'] = from_name
+            
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+            
+            sent_message = self.service.users().messages().send(
+                userId=self.user_id,
+                body={'raw': raw_message}
+            ).execute()
+            
+            return {
+                'success': True,
+                'message_id': sent_message['id'],
+                'to': to_email,
+                'subject': subject,
+                'summary': f"✅ **Email Sent Successfully**\n📧 To: {to_email}\n📝 Subject: {subject}\n🆔 ID: {sent_message['id'][:8]}..."
+            }
+            
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Send")
+            return {
+                'success': False,
+                'error': error_msg,
+                'summary': f"❌ Failed to send email: {error_msg}"
+            }
+    
+    async def get_email_stats(self):
+        """Get email statistics for executive dashboard"""
+        if not self.service:
+            return "📧 Gmail integration not available"
+        
+        try:
+            unread = self.service.users().messages().list(
+                userId=self.user_id,
+                q='is:unread in:inbox',
+                maxResults=1
+            ).execute()
+            
+            today_emails = self.service.users().messages().list(
+                userId=self.user_id,
+                q='in:inbox newer_than:1d',
+                maxResults=1
+            ).execute()
+            
+            unread_count = unread.get('resultSizeEstimate', 0)
+            today_count = today_emails.get('resultSizeEstimate', 0)
+            
+            stats = f"📊 **Email Dashboard**\n"
+            stats += f"📥 Unread: {unread_count}\n"
+            stats += f"📅 Today: {today_count}"
+            
+            return stats
+            
+        except Exception as e:
+            error_msg = RoseErrorHandler.handle_api_error(e, "Gmail Stats")
+            return f"📧 Email statistics error: {error_msg}"
+
+# ============================================================================
+# DISCORD BOT INITIALIZATION
+# ============================================================================
+
+try:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+except Exception as e:
+    print(f"❌ CRITICAL: Discord bot initialization failed: {e}")
+    exit(1)
+
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+except Exception as e:
+    print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
+    exit(1)
+
+# Google Services setup
+calendar_service = None
+gmail_service = None
+accessible_calendars = []
+calendar_manager = None
+gmail_manager = None
+
+GOOGLE_SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.modify'
+]
+
+try:
+    if GOOGLE_SERVICE_ACCOUNT_JSON:
+        credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+        credentials = Credentials.from_service_account_info(
+            credentials_info,
+            scopes=GOOGLE_SCOPES
+        )
+        
+        calendar_service = build('calendar', 'v3', credentials=credentials)
+        calendar_list = calendar_service.calendarList().list().execute()
+        for calendar in calendar_list.get('items', []):
+            accessible_calendars.append((calendar['id'], calendar.get('summary', 'Unnamed')))
+        
+        calendar_manager = CalendarManager(calendar_service, accessible_calendars)
+        print(f"✅ Google Calendar initialized with {len(accessible_calendars)} calendars")
+        
+        gmail_service = build('gmail', 'v1', credentials=credentials)
+        gmail_manager = GmailManager(gmail_service)
+        print("✅ Gmail service initialized")
+        
+except Exception as e:
+    print(f"⚠️ Google services initialization failed: {e}")
+    calendar_manager = CalendarManager(None, [])
+    gmail_manager = GmailManager(None)
+
+# Global state management
+user_conversations = {}
+active_runs = {}
+last_response_time = {}
+processing_messages = set()
+
+# ============================================================================
+# UNIFIED CALENDAR FUNCTIONS
+# ============================================================================
+
+async def get_calendar_events_unified(timeframe="today", max_results=10, calendar_filter=None):
+    """Unified calendar function"""
+    if not calendar_manager:
+        return "📅 Calendar integration not available"
+    
+    try
