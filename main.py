@@ -1248,9 +1248,10 @@ Keep core content focused and always provide strategic context with calendar coo
         print(f"❌ Rose error: {e}")
         print(f"📋 Full traceback: {traceback.format_exc()}")
         return "❌ Something went wrong with executive strategy. Please try again!"
-    finally:
-        if user_id in user_conversations:
-            user_conversations[user_id]['active'] = False
+finally:
+    if user_id in user_conversations:
+        # Thread completed successfully - no cleanup needed
+        pass
 
 def format_for_discord_rose(response):
     """Format response for Discord with error handling"""
