@@ -1,4 +1,43 @@
-#!/usr/bin/env python3
+        calendar_status = "❌ No calendars accessible"
+        if accessible_calendars:
+            calendar_names = [name for name, _, _ in accessible_calendars]
+            calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
+        
+        gmail_status = "❌ Not configured"
+        if gmail_service and gmail_user_email:
+            gmail_status = f"✅ Connected: {gmail_user_email}"
+        
+        research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
+        assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
+        
+        sa_info = "Not configured"
+        if service_account_email:
+            sa_info = f"✅ {service_account_email}"
+        
+        status_text = f"""👑 **{ASSISTANT_NAME} Executive Status**
+
+**🤖 Core Systems:**
+• Discord: ✅ Connected as {bot.user.name if bot.user else 'Unknown'}
+• OpenAI Assistant: {assistant_status}
+• Service Account: {sa_info}
+
+**📅 Calendar Integration:**
+• Status: {calendar_status}
+• Timezone: 🇨🇦 Toronto (America/Toronto)
+
+**📧 Gmail Integration:**
+• Status: {gmail_status}
+
+**🔍 Planning Research:**
+• Brave Search API: {research_status}
+
+**💼 Executive Features:**
+• Active conversations: {len(user_conversations)}
+• Channels: {', '.join(ALLOWED_CHANNELS)}
+
+**⚡ Performance:**
+• Uptime: Ready for executive assistance
+• Memory: {len(processing_messages)} processing"""#!/usr/bin/env python3
 """
 ROSE ASHCOMBE - DISCORD BOT (FIXED VERSION)
 Executive Assistant with Full Google Calendar API Integration & Advanced Task Management
@@ -40,6 +79,10 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
 
+# Gmail integration
+GMAIL_USER_EMAIL = os.getenv('GMAIL_USER_EMAIL')  # Your main email address
+GMAIL_DELEGATE_EMAIL = os.getenv('GMAIL_DELEGATE_EMAIL', GMAIL_USER_EMAIL)  # Email to impersonate
+
 # Validate critical environment variables
 if not DISCORD_TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found in environment variables")
@@ -73,6 +116,10 @@ except Exception as e:
 calendar_service = None
 accessible_calendars = []
 service_account_email = None
+
+# Gmail setup
+gmail_service = None
+gmail_user_email = None
 
 def test_calendar_access(calendar_id, calendar_name):
     """Test calendar access with comprehensive error handling"""
@@ -116,7 +163,11 @@ try:
             scopes=[
                 'https://www.googleapis.com/auth/calendar.readonly',
                 'https://www.googleapis.com/auth/calendar.events',
-                'https://www.googleapis.com/auth/calendar'
+                'https://www.googleapis.com/auth/calendar',
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.compose',
+                'https://www.googleapis.com/auth/gmail.modify'
             ]
         )
         calendar_service = build('calendar', 'v3', credentials=credentials)
@@ -124,6 +175,15 @@ try:
         
         service_account_email = credentials_info.get('client_email')
         print(f"📧 Service Account: {service_account_email}")
+        
+        # Initialize Gmail service with domain-wide delegation
+        if GMAIL_USER_EMAIL:
+            delegated_credentials = credentials.with_subject(GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL)
+            gmail_service = build('gmail', 'v1', credentials=delegated_credentials)
+            gmail_user_email = GMAIL_DELEGATE_EMAIL or GMAIL_USER_EMAIL
+            print(f"✅ Gmail service initialized for: {gmail_user_email}")
+        else:
+            print("⚠️ GMAIL_USER_EMAIL not configured - Gmail features disabled")
         
         working_calendars = [
             ("BG Calendar", GOOGLE_CALENDAR_ID, "calendar"),
@@ -147,8 +207,9 @@ try:
         print("⚠️ Google Calendar credentials not found")
         
 except Exception as e:
-    print(f"❌ Google Calendar setup error: {e}")
+    print(f"❌ Google services setup error: {e}")
     calendar_service = None
+    gmail_service = None
     accessible_calendars = []
 
 # Memory and duplicate prevention systems
@@ -839,6 +900,496 @@ def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=Non
         return f"❌ **Free Time Search Failed:** {str(e)}"
 
 # ============================================================================
+# GMAIL FUNCTIONS
+# ============================================================================
+
+import base64
+import email
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+
+def get_recent_emails(max_results=10, query=""):
+    """Get recent emails from Gmail"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Build query for recent emails
+        search_query = query if query else "in:inbox"
+        
+        # Get message IDs
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=search_query,
+            maxResults=max_results
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Recent Emails:** No emails found"
+        
+        formatted_emails = []
+        
+        for msg in messages[:max_results]:
+            try:
+                # Get full message
+                message = gmail_service.users().messages().get(
+                    userId='me',
+                    id=msg['id'],
+                    format='metadata',
+                    metadataHeaders=['From', 'Subject', 'Date']
+                ).execute()
+                
+                headers = message['payload'].get('headers', [])
+                
+                # Extract email details
+                from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+                subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+                date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
+                
+                # Parse date for better formatting
+                try:
+                    from dateutil import parser
+                    parsed_date = parser.parse(date)
+                    toronto_tz = pytz.timezone('America/Toronto')
+                    local_date = parsed_date.astimezone(toronto_tz)
+                    formatted_date = local_date.strftime('%m/%d %H:%M')
+                except:
+                    formatted_date = date[:16] if len(date) > 16 else date
+                
+                # Check if unread
+                labels = message.get('labelIds', [])
+                unread_indicator = "🔴" if 'UNREAD' in labels else "📧"
+                
+                # Format sender (extract name/email)
+                if '<' in from_email:
+                    sender = from_email.split('<')[0].strip().strip('"')
+                    if not sender:
+                        sender = from_email.split('<')[1].split('>')[0]
+                else:
+                    sender = from_email
+                
+                formatted_emails.append(f"{unread_indicator} **{subject[:50]}{'...' if len(subject) > 50 else ''}**\n   From: {sender[:30]}{'...' if len(sender) > 30 else ''} | {formatted_date}")
+                
+            except Exception as e:
+                print(f"❌ Error processing email {msg['id']}: {e}")
+                continue
+        
+        header = f"📧 **Recent Emails:** {len(formatted_emails)} messages"
+        return header + "\n\n" + "\n\n".join(formatted_emails)
+        
+    except Exception as e:
+        print(f"❌ Error getting emails: {e}")
+        return f"📧 **Email Error:** {str(e)}"
+
+def search_emails(query, max_results=10):
+    """Search emails with specific query"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Search for emails
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=max_results
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Search Results:** No emails found for '{query}'"
+        
+        formatted_results = []
+        
+        for msg in messages[:max_results]:
+            try:
+                # Get message metadata
+                message = gmail_service.users().messages().get(
+                    userId='me',
+                    id=msg['id'],
+                    format='metadata',
+                    metadataHeaders=['From', 'Subject', 'Date']
+                ).execute()
+                
+                headers = message['payload'].get('headers', [])
+                
+                from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+                subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+                date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
+                
+                # Parse date
+                try:
+                    from dateutil import parser
+                    parsed_date = parser.parse(date)
+                    toronto_tz = pytz.timezone('America/Toronto')
+                    local_date = parsed_date.astimezone(toronto_tz)
+                    formatted_date = local_date.strftime('%m/%d %H:%M')
+                except:
+                    formatted_date = date[:16] if len(date) > 16 else date
+                
+                # Format sender
+                if '<' in from_email:
+                    sender = from_email.split('<')[0].strip().strip('"')
+                    if not sender:
+                        sender = from_email.split('<')[1].split('>')[0]
+                else:
+                    sender = from_email
+                
+                formatted_results.append(f"📧 **{subject[:45]}{'...' if len(subject) > 45 else ''}**\n   {sender[:25]}{'...' if len(sender) > 25 else ''} | {formatted_date}")
+                
+            except Exception as e:
+                print(f"❌ Error processing search result {msg['id']}: {e}")
+                continue
+        
+        return f"📧 **Search: '{query}'** ({len(formatted_results)} results)\n\n" + "\n\n".join(formatted_results)
+        
+    except Exception as e:
+        print(f"❌ Error searching emails: {e}")
+        return f"📧 **Search Error:** {str(e)}"
+
+def get_email_details(search_term):
+    """Get detailed view of a specific email"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Search for the email
+        query = f"subject:{search_term}" if search_term else "in:inbox"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Email Not Found:** No email matching '{search_term}'"
+        
+        # Get full message
+        message = gmail_service.users().messages().get(
+            userId='me',
+            id=messages[0]['id'],
+            format='full'
+        ).execute()
+        
+        headers = message['payload'].get('headers', [])
+        
+        # Extract headers
+        from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+        to_email = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown')
+        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+        date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
+        
+        # Extract body
+        def extract_body(payload):
+            body = ""
+            if 'parts' in payload:
+                for part in payload['parts']:
+                    if part['mimeType'] == 'text/plain':
+                        data = part['body'].get('data', '')
+                        if data:
+                            body = base64.urlsafe_b64decode(data).decode('utf-8')
+                            break
+                    elif part['mimeType'] == 'text/html' and not body:
+                        data = part['body'].get('data', '')
+                        if data:
+                            body = base64.urlsafe_b64decode(data).decode('utf-8')
+            else:
+                if payload['mimeType'] == 'text/plain':
+                    data = payload['body'].get('data', '')
+                    if data:
+                        body = base64.urlsafe_b64decode(data).decode('utf-8')
+            
+            return body[:500] + "..." if len(body) > 500 else body
+        
+        body = extract_body(message['payload'])
+        
+        # Format date
+        try:
+            from dateutil import parser
+            parsed_date = parser.parse(date)
+            toronto_tz = pytz.timezone('America/Toronto')
+            local_date = parsed_date.astimezone(toronto_tz)
+            formatted_date = local_date.strftime('%A, %B %d, %Y at %H:%M')
+        except:
+            formatted_date = date
+        
+        response = f"""📧 **Email Details:**
+
+**Subject:** {subject}
+**From:** {from_email}
+**To:** {to_email}
+**Date:** {formatted_date}
+
+**Message Preview:**
+{body if body else "No content available"}"""
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error getting email details: {e}")
+        return f"📧 **Email Details Error:** {str(e)}"
+
+def send_email(to_email, subject, body, cc_email=None, bcc_email=None):
+    """Send an email via Gmail"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Create message
+        message = MIMEMultipart()
+        message['To'] = to_email
+        message['Subject'] = subject
+        message['From'] = gmail_user_email
+        
+        if cc_email:
+            message['Cc'] = cc_email
+        if bcc_email:
+            message['Bcc'] = bcc_email
+        
+        # Add body
+        message.attach(MIMEText(body, 'plain'))
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Send email
+        sent_message = gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        # Get message details for confirmation
+        sent_details = gmail_service.users().messages().get(
+            userId='me',
+            id=sent_message['id'],
+            format='metadata',
+            metadataHeaders=['Message-ID', 'Date']
+        ).execute()
+        
+        return f"✅ **Email Sent Successfully**\n📧 To: {to_email}\n📝 Subject: {subject}\n🕐 Sent at: {datetime.now(pytz.timezone('America/Toronto')).strftime('%H:%M')}"
+        
+    except Exception as e:
+        print(f"❌ Error sending email: {e}")
+        return f"❌ **Failed to send email:** {str(e)}"
+
+def reply_to_email(search_term, reply_body):
+    """Reply to an email"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Find the original email
+        query = f"subject:{search_term}" if search_term else "in:inbox"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Original Email Not Found:** No email matching '{search_term}'"
+        
+        # Get original message
+        original_message = gmail_service.users().messages().get(
+            userId='me',
+            id=messages[0]['id'],
+            format='full'
+        ).execute()
+        
+        headers = original_message['payload'].get('headers', [])
+        
+        # Extract original details
+        original_from = next((h['value'] for h in headers if h['name'] == 'From'), '')
+        original_subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
+        original_message_id = next((h['value'] for h in headers if h['name'] == 'Message-ID'), '')
+        
+        # Create reply
+        reply_subject = f"Re: {original_subject}" if not original_subject.startswith('Re:') else original_subject
+        
+        message = MIMEMultipart()
+        message['To'] = original_from
+        message['Subject'] = reply_subject
+        message['From'] = gmail_user_email
+        message['In-Reply-To'] = original_message_id
+        message['References'] = original_message_id
+        
+        # Add reply body
+        message.attach(MIMEText(reply_body, 'plain'))
+        
+        # Encode and send
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        sent_reply = gmail_service.users().messages().send(
+            userId='me',
+            body={
+                'raw': raw_message,
+                'threadId': original_message['threadId']
+            }
+        ).execute()
+        
+        return f"✅ **Reply Sent Successfully**\n📧 To: {original_from}\n📝 Subject: {reply_subject}\n🕐 Sent at: {datetime.now(pytz.timezone('America/Toronto')).strftime('%H:%M')}"
+        
+    except Exception as e:
+        print(f"❌ Error sending reply: {e}")
+        return f"❌ **Failed to send reply:** {str(e)}"
+
+def mark_email_as_read(search_term):
+    """Mark an email as read"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Find the email
+        query = f"subject:{search_term} is:unread" if search_term else "is:unread"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Email Not Found:** No unread email matching '{search_term}'"
+        
+        # Mark as read by removing UNREAD label
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=messages[0]['id'],
+            body={'removeLabelIds': ['UNREAD']}
+        ).execute()
+        
+        return f"✅ **Email marked as read:** {search_term}"
+        
+    except Exception as e:
+        print(f"❌ Error marking email as read: {e}")
+        return f"❌ **Failed to mark as read:** {str(e)}"
+
+def archive_email(search_term):
+    """Archive an email"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Find the email
+        query = f"subject:{search_term} in:inbox" if search_term else "in:inbox"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Email Not Found:** No inbox email matching '{search_term}'"
+        
+        # Archive by removing INBOX label
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=messages[0]['id'],
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"✅ **Email archived:** {search_term}"
+        
+    except Exception as e:
+        print(f"❌ Error archiving email: {e}")
+        return f"❌ **Failed to archive:** {str(e)}"
+
+def delete_email(search_term):
+    """Delete an email (move to trash)"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Find the email
+        query = f"subject:{search_term}" if search_term else "in:inbox"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Email Not Found:** No email matching '{search_term}'"
+        
+        # Move to trash
+        gmail_service.users().messages().trash(
+            userId='me',
+            id=messages[0]['id']
+        ).execute()
+        
+        return f"✅ **Email moved to trash:** {search_term}"
+        
+    except Exception as e:
+        print(f"❌ Error deleting email: {e}")
+        return f"❌ **Failed to delete:** {str(e)}"
+
+def get_unread_count():
+    """Get count of unread emails"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Get unread emails count
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:unread in:inbox',
+            maxResults=1
+        ).execute()
+        
+        # Get the estimated total count
+        unread_count = results.get('resultSizeEstimate', 0)
+        
+        if unread_count == 0:
+            return "📧 **Inbox Status:** All caught up! No unread emails"
+        elif unread_count == 1:
+            return "📧 **Inbox Status:** 1 unread email"
+        else:
+            return f"📧 **Inbox Status:** {unread_count} unread emails"
+        
+    except Exception as e:
+        print(f"❌ Error getting unread count: {e}")
+        return f"📧 **Inbox Status Error:** {str(e)}"
+
+def get_inbox_summary():
+    """Get a comprehensive inbox summary"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Get recent emails
+        recent_emails = get_recent_emails(5, "in:inbox")
+        
+        # Get unread count
+        unread_status = get_unread_count()
+        
+        # Combine into summary
+        summary = f"""📧 **Inbox Executive Summary**
+
+{unread_status}
+
+**Recent Emails:**
+{recent_emails.split('📧 **Recent Emails:** 5 messages')[1] if '📧 **Recent Emails:** 5 messages' in recent_emails else recent_emails}"""
+        
+        return summary
+        
+    except Exception as e:
+        print(f"❌ Error getting inbox summary: {e}")
+        return f"📧 **Inbox Summary Error:** {str(e)}"
+
+# ============================================================================
 # ENHANCED PLANNING SEARCH
 # ============================================================================
 
@@ -1020,6 +1571,80 @@ async def handle_rose_functions_enhanced(run, thread_id):
                             output += f"({source['number']}) {source['title']} - {source['domain']}\n"
                 else:
                     output = "🔍 No planning research query provided"
+                
+            # GMAIL FUNCTIONS
+            elif function_name == "get_recent_emails":
+                max_results = arguments.get('max_results', 10)
+                query = arguments.get('query', '')
+                output = get_recent_emails(max_results, query)
+                
+            elif function_name == "search_emails":
+                query = arguments.get('query', '')
+                max_results = arguments.get('max_results', 10)
+                
+                if query:
+                    output = search_emails(query, max_results)
+                else:
+                    output = "❌ Missing required parameter: query"
+                    
+            elif function_name == "get_email_details":
+                search_term = arguments.get('search_term', '')
+                
+                if search_term:
+                    output = get_email_details(search_term)
+                else:
+                    output = "❌ Missing required parameter: search_term"
+                    
+            elif function_name == "send_email":
+                to_email = arguments.get('to_email', '')
+                subject = arguments.get('subject', '')
+                body = arguments.get('body', '')
+                cc_email = arguments.get('cc_email', None)
+                bcc_email = arguments.get('bcc_email', None)
+                
+                if to_email and subject and body:
+                    output = send_email(to_email, subject, body, cc_email, bcc_email)
+                else:
+                    output = "❌ Missing required parameters: to_email, subject, body"
+                    
+            elif function_name == "reply_to_email":
+                search_term = arguments.get('search_term', '')
+                reply_body = arguments.get('reply_body', '')
+                
+                if search_term and reply_body:
+                    output = reply_to_email(search_term, reply_body)
+                else:
+                    output = "❌ Missing required parameters: search_term, reply_body"
+                    
+            elif function_name == "mark_email_as_read":
+                search_term = arguments.get('search_term', '')
+                
+                if search_term:
+                    output = mark_email_as_read(search_term)
+                else:
+                    output = "❌ Missing required parameter: search_term"
+                    
+            elif function_name == "archive_email":
+                search_term = arguments.get('search_term', '')
+                
+                if search_term:
+                    output = archive_email(search_term)
+                else:
+                    output = "❌ Missing required parameter: search_term"
+                    
+            elif function_name == "delete_email":
+                search_term = arguments.get('search_term', '')
+                
+                if search_term:
+                    output = delete_email(search_term)
+                else:
+                    output = "❌ Missing required parameter: search_term"
+                    
+            elif function_name == "get_unread_count":
+                output = get_unread_count()
+                
+            elif function_name == "get_inbox_summary":
+                output = get_inbox_summary()
                 
             else:
                 output = f"❓ Function {function_name} not implemented yet"
@@ -1415,6 +2040,12 @@ async def help_command(ctx):
 • `!agenda` - Comprehensive executive agenda overview
 • `!overview` - Complete executive overview
 
+**📧 Gmail & Email:**
+• `!inbox` - Recent inbox summary
+• `!emails [count]` - Recent emails (default 10)
+• `!unread` - Count of unread emails
+• `!search <query>` - Search emails
+
 **🔍 Planning & Research:**
 • `!research <query>` - Strategic planning research
 • `!planning <topic>` - Productivity insights
@@ -1431,9 +2062,10 @@ async def help_command(ctx):
 **💡 Example Commands:**
 • `!briefing` - Get comprehensive morning briefing
 • `!today` - See today's complete schedule
+• `!inbox` - Check recent emails and unread count
 • `!overview` - Complete executive overview
-• `!upcoming 3` - See next 3 days of events
-• "What's my day like?" - Natural language schedule request
+• `@Rose send an email to john@example.com about meeting`
+• `@Rose search emails from yesterday`
 """
         
         await ctx.send(help_text)
@@ -1661,6 +2293,55 @@ async def planning_command(ctx, *, topic: str = None):
     except Exception as e:
         print(f"❌ Planning command error: {e}")
         await ctx.send("👑 Executive planning insights unavailable. Please try again.")
+
+@bot.command(name='inbox')
+async def inbox_command(ctx):
+    """Get inbox summary"""
+    try:
+        async with ctx.typing():
+            summary = get_inbox_summary()
+            await ctx.send(summary)
+    except Exception as e:
+        print(f"❌ Inbox command error: {e}")
+        await ctx.send("📧 Inbox summary unavailable. Please try again.")
+
+@bot.command(name='emails')
+async def emails_command(ctx, count: int = 10):
+    """Get recent emails"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 25))  # Limit between 1-25
+            emails = get_recent_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Emails command error: {e}")
+        await ctx.send("📧 Recent emails unavailable. Please try again.")
+
+@bot.command(name='unread')
+async def unread_command(ctx):
+    """Get unread email count"""
+    try:
+        async with ctx.typing():
+            unread_status = get_unread_count()
+            await ctx.send(unread_status)
+    except Exception as e:
+        print(f"❌ Unread command error: {e}")
+        await ctx.send("📧 Unread count unavailable. Please try again.")
+
+@bot.command(name='search')
+async def search_command(ctx, *, query: str = None):
+    """Search emails"""
+    try:
+        if not query:
+            await ctx.send("📧 **Email Search Usage:** `!search <search query>`\n\nExamples:\n• `!search from:john@example.com`\n• `!search subject:meeting`\n• `!search yesterday`")
+            return
+        
+        async with ctx.typing():
+            search_results = search_emails(query, 10)
+            await send_long_message(ctx.message, search_results)
+    except Exception as e:
+        print(f"❌ Search command error: {e}")
+        await ctx.send("📧 Email search unavailable. Please try again.")
 
 # ============================================================================
 # ERROR HANDLING
