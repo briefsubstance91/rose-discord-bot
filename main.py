@@ -1041,7 +1041,7 @@ async def on_message(message):
         RoseErrorHandler.log_error(e, "on_message event")
 
 # ============================================================================
-# STANDARDIZED COMMANDS
+# ROSE'S EXECUTIVE COMMANDS (RESTORED)
 # ============================================================================
 
 @bot.command(name='ping')
@@ -1052,6 +1052,113 @@ async def ping_command(ctx):
         await ctx.send(f"👑 Pong! Executive response time: {latency}ms")
     except Exception as e:
         error_msg = RoseErrorHandler.handle_discord_error(e, "Ping command")
+        await ctx.send(error_msg)
+
+@bot.command(name='schedule')
+async def schedule_command(ctx):
+    """Get today's calendar schedule"""
+    try:
+        async with ctx.typing():
+            schedule = await get_calendar_events_unified("today", 10)
+            
+        embed = discord.Embed(
+            title="📅 Today's Executive Schedule",
+            description=schedule,
+            color=0x9932CC
+        )
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Schedule command")
+        await ctx.send(error_msg)
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """View upcoming events (default: 7 days)"""
+    try:
+        async with ctx.typing():
+            if days <= 7:
+                timeframe = "week"
+            elif days <= 30:
+                timeframe = "month"
+            else:
+                timeframe = "month"
+                days = 30
+            
+            events = await get_calendar_events_unified(timeframe, 15)
+            
+        embed = discord.Embed(
+            title=f"📋 Upcoming Events ({days} days)",
+            description=events,
+            color=0x9932CC
+        )
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Upcoming command")
+        await ctx.send(error_msg)
+
+@bot.command(name='plan')
+async def plan_command(ctx, *, query):
+    """Planning research for strategic insights"""
+    try:
+        async with ctx.typing():
+            if not query:
+                await ctx.send("👑 Please provide a planning topic to research.")
+                return
+            
+            search_results, sources = await planning_search_enhanced(query, 5)
+            
+        embed = discord.Embed(
+            title="📊 Strategic Planning Research",
+            description=f"**Query:** {query}\n\n{search_results}",
+            color=0x9932CC
+        )
+        
+        if sources:
+            source_list = "\n".join([f"{s['number']}. {s['title'][:50]}..." for s in sources[:3]])
+            embed.add_field(name="🔗 Sources", value=source_list, inline=False)
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Plan command")
+        await ctx.send(error_msg)
+
+@bot.command(name='briefing')
+async def briefing_command(ctx):
+    """Executive briefing with calendar and insights"""
+    try:
+        async with ctx.typing():
+            # Get today's schedule
+            today_schedule = await get_calendar_events_unified("today", 8)
+            
+            # Get upcoming events
+            upcoming_events = await get_calendar_events_unified("week", 5)
+            
+            # Build executive briefing
+            briefing_parts = [
+                "👑 **Executive Briefing**",
+                f"📅 **Today's Priority Schedule:**\n{today_schedule}",
+                f"📋 **Week Ahead Preview:**\n{upcoming_events}",
+                "🎯 **Strategic Focus:** Optimize time blocks and maintain executive productivity"
+            ]
+            
+            briefing = "\n\n".join(briefing_parts)
+        
+        # Send as embed or long message depending on length
+        if len(briefing) <= 4000:
+            embed = discord.Embed(
+                title="📊 Executive Briefing",
+                description=briefing,
+                color=0x9932CC
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(briefing)
+        
+    except Exception as e:
+        error_msg = RoseErrorHandler.handle_discord_error(e, "Briefing command")
         await ctx.send(error_msg)
 
 @bot.command(name='status')
@@ -1109,39 +1216,39 @@ async def status_command(ctx):
 
 @bot.command(name='help')
 async def help_command(ctx):
-    """Show Rose's capabilities and usage"""
+    """Show Rose's executive capabilities and usage"""
     try:
         embed = discord.Embed(
             title="👑 Rose Ashcombe - Executive Assistant",
-            description="Your strategic calendar management and planning specialist",
+            description="Your strategic planning specialist with calendar integration and productivity optimization",
             color=0x9932CC
         )
         
-        # How to use
+        # How to Use Rose
         embed.add_field(
-            name="💬 How to Use",
-            value="• Mention @Rose for executive assistance\n• Ask about calendar, scheduling, planning\n• Request strategic insights and coordination",
+            name="💬 How to Use Rose",
+            value="• Mention @Rose Ashcombe for executive planning & productivity advice\n• Ask about time management, scheduling, productivity systems\n• Get strategic insights based on your calendar and goals",
             inline=False
         )
         
-        # Core capabilities
+        # Executive Commands
         embed.add_field(
-            name="🎯 Core Capabilities",
-            value="• Calendar management & strategic scheduling\n• Executive briefings & dashboard views\n• Meeting coordination & optimization\n• Research-backed planning insights",
+            name="🔧 Executive Commands",
+            value="• `!schedule` - Get today's calendar\n• `!upcoming [days]` - View upcoming events\n• `!plan [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - Show capabilities",
             inline=False
         )
         
-        # Example requests
+        # Example Requests
         embed.add_field(
-            name="✨ Example Requests",
-            value="• \"What's on my calendar today?\"\n• \"Schedule a meeting for tomorrow at 2pm\"\n• \"Give me an executive briefing\"\n• \"Research productivity strategies\"",
+            name="👑 Example Requests",
+            value="• @Rose help me plan my week strategically\n• @Rose what's the best time blocking method?\n• @Rose analyze my schedule for optimization\n• @Rose research productivity systems for executives",
             inline=False
         )
         
-        # Commands
+        # Specialties
         embed.add_field(
-            name="🔧 Commands",
-            value="• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
+            name="📊 Specialties",
+            value="👑 Executive Planning • 📅 Calendar Management • 🎯 Productivity Systems • ⚡ Time Optimization • 🏢 Life OS",
             inline=False
         )
         
