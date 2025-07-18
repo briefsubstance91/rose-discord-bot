@@ -1,56 +1,7 @@
-@bot.command(name='status')
-async def status_command(ctx):
-    """Executive system status with comprehensive diagnostics"""
-    try:
-        calendar_status = "❌ No calendars accessible"
-        if accessible_calendars:
-            calendar_names = [name for name, _, _ in accessible_calendars]
-            calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
-        
-        gmail_status = "❌ Not configured"
-        if gmail_service and gmail_user_email:
-            gmail_status = f"✅ Connected: {gmail_user_email}"
-        
-        research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
-        assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
-        
-        sa_info = "Not configured"
-        if service_account_email:
-            sa_info = f"✅ {service_account_email}"
-        
-        status_text = f"""👑 **{ASSISTANT_NAME} Executive Status**
-
-**🤖 Core Systems:**
-• Discord: ✅ Connected as {bot.user.name if bot.user else 'Unknown'}
-• OpenAI Assistant: {assistant_status}
-• Service Account: {sa_info}
-
-**📅 Calendar Integration:**
-• Status: {calendar_status}
-• Timezone: 🇨🇦 Toronto (America/Toronto)
-
-**📧 Gmail Integration:**
-• Status: {gmail_status}
-
-**🔍 Planning Research:**
-• Brave Search API: {research_status}
-
-**💼 Executive Features:**
-• Active conversations: {len(user_conversations)}
-• Channels: {', '.join(ALLOWED_CHANNELS)}
-
-**⚡ Performance:**
-• Uptime: Ready for executive assistance
-• Memory: {len(processing_messages)} processing"""
-        
-        await ctx.send(status_text)
-        
-    except Exception as e:
-        print(f"❌ Status command error: {e}")
-        await ctx.send("👑 Status diagnostics experiencing issues. Please try again.")#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (FIXED VERSION)
-Executive Assistant with Full Google Calendar API Integration & Advanced Task Management
+ROSE ASHCOMBE - DISCORD BOT (COMPLETE FIXED VERSION)
+Executive Assistant with Full Google Calendar API Integration & Gmail Integration
 """
 import pytz
 import discord
@@ -61,6 +12,13 @@ import aiohttp
 import json
 import time
 import re
+import base64
+import email
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+from email.utils import parsedate_to_datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from google.oauth2.service_account import Credentials
@@ -164,7 +122,7 @@ def test_calendar_access(calendar_id, calendar_name):
         print(f"❌ {calendar_name} error: {e}")
         return False
 
-# Initialize Google Calendar service
+# Initialize Google Calendar and Gmail services
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
@@ -214,7 +172,7 @@ try:
             print(f"   ✅ {name}")
             
     else:
-        print("⚠️ Google Calendar credentials not found")
+        print("⚠️ Google services credentials not found")
         
 except Exception as e:
     print(f"❌ Google services setup error: {e}")
@@ -340,108 +298,6 @@ def get_today_schedule():
         print(f"❌ Calendar error: {e}")
         return "📅 **Today's Schedule:** Error retrieving calendar data"
 
-def get_upcoming_events(days=7):
-    """Get upcoming events with enhanced formatting"""
-    if not calendar_service or not accessible_calendars:
-        return f"📅 **Upcoming {days} Days:** Calendar integration not available"
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        start_toronto = datetime.now(toronto_tz)
-        end_toronto = start_toronto + timedelta(days=days)
-        
-        start_utc = start_toronto.astimezone(pytz.UTC)
-        end_utc = end_toronto.astimezone(pytz.UTC)
-        
-        all_events = []
-        
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, start_utc, end_utc)
-            for event in events:
-                all_events.append((event, calendar_type, calendar_name))
-        
-        if not all_events:
-            calendar_list = ", ".join([name for name, _, _ in accessible_calendars])
-            return f"📅 **Upcoming {days} Days:** No events found"
-        
-        events_by_date = defaultdict(list)
-        
-        for event, calendar_type, calendar_name in all_events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            
-            try:
-                if 'T' in start:
-                    utc_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    toronto_time = utc_time.astimezone(toronto_tz)
-                    date_str = toronto_time.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type, toronto_tz)
-                    events_by_date[date_str].append(formatted)
-                else:
-                    date_obj = datetime.fromisoformat(start)
-                    date_str = date_obj.strftime('%a %m/%d')
-                    formatted = format_event(event, calendar_type, toronto_tz)
-                    events_by_date[date_str].append(formatted)
-            except Exception as e:
-                print(f"❌ Date parsing error: {e}")
-                continue
-        
-        formatted = []
-        total_events = len(all_events)
-        
-        for date, day_events in list(events_by_date.items())[:7]:
-            formatted.append(f"**{date}**")
-            formatted.extend(day_events[:6])
-        
-        header = f"📅 **Upcoming {days} Days:** {total_events} total events"
-        
-        return header + "\n\n" + "\n".join(formatted)
-        
-    except Exception as e:
-        print(f"❌ Calendar error: {e}")
-        return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
-
-def get_morning_briefing():
-    """Morning briefing with enhanced formatting"""
-    if not calendar_service or not accessible_calendars:
-        return "🌅 **Morning Briefing:** Calendar integration not available"
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        today_schedule = get_today_schedule()
-        
-        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow_toronto = today_toronto + timedelta(days=1)
-        day_after_toronto = tomorrow_toronto + timedelta(days=1)
-        
-        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
-        day_after_utc = day_after_toronto.astimezone(pytz.UTC)
-        
-        tomorrow_events = []
-        
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, tomorrow_utc, day_after_utc)
-            tomorrow_events.extend([(event, calendar_type, calendar_name) for event in events])
-        
-        if tomorrow_events:
-            tomorrow_formatted = []
-            for event, calendar_type, calendar_name in tomorrow_events[:4]:
-                formatted = format_event(event, calendar_type, toronto_tz)
-                tomorrow_formatted.append(formatted)
-            tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
-        else:
-            tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - strategic planning day"
-        
-        current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
-        briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_preview}\n\n💼 **Executive Focus:** Prioritize high-impact activities"
-        
-        return briefing
-        
-    except Exception as e:
-        print(f"❌ Morning briefing error: {e}")
-        return "🌅 **Morning Briefing:** Error generating briefing"
-
 def create_calendar_event(title, start_time, end_time, calendar_type="calendar", description=""):
     """Create a new calendar event in specified Google Calendar with concise confirmation"""
     if not calendar_service or not accessible_calendars:
@@ -452,15 +308,11 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
         target_calendar_id = None
         target_calendar_name = None
         
-        print(f"🔍 Looking for calendar type: {calendar_type}")
-        print(f"📅 Available calendars: {[(name, cal_type) for name, _, cal_type in accessible_calendars]}")
-        
         # First, try exact calendar type match
         for name, cal_id, cal_type in accessible_calendars:
             if calendar_type == cal_type:
                 target_calendar_id = cal_id
                 target_calendar_name = name
-                print(f"✅ Exact match found: {name} ({cal_type})")
                 break
         
         # If no exact match, try keyword matching
@@ -469,37 +321,15 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
                 if calendar_type.lower() in name.lower() or calendar_type.lower() in cal_type.lower():
                     target_calendar_id = cal_id
                     target_calendar_name = name
-                    print(f"✅ Keyword match found: {name} ({cal_type})")
                     break
         
-        # Last resort: use tasks calendar if available for task-related requests
-        if not target_calendar_id and calendar_type == "tasks":
-            for name, cal_id, cal_type in accessible_calendars:
-                if "task" in name.lower() or cal_type == "tasks":
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    print(f"✅ Task calendar found: {name} ({cal_type})")
-                    break
-        
-        # Final fallback to primary calendar only if no specific calendar found
-        if not target_calendar_id:
-            for name, cal_id, cal_type in accessible_calendars:
-                if "primary" in name.lower() or cal_id == "primary":
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    print(f"⚠️ Using primary fallback: {name} ({cal_type})")
-                    break
-        
-        # If still no calendar found, use first available
+        # Final fallback to first available
         if not target_calendar_id and accessible_calendars:
             target_calendar_id = accessible_calendars[0][1]
             target_calendar_name = accessible_calendars[0][0]
-            print(f"⚠️ Using first available: {target_calendar_name}")
         
         if not target_calendar_id:
             return "❌ No suitable calendar found"
-        
-        print(f"🎯 Creating event in: {target_calendar_name} ({target_calendar_id})")
         
         # Parse times
         toronto_tz = pytz.timezone('America/Toronto')
@@ -560,365 +390,9 @@ def create_calendar_event(title, start_time, end_time, calendar_type="calendar",
         print(f"❌ Error creating calendar event: {e}")
         return f"❌ Failed to create '{title}': {str(e)}"
 
-def find_calendar_event(search_term, days_range=30):
-    """Find calendar events matching a search term"""
-    if not calendar_service or not accessible_calendars:
-        return None, None, None
-    
-    try:
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        past_search = now - timedelta(days=7)  # Search past week
-        future_search = now + timedelta(days=days_range)  # Search ahead
-        
-        # Search all accessible calendars
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, past_search, future_search, max_results=200)
-            for event in events:
-                event_title = event.get('summary', '').lower()
-                if search_term.lower() in event_title:
-                    return event, calendar_id, calendar_name
-        
-        return None, None, None
-        
-    except Exception as e:
-        print(f"❌ Error finding event: {e}")
-        return None, None, None
-
-def update_calendar_event(event_search, new_title=None, new_start_time=None, new_end_time=None, new_description=None):
-    """Update an existing calendar event"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        # Update fields as needed
-        updated_fields = []
-        
-        if new_title:
-            found_event['summary'] = new_title
-            updated_fields.append(f"Title → {new_title}")
-        
-        if new_start_time or new_end_time:
-            toronto_tz = pytz.timezone('America/Toronto')
-            
-            if new_start_time:
-                try:
-                    if "T" not in new_start_time:
-                        new_start_time = f"{new_start_time}T{found_event['start']['dateTime'].split('T')[1]}"
-                    new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
-                    if new_start_dt.tzinfo is None:
-                        new_start_dt = toronto_tz.localize(new_start_dt)
-                    found_event['start'] = {
-                        'dateTime': new_start_dt.isoformat(),
-                        'timeZone': 'America/Toronto',
-                    }
-                    updated_fields.append(f"Start → {new_start_dt.strftime('%m/%d %H:%M')}")
-                except ValueError as e:
-                    return f"❌ Invalid start time: {e}"
-            
-            if new_end_time:
-                try:
-                    if "T" not in new_end_time:
-                        new_end_time = f"{new_end_time}T{found_event['end']['dateTime'].split('T')[1]}"
-                    new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
-                    if new_end_dt.tzinfo is None:
-                        new_end_dt = toronto_tz.localize(new_end_dt)
-                    found_event['end'] = {
-                        'dateTime': new_end_dt.isoformat(),
-                        'timeZone': 'America/Toronto',
-                    }
-                    updated_fields.append(f"End → {new_end_dt.strftime('%m/%d %H:%M')}")
-                except ValueError as e:
-                    return f"❌ Invalid end time: {e}"
-        
-        if new_description is not None:
-            found_event['description'] = new_description
-            updated_fields.append("Description updated")
-        
-        # Update the event
-        updated_event = calendar_service.events().update(
-            calendarId=found_calendar_id,
-            eventId=found_event['id'],
-            body=found_event
-        ).execute()
-        
-        # Concise confirmation with 24-hour time
-        return f"✅ **{updated_event['summary']}** updated\n🔄 {', '.join(updated_fields)}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
-        
-    except Exception as e:
-        print(f"❌ Error updating event: {e}")
-        return f"❌ Failed to update '{event_search}': {str(e)}"
-
-def reschedule_event(event_search, new_start_time, new_end_time=None):
-    """Reschedule an existing calendar event to new time"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        
-        # Parse new start time
-        try:
-            if "T" not in new_start_time:
-                original_time = found_event['start']['dateTime'].split('T')[1] if 'dateTime' in found_event['start'] else '15:00:00'
-                new_start_time = f"{new_start_time}T{original_time}"
-            
-            new_start_dt = datetime.fromisoformat(new_start_time.replace('Z', ''))
-            if new_start_dt.tzinfo is None:
-                new_start_dt = toronto_tz.localize(new_start_dt)
-                
-        except ValueError:
-            return "❌ Invalid time format"
-        
-        # Calculate new end time
-        if new_end_time:
-            try:
-                if "T" not in new_end_time:
-                    original_time = found_event['end']['dateTime'].split('T')[1] if 'dateTime' in found_event['end'] else '16:00:00'
-                    new_end_time = f"{new_end_time}T{original_time}"
-                new_end_dt = datetime.fromisoformat(new_end_time.replace('Z', ''))
-                if new_end_dt.tzinfo is None:
-                    new_end_dt = toronto_tz.localize(new_end_dt)
-            except ValueError:
-                return "❌ Invalid end time format"
-        else:
-            # Calculate duration from original event
-            original_start = datetime.fromisoformat(found_event['start']['dateTime'].replace('Z', '+00:00'))
-            original_end = datetime.fromisoformat(found_event['end']['dateTime'].replace('Z', '+00:00'))
-            duration = original_end - original_start
-            new_end_dt = new_start_dt + duration
-        
-        # Update the event
-        found_event['start'] = {
-            'dateTime': new_start_dt.isoformat(),
-            'timeZone': 'America/Toronto',
-        }
-        found_event['end'] = {
-            'dateTime': new_end_dt.isoformat(),
-            'timeZone': 'America/Toronto',
-        }
-        
-        updated_event = calendar_service.events().update(
-            calendarId=found_calendar_id,
-            eventId=found_event['id'],
-            body=found_event
-        ).execute()
-        
-        # Concise confirmation with 24-hour time
-        display_start_dt = new_start_dt.astimezone(toronto_tz)
-        display_end_dt = new_end_dt.astimezone(toronto_tz)
-        
-        day_date = display_start_dt.strftime('%A, %B %d')
-        start_time_24h = display_start_dt.strftime('%H:%M')
-        end_time_24h = display_end_dt.strftime('%H:%M')
-        
-        return f"✅ **{updated_event['summary']}** rescheduled\n📅 {day_date}, {start_time_24h} - {end_time_24h}\n🗓️ {found_calendar_name}\n🔗 [View Event]({updated_event.get('htmlLink', '#')})"
-        
-    except Exception as e:
-        print(f"❌ Error rescheduling event: {e}")
-        return f"❌ Failed to reschedule '{event_search}': {str(e)}"
-
-def move_task_between_calendars(task_search, target_calendar="tasks"):
-    """Move tasks/events between different Google calendars"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(task_search)
-        
-        if not found_event:
-            return f"❌ '{task_search}' not found"
-        
-        # Find target calendar with enhanced logic
-        target_calendar_id = None
-        target_calendar_name = None
-        
-        # Try exact type match first
-        for name, cal_id, cal_type in accessible_calendars:
-            if target_calendar == cal_type:
-                target_calendar_id = cal_id
-                target_calendar_name = name
-                break
-        
-        # Try keyword matching
-        if not target_calendar_id:
-            for name, cal_id, cal_type in accessible_calendars:
-                if target_calendar.lower() in name.lower() or target_calendar.lower() in cal_type.lower():
-                    target_calendar_id = cal_id
-                    target_calendar_name = name
-                    break
-        
-        if not target_calendar_id:
-            available_types = [f"{name} ({cal_type})" for name, _, cal_type in accessible_calendars]
-            return f"❌ '{target_calendar}' calendar not found\n📅 Available: {', '.join(available_types)}"
-        
-        if found_calendar_id == target_calendar_id:
-            return f"📅 '{found_event['summary']}' already in {target_calendar_name}"
-        
-        # Create event copy for target calendar
-        event_copy = {
-            'summary': found_event.get('summary'),
-            'description': found_event.get('description', ''),
-            'start': found_event.get('start'),
-            'end': found_event.get('end'),
-            'location': found_event.get('location', ''),
-        }
-        
-        # Remove read-only fields
-        for field in ['id', 'htmlLink', 'iCalUID', 'created', 'updated', 'creator', 'organizer']:
-            event_copy.pop(field, None)
-        
-        # Create in target calendar
-        created_event = calendar_service.events().insert(
-            calendarId=target_calendar_id,
-            body=event_copy
-        ).execute()
-        
-        # Delete from original calendar
-        calendar_service.events().delete(
-            calendarId=found_calendar_id,
-            eventId=found_event['id']
-        ).execute()
-        
-        # Concise confirmation
-        return f"✅ **{found_event['summary']}** moved\n📍 {found_calendar_name} → {target_calendar_name}\n🔗 [View Event]({created_event.get('htmlLink', '#')})"
-        
-    except HttpError as e:
-        return f"❌ Calendar error: {e.resp.status}"
-    except Exception as e:
-        print(f"❌ Error moving task: {e}")
-        return f"❌ Failed to move '{task_search}': {str(e)}"
-
-def delete_calendar_event(event_search):
-    """Delete a calendar event"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 Calendar integration not available"
-    
-    try:
-        # Find the event
-        found_event, found_calendar_id, found_calendar_name = find_calendar_event(event_search)
-        
-        if not found_event:
-            return f"❌ '{event_search}' not found"
-        
-        # Store event details before deletion
-        event_title = found_event.get('summary', 'Unknown Event')
-        
-        # Delete the event
-        calendar_service.events().delete(
-            calendarId=found_calendar_id,
-            eventId=found_event['id']
-        ).execute()
-        
-        # Concise confirmation
-        return f"✅ **{event_title}** deleted from {found_calendar_name}"
-        
-    except Exception as e:
-        print(f"❌ Error deleting event: {e}")
-        return f"❌ Failed to delete '{event_search}': {str(e)}"
-
-def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=None, days_ahead=7):
-    """Find free time slots in the calendar"""
-    if not calendar_service or not accessible_calendars:
-        return "📅 **Free Time Search:** Calendar integration not configured."
-    
-    try:
-        if preferred_days is None:
-            preferred_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-        if preferred_hours is None:
-            preferred_hours = list(range(9, 17))  # 9 AM to 5 PM
-        
-        toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        search_end = now + timedelta(days=days_ahead)
-        
-        # Get all existing events to find gaps
-        all_busy_times = []
-        for calendar_name, calendar_id, calendar_type in accessible_calendars:
-            events = get_calendar_events(calendar_id, now, search_end)
-            for event in events:
-                start_str = event['start'].get('dateTime', event['start'].get('date'))
-                end_str = event['end'].get('dateTime', event['end'].get('date'))
-                
-                if 'T' in start_str:  # DateTime event
-                    start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00')).astimezone(toronto_tz)
-                    end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00')).astimezone(toronto_tz)
-                    all_busy_times.append((start_dt, end_dt))
-        
-        # Find available slots
-        available_slots = []
-        current_date = now.date()
-        
-        for day_offset in range(days_ahead):
-            check_date = current_date + timedelta(days=day_offset)
-            weekday = check_date.strftime('%A')
-            
-            if weekday not in preferred_days:
-                continue
-            
-            for hour in preferred_hours:
-                slot_start = datetime.combine(check_date, datetime.min.time().replace(hour=hour)).replace(tzinfo=toronto_tz)
-                slot_end = slot_start + timedelta(minutes=duration_minutes)
-                
-                # Skip past times
-                if slot_start <= now:
-                    continue
-                
-                # Check for conflicts
-                has_conflict = False
-                for busy_start, busy_end in all_busy_times:
-                    if (slot_start < busy_end and slot_end > busy_start):
-                        has_conflict = True
-                        break
-                
-                if not has_conflict:
-                    available_slots.append({
-                        'start': slot_start,
-                        'end': slot_end,
-                        'date': check_date.strftime('%A, %B %d'),
-                        'time': slot_start.strftime('%H:%M')  # 24-hour format
-                    })
-        
-        if not available_slots:
-            return f"❌ **No Available Slots:** No {duration_minutes}-minute slots found in the next {days_ahead} days.\n💡 **Suggestion:** Try reducing duration or expanding preferred hours."
-        
-        # Return top 5 slots with 24-hour time
-        result = f"📅 **Available {duration_minutes}-minute slots:**\n\n"
-        for i, slot in enumerate(available_slots[:5]):
-            result += f"**{i+1}.** {slot['date']} at {slot['time']}\n"
-        
-        if len(available_slots) > 5:
-            result += f"\n*...and {len(available_slots) - 5} more slots available*"
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error finding free time: {e}")
-        return f"❌ **Free Time Search Failed:** {str(e)}"
-
 # ============================================================================
 # GMAIL FUNCTIONS
 # ============================================================================
-
-import base64
-import email
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 
 def get_recent_emails(max_results=10, query=""):
     """Get recent emails from Gmail"""
@@ -962,8 +436,7 @@ def get_recent_emails(max_results=10, query=""):
                 
                 # Parse date for better formatting
                 try:
-                    from dateutil import parser
-                    parsed_date = parser.parse(date)
+                    parsed_date = parsedate_to_datetime(date)
                     toronto_tz = pytz.timezone('America/Toronto')
                     local_date = parsed_date.astimezone(toronto_tz)
                     formatted_date = local_date.strftime('%m/%d %H:%M')
@@ -995,156 +468,6 @@ def get_recent_emails(max_results=10, query=""):
         print(f"❌ Error getting emails: {e}")
         return f"📧 **Email Error:** {str(e)}"
 
-def search_emails(query, max_results=10):
-    """Search emails with specific query"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Search for emails
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=max_results
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Search Results:** No emails found for '{query}'"
-        
-        formatted_results = []
-        
-        for msg in messages[:max_results]:
-            try:
-                # Get message metadata
-                message = gmail_service.users().messages().get(
-                    userId='me',
-                    id=msg['id'],
-                    format='metadata',
-                    metadataHeaders=['From', 'Subject', 'Date']
-                ).execute()
-                
-                headers = message['payload'].get('headers', [])
-                
-                from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
-                subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-                date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
-                
-                # Parse date
-                try:
-                    from dateutil import parser
-                    parsed_date = parser.parse(date)
-                    toronto_tz = pytz.timezone('America/Toronto')
-                    local_date = parsed_date.astimezone(toronto_tz)
-                    formatted_date = local_date.strftime('%m/%d %H:%M')
-                except:
-                    formatted_date = date[:16] if len(date) > 16 else date
-                
-                # Format sender
-                if '<' in from_email:
-                    sender = from_email.split('<')[0].strip().strip('"')
-                    if not sender:
-                        sender = from_email.split('<')[1].split('>')[0]
-                else:
-                    sender = from_email
-                
-                formatted_results.append(f"📧 **{subject[:45]}{'...' if len(subject) > 45 else ''}**\n   {sender[:25]}{'...' if len(sender) > 25 else ''} | {formatted_date}")
-                
-            except Exception as e:
-                print(f"❌ Error processing search result {msg['id']}: {e}")
-                continue
-        
-        return f"📧 **Search: '{query}'** ({len(formatted_results)} results)\n\n" + "\n\n".join(formatted_results)
-        
-    except Exception as e:
-        print(f"❌ Error searching emails: {e}")
-        return f"📧 **Search Error:** {str(e)}"
-
-def get_email_details(search_term):
-    """Get detailed view of a specific email"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Search for the email
-        query = f"subject:{search_term}" if search_term else "in:inbox"
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Email Not Found:** No email matching '{search_term}'"
-        
-        # Get full message
-        message = gmail_service.users().messages().get(
-            userId='me',
-            id=messages[0]['id'],
-            format='full'
-        ).execute()
-        
-        headers = message['payload'].get('headers', [])
-        
-        # Extract headers
-        from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
-        to_email = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown')
-        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-        date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
-        
-        # Extract body
-        def extract_body(payload):
-            body = ""
-            if 'parts' in payload:
-                for part in payload['parts']:
-                    if part['mimeType'] == 'text/plain':
-                        data = part['body'].get('data', '')
-                        if data:
-                            body = base64.urlsafe_b64decode(data).decode('utf-8')
-                            break
-                    elif part['mimeType'] == 'text/html' and not body:
-                        data = part['body'].get('data', '')
-                        if data:
-                            body = base64.urlsafe_b64decode(data).decode('utf-8')
-            else:
-                if payload['mimeType'] == 'text/plain':
-                    data = payload['body'].get('data', '')
-                    if data:
-                        body = base64.urlsafe_b64decode(data).decode('utf-8')
-            
-            return body[:500] + "..." if len(body) > 500 else body
-        
-        body = extract_body(message['payload'])
-        
-        # Format date
-        try:
-            from dateutil import parser
-            parsed_date = parser.parse(date)
-            toronto_tz = pytz.timezone('America/Toronto')
-            local_date = parsed_date.astimezone(toronto_tz)
-            formatted_date = local_date.strftime('%A, %B %d, %Y at %H:%M')
-        except:
-            formatted_date = date
-        
-        response = f"""📧 **Email Details:**
-
-**Subject:** {subject}
-**From:** {from_email}
-**To:** {to_email}
-**Date:** {formatted_date}
-
-**Message Preview:**
-{body if body else "No content available"}"""
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error getting email details: {e}")
-        return f"📧 **Email Details Error:** {str(e)}"
-
 def send_email(to_email, subject, body, cc_email=None, bcc_email=None):
     """Send an email via Gmail"""
     if not gmail_service:
@@ -1174,177 +497,11 @@ def send_email(to_email, subject, body, cc_email=None, bcc_email=None):
             body={'raw': raw_message}
         ).execute()
         
-        # Get message details for confirmation
-        sent_details = gmail_service.users().messages().get(
-            userId='me',
-            id=sent_message['id'],
-            format='metadata',
-            metadataHeaders=['Message-ID', 'Date']
-        ).execute()
-        
         return f"✅ **Email Sent Successfully**\n📧 To: {to_email}\n📝 Subject: {subject}\n🕐 Sent at: {datetime.now(pytz.timezone('America/Toronto')).strftime('%H:%M')}"
         
     except Exception as e:
         print(f"❌ Error sending email: {e}")
         return f"❌ **Failed to send email:** {str(e)}"
-
-def reply_to_email(search_term, reply_body):
-    """Reply to an email"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Find the original email
-        query = f"subject:{search_term}" if search_term else "in:inbox"
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Original Email Not Found:** No email matching '{search_term}'"
-        
-        # Get original message
-        original_message = gmail_service.users().messages().get(
-            userId='me',
-            id=messages[0]['id'],
-            format='full'
-        ).execute()
-        
-        headers = original_message['payload'].get('headers', [])
-        
-        # Extract original details
-        original_from = next((h['value'] for h in headers if h['name'] == 'From'), '')
-        original_subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
-        original_message_id = next((h['value'] for h in headers if h['name'] == 'Message-ID'), '')
-        
-        # Create reply
-        reply_subject = f"Re: {original_subject}" if not original_subject.startswith('Re:') else original_subject
-        
-        message = MIMEMultipart()
-        message['To'] = original_from
-        message['Subject'] = reply_subject
-        message['From'] = gmail_user_email
-        message['In-Reply-To'] = original_message_id
-        message['References'] = original_message_id
-        
-        # Add reply body
-        message.attach(MIMEText(reply_body, 'plain'))
-        
-        # Encode and send
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        
-        sent_reply = gmail_service.users().messages().send(
-            userId='me',
-            body={
-                'raw': raw_message,
-                'threadId': original_message['threadId']
-            }
-        ).execute()
-        
-        return f"✅ **Reply Sent Successfully**\n📧 To: {original_from}\n📝 Subject: {reply_subject}\n🕐 Sent at: {datetime.now(pytz.timezone('America/Toronto')).strftime('%H:%M')}"
-        
-    except Exception as e:
-        print(f"❌ Error sending reply: {e}")
-        return f"❌ **Failed to send reply:** {str(e)}"
-
-def mark_email_as_read(search_term):
-    """Mark an email as read"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Find the email
-        query = f"subject:{search_term} is:unread" if search_term else "is:unread"
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Email Not Found:** No unread email matching '{search_term}'"
-        
-        # Mark as read by removing UNREAD label
-        gmail_service.users().messages().modify(
-            userId='me',
-            id=messages[0]['id'],
-            body={'removeLabelIds': ['UNREAD']}
-        ).execute()
-        
-        return f"✅ **Email marked as read:** {search_term}"
-        
-    except Exception as e:
-        print(f"❌ Error marking email as read: {e}")
-        return f"❌ **Failed to mark as read:** {str(e)}"
-
-def archive_email(search_term):
-    """Archive an email"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Find the email
-        query = f"subject:{search_term} in:inbox" if search_term else "in:inbox"
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Email Not Found:** No inbox email matching '{search_term}'"
-        
-        # Archive by removing INBOX label
-        gmail_service.users().messages().modify(
-            userId='me',
-            id=messages[0]['id'],
-            body={'removeLabelIds': ['INBOX']}
-        ).execute()
-        
-        return f"✅ **Email archived:** {search_term}"
-        
-    except Exception as e:
-        print(f"❌ Error archiving email: {e}")
-        return f"❌ **Failed to archive:** {str(e)}"
-
-def delete_email(search_term):
-    """Delete an email (move to trash)"""
-    if not gmail_service:
-        return "📧 Gmail integration not available"
-    
-    try:
-        # Find the email
-        query = f"subject:{search_term}" if search_term else "in:inbox"
-        results = gmail_service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=1
-        ).execute()
-        
-        messages = results.get('messages', [])
-        
-        if not messages:
-            return f"📧 **Email Not Found:** No email matching '{search_term}'"
-        
-        # Move to trash
-        gmail_service.users().messages().trash(
-            userId='me',
-            id=messages[0]['id']
-        ).execute()
-        
-        return f"✅ **Email moved to trash:** {search_term}"
-        
-    except Exception as e:
-        print(f"❌ Error deleting email: {e}")
-        return f"❌ **Failed to delete:** {str(e)}"
 
 def get_unread_count():
     """Get count of unread emails"""
@@ -1400,75 +557,11 @@ def get_inbox_summary():
         return f"📧 **Inbox Summary Error:** {str(e)}"
 
 # ============================================================================
-# ENHANCED PLANNING SEARCH
-# ============================================================================
-
-async def planning_search_enhanced(query, focus_area="general", num_results=3):
-    """Enhanced planning and productivity research with comprehensive error handling"""
-    if not BRAVE_API_KEY:
-        return "🔍 Planning research requires Brave Search API configuration", []
-    
-    try:
-        planning_query = f"{query} {focus_area} productivity executive planning time management 2025"
-        
-        headers = {
-            'X-Subscription-Token': BRAVE_API_KEY,
-            'Accept': 'application/json'
-        }
-        
-        params = {
-            'q': planning_query,
-            'count': num_results,
-            'country': 'US',
-            'search_lang': 'en',
-            'ui_lang': 'en',
-            'safesearch': 'moderate'
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get('https://api.search.brave.com/res/v1/web/search', 
-                                   headers=headers, params=params, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    results = data.get('web', {}).get('results', [])
-                    
-                    if not results:
-                        return "🔍 No planning research results found for this query", []
-                    
-                    formatted_results = []
-                    sources = []
-                    
-                    for i, result in enumerate(results[:num_results]):
-                        title = result.get('title', 'No title')
-                        snippet = result.get('description', 'No description')
-                        url = result.get('url', '')
-                        
-                        domain = url.split('/')[2] if len(url.split('/')) > 2 else 'Unknown'
-                        
-                        formatted_results.append(f"**{i+1}. {title}**\n{snippet}")
-                        sources.append({
-                            'number': i+1,
-                            'title': title,
-                            'url': url,
-                            'domain': domain
-                        })
-                    
-                    return "\n\n".join(formatted_results), sources
-                else:
-                    return f"🔍 Planning search error: HTTP {response.status}", []
-                    
-    except asyncio.TimeoutError:
-        return "🔍 Planning search timed out", []
-    except Exception as e:
-        print(f"❌ Planning search error: {e}")
-        return f"🔍 Planning search error: Please try again", []
-
-# ============================================================================
 # ENHANCED FUNCTION HANDLING
 # ============================================================================
 
 async def handle_rose_functions_enhanced(run, thread_id):
-    """Enhanced function handling with complete calendar management"""
+    """Enhanced function handling with complete calendar and Gmail management"""
     
     if not run or not hasattr(run, 'required_action') or not run.required_action:
         return
@@ -1495,25 +588,10 @@ async def handle_rose_functions_enhanced(run, thread_id):
         print(f"📋 Arguments: {arguments}")
         
         try:
-            # CALENDAR VIEWING FUNCTIONS
+            # CALENDAR FUNCTIONS
             if function_name == "get_today_schedule":
                 output = get_today_schedule()
                     
-            elif function_name == "get_upcoming_events":
-                days = arguments.get('days', 7)
-                output = get_upcoming_events(days)
-                
-            elif function_name == "get_morning_briefing":
-                output = get_morning_briefing()
-                
-            elif function_name == "find_free_time":
-                duration_minutes = arguments.get('duration_minutes', 60)
-                preferred_days = arguments.get('preferred_days', None)
-                preferred_hours = arguments.get('preferred_hours', None)
-                days_ahead = arguments.get('days_ahead', 7)
-                output = find_free_time(duration_minutes, preferred_days, preferred_hours, days_ahead)
-            
-            # CALENDAR MODIFICATION FUNCTIONS
             elif function_name == "create_calendar_event":
                 title = arguments.get('title', '')
                 start_time = arguments.get('start_time', '')
@@ -1525,86 +603,13 @@ async def handle_rose_functions_enhanced(run, thread_id):
                     output = create_calendar_event(title, start_time, end_time, calendar_type, description)
                 else:
                     output = "❌ Missing required parameters: title, start_time, end_time"
-                    
-            elif function_name == "update_calendar_event":
-                event_search = arguments.get('event_search', '')
-                new_title = arguments.get('new_title', None)
-                new_start_time = arguments.get('new_start_time', None)
-                new_end_time = arguments.get('new_end_time', None)
-                new_description = arguments.get('new_description', None)
-                
-                if event_search:
-                    output = update_calendar_event(event_search, new_title, new_start_time, new_end_time, new_description)
-                else:
-                    output = "❌ Missing required parameter: event_search"
-                    
-            elif function_name == "reschedule_event":
-                event_search = arguments.get('event_search', '')
-                new_start_time = arguments.get('new_start_time', '')
-                new_end_time = arguments.get('new_end_time', None)
-                
-                if event_search and new_start_time:
-                    output = reschedule_event(event_search, new_start_time, new_end_time)
-                else:
-                    output = "❌ Missing required parameters: event_search, new_start_time"
-                    
-            elif function_name == "move_task_between_calendars":
-                task_search = arguments.get('task_search', '')
-                target_calendar = arguments.get('target_calendar', 'tasks')
-                
-                if task_search:
-                    output = move_task_between_calendars(task_search, target_calendar)
-                else:
-                    output = "❌ Missing required parameter: task_search"
-                    
-            elif function_name == "delete_calendar_event":
-                event_search = arguments.get('event_search', '')
-                
-                if event_search:
-                    output = delete_calendar_event(event_search)
-                else:
-                    output = "❌ Missing required parameter: event_search"
             
-            # PLANNING RESEARCH FUNCTIONS
-            elif function_name == "planning_search":
-                query = arguments.get('query', '')
-                focus = arguments.get('focus', 'general')
-                num_results = arguments.get('num_results', 3)
-                
-                if query:
-                    search_results, sources = await planning_search_enhanced(query, focus, num_results)
-                    output = f"📊 **Planning Research:** {query}\n\n{search_results}"
-                    
-                    if sources:
-                        output += "\n\n📚 **Sources:**\n"
-                        for source in sources:
-                            output += f"({source['number']}) {source['title']} - {source['domain']}\n"
-                else:
-                    output = "🔍 No planning research query provided"
-                
             # GMAIL FUNCTIONS
             elif function_name == "get_recent_emails":
                 max_results = arguments.get('max_results', 10)
                 query = arguments.get('query', '')
                 output = get_recent_emails(max_results, query)
                 
-            elif function_name == "search_emails":
-                query = arguments.get('query', '')
-                max_results = arguments.get('max_results', 10)
-                
-                if query:
-                    output = search_emails(query, max_results)
-                else:
-                    output = "❌ Missing required parameter: query"
-                    
-            elif function_name == "get_email_details":
-                search_term = arguments.get('search_term', '')
-                
-                if search_term:
-                    output = get_email_details(search_term)
-                else:
-                    output = "❌ Missing required parameter: search_term"
-                    
             elif function_name == "send_email":
                 to_email = arguments.get('to_email', '')
                 subject = arguments.get('subject', '')
@@ -1616,39 +621,6 @@ async def handle_rose_functions_enhanced(run, thread_id):
                     output = send_email(to_email, subject, body, cc_email, bcc_email)
                 else:
                     output = "❌ Missing required parameters: to_email, subject, body"
-                    
-            elif function_name == "reply_to_email":
-                search_term = arguments.get('search_term', '')
-                reply_body = arguments.get('reply_body', '')
-                
-                if search_term and reply_body:
-                    output = reply_to_email(search_term, reply_body)
-                else:
-                    output = "❌ Missing required parameters: search_term, reply_body"
-                    
-            elif function_name == "mark_email_as_read":
-                search_term = arguments.get('search_term', '')
-                
-                if search_term:
-                    output = mark_email_as_read(search_term)
-                else:
-                    output = "❌ Missing required parameter: search_term"
-                    
-            elif function_name == "archive_email":
-                search_term = arguments.get('search_term', '')
-                
-                if search_term:
-                    output = archive_email(search_term)
-                else:
-                    output = "❌ Missing required parameter: search_term"
-                    
-            elif function_name == "delete_email":
-                search_term = arguments.get('search_term', '')
-                
-                if search_term:
-                    output = delete_email(search_term)
-                else:
-                    output = "❌ Missing required parameter: search_term"
                     
             elif function_name == "get_unread_count":
                 output = get_unread_count()
@@ -1779,6 +751,18 @@ CURRENT DATE & TIME CONTEXT:
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
 - AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
+- GMAIL STATUS: {'Enabled' if gmail_service else 'Disabled'}
+        enhanced_message = f"""USER EXECUTIVE REQUEST: {clean_message}
+
+CURRENT DATE & TIME CONTEXT:
+- TODAY: {today_formatted} ({today_date})
+- TOMORROW: {tomorrow_formatted} ({tomorrow_date})
+- TIMEZONE: America/Toronto
+
+RESPONSE GUIDELINES:
+- Use professional executive formatting with strategic headers
+- AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
+- GMAIL STATUS: {'Enabled' if gmail_service else 'Disabled'}
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
@@ -1814,21 +798,21 @@ RESPONSE GUIDELINES:
             run = client.beta.threads.runs.create(
                 thread_id=thread_id,
                 assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant specialist with Google Calendar integration.
+                instructions="""You are Rose Ashcombe, executive assistant specialist with Google Calendar and Gmail integration.
 
 EXECUTIVE APPROACH:
-- Use executive calendar functions to provide comprehensive scheduling insights
+- Use executive calendar and email functions to provide comprehensive scheduling and communication insights
 - Apply strategic planning perspective with productivity optimization
 - Include actionable recommendations with clear timelines
 
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼) and provide organized, action-oriented guidance.
+FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼 📧) and provide organized, action-oriented guidance.
 
 STRUCTURE:
-👑 **Executive Summary:** [strategic overview with calendar insights]
+👑 **Executive Summary:** [strategic overview with calendar and email insights]
 📊 **Strategic Analysis:** [research-backed recommendations]
 🎯 **Action Items:** [specific next steps with timing]
 
-Keep core content focused and always provide strategic context with calendar coordination."""
+Keep core content focused and always provide strategic context with calendar and email coordination."""
             )
         except Exception as e:
             print(f"❌ Run creation error: {e}")
@@ -1952,6 +936,7 @@ async def on_ready():
         print(f"🤖 Connected as: {bot.user.name} (ID: {bot.user.id})")
         print(f"🎯 Role: {ASSISTANT_ROLE}")
         print(f"📅 Calendar Status: {len(accessible_calendars)} accessible calendars")
+        print(f"📧 Gmail Status: {'Connected' if gmail_service else 'Not configured'}")
         print(f"🔍 Research: {'Enabled' if BRAVE_API_KEY else 'Disabled'}")
         print(f"🏢 Allowed channels: {', '.join(ALLOWED_CHANNELS)}")
         
@@ -1959,7 +944,7 @@ async def on_ready():
             status=discord.Status.online,
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="📅 Executive Calendar & Task Management"
+                name="📅📧 Executive Calendar & Email Management"
             )
         )
         print("👑 Rose is ready for complete executive assistance!")
@@ -2043,22 +1028,12 @@ async def help_command(ctx):
 
 **📅 Calendar & Scheduling:**
 • `!today` - Today's executive schedule
-• `!upcoming [days]` - Upcoming events (default 7 days)
 • `!briefing` / `!daily` / `!morning` - Morning executive briefing
-• `!calendar` - Quick calendar overview with AI insights
-• `!schedule [timeframe]` - Flexible schedule view
-• `!agenda` - Comprehensive executive agenda overview
-• `!overview` - Complete executive overview
 
 **📧 Gmail & Email:**
 • `!inbox` - Recent inbox summary
 • `!emails [count]` - Recent emails (default 10)
 • `!unread` - Count of unread emails
-• `!search <query>` - Search emails
-
-**🔍 Planning & Research:**
-• `!research <query>` - Strategic planning research
-• `!planning <topic>` - Productivity insights
 
 **💼 Executive Functions:**
 • `!status` - System and calendar status
@@ -2073,10 +1048,8 @@ async def help_command(ctx):
 • `!briefing` - Get comprehensive morning briefing
 • `!today` - See today's complete schedule
 • `!inbox` - Check recent emails and unread count
-• `!overview` - Complete executive overview
 • `@Rose send an email to john@example.com about meeting`
-• `@Rose search emails from yesterday`
-"""
+• `@Rose create a meeting tomorrow at 2pm`"""
         
         await ctx.send(help_text)
         
@@ -2093,7 +1066,10 @@ async def status_command(ctx):
             calendar_names = [name for name, _, _ in accessible_calendars]
             calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
         
-        research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
+        gmail_status = "❌ Not configured"
+        if gmail_service and gmail_user_email:
+            gmail_status = f"✅ Connected: {gmail_user_email}"
+        
         assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
         
         sa_info = "Not configured"
@@ -2111,8 +1087,8 @@ async def status_command(ctx):
 • Status: {calendar_status}
 • Timezone: 🇨🇦 Toronto (America/Toronto)
 
-**🔍 Planning Research:**
-• Brave Search API: {research_status}
+**📧 Gmail Integration:**
+• Status: {gmail_status}
 
 **💼 Executive Features:**
 • Active conversations: {len(user_conversations)}
@@ -2139,170 +1115,18 @@ async def today_command(ctx):
         print(f"❌ Today command error: {e}")
         await ctx.send("👑 Today's schedule unavailable. Please try again.")
 
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await ctx.send(events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("👑 Upcoming events unavailable. Please try again.")
-
 @bot.command(name='briefing')
 async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
+            user_id = str(ctx.author.id)
+            briefing_query = "morning executive briefing with calendar and email summary"
+            response = await get_rose_response(briefing_query, user_id)
+            await send_long_message(ctx.message, response)
     except Exception as e:
         print(f"❌ Briefing command error: {e}")
         await ctx.send("👑 Executive briefing unavailable. Please try again.")
-
-@bot.command(name='calendar')
-async def calendar_command(ctx):
-    """Quick calendar overview command"""
-    try:
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            calendar_query = "what's on my calendar today and upcoming strategic overview"
-            response = await get_rose_response(calendar_query, user_id)
-            await send_long_message(ctx.message, response)
-    except Exception as e:
-        print(f"❌ Calendar command error: {e}")
-        await ctx.send("👑 Calendar overview unavailable. Please try again.")
-
-@bot.command(name='schedule')
-async def schedule_command(ctx, *, timeframe: str = "today"):
-    """Flexible schedule command"""
-    try:
-        async with ctx.typing():
-            timeframe_lower = timeframe.lower()
-            
-            if any(word in timeframe_lower for word in ["today", "now", "current"]):
-                response = get_today_schedule()
-            elif any(word in timeframe_lower for word in ["tomorrow", "next"]):
-                response = get_upcoming_events(1)
-            elif any(word in timeframe_lower for word in ["week", "7"]):
-                response = get_upcoming_events(7)
-            elif any(word in timeframe_lower for word in ["month", "30"]):
-                response = get_upcoming_events(30)
-            elif timeframe_lower.isdigit():
-                days = int(timeframe_lower)
-                days = max(1, min(days, 30))
-                response = get_upcoming_events(days)
-            else:
-                response = get_today_schedule()
-            
-            await ctx.send(response)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("👑 Schedule view unavailable. Please try again.")
-
-@bot.command(name='agenda')
-async def agenda_command(ctx):
-    """Executive agenda command"""
-    try:
-        async with ctx.typing():
-            today_schedule = get_today_schedule()
-            tomorrow_events = get_upcoming_events(1)
-            
-            agenda = f"📋 **Executive Agenda Overview**\n\n{today_schedule}\n\n**Tomorrow:**\n{tomorrow_events}"
-            
-            if len(agenda) > 1900:
-                agenda = agenda[:1900] + "\n\n👑 *Use `!today` and `!upcoming` for detailed views*"
-            
-            await ctx.send(agenda)
-    except Exception as e:
-        print(f"❌ Agenda command error: {e}")
-        await ctx.send("👑 Executive agenda unavailable. Please try again.")
-
-@bot.command(name='daily')
-async def daily_command(ctx):
-    """Daily executive briefing - alias for briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Daily briefing command error: {e}")
-        await ctx.send("👑 Daily executive briefing unavailable. Please try again.")
-
-@bot.command(name='morning')
-async def morning_command(ctx):
-    """Morning briefing command - alias for briefing"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await ctx.send(briefing)
-    except Exception as e:
-        print(f"❌ Morning briefing command error: {e}")
-        await ctx.send("👑 Morning executive briefing unavailable. Please try again.")
-
-@bot.command(name='overview')
-async def overview_command(ctx):
-    """Executive overview command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            upcoming = get_upcoming_events(3)
-            
-            overview = f"{briefing}\n\n📋 **3-Day Executive Outlook:**\n{upcoming}"
-            
-            if len(overview) > 1900:
-                await ctx.send(briefing)
-                await ctx.send(f"📋 **3-Day Executive Outlook:**\n{upcoming}")
-            else:
-                await ctx.send(overview)
-                
-    except Exception as e:
-        print(f"❌ Overview command error: {e}")
-        await ctx.send("👑 Executive overview unavailable. Please try again.")
-
-@bot.command(name='research')
-async def research_command(ctx, *, query: str = None):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("👑 **Executive Research Usage:** `!research <your planning query>`\n\nExamples:\n• `!research time management strategies`\n• `!research productivity systems for executives`")
-            return
-        
-        async with ctx.typing():
-            results, sources = await planning_search_enhanced(query, "executive planning", 3)
-            
-            response = f"📊 **Executive Research:** {query}\n\n{results}"
-            
-            if sources:
-                response += "\n\n📚 **Strategic Sources:**\n"
-                for source in sources:
-                    response += f"({source['number']}) {source['title']} - {source['domain']}\n"
-            
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Research command error: {e}")
-        await ctx.send("👑 Executive research unavailable. Please try again.")
-
-@bot.command(name='planning')
-async def planning_command(ctx, *, topic: str = None):
-    """Quick planning insights command"""
-    try:
-        if not topic:
-            await ctx.send("👑 **Executive Planning Usage:** `!planning <planning topic>`\n\nExamples:\n• `!planning quarterly review`\n• `!planning meeting preparation`")
-            return
-        
-        async with ctx.typing():
-            user_id = str(ctx.author.id)
-            planning_query = f"executive planning insights for {topic} productivity optimization"
-            response = await get_rose_response(planning_query, user_id)
-            await send_long_message(ctx.message, response)
-            
-    except Exception as e:
-        print(f"❌ Planning command error: {e}")
-        await ctx.send("👑 Executive planning insights unavailable. Please try again.")
 
 @bot.command(name='inbox')
 async def inbox_command(ctx):
@@ -2338,21 +1162,6 @@ async def unread_command(ctx):
         print(f"❌ Unread command error: {e}")
         await ctx.send("📧 Unread count unavailable. Please try again.")
 
-@bot.command(name='search')
-async def search_command(ctx, *, query: str = None):
-    """Search emails"""
-    try:
-        if not query:
-            await ctx.send("📧 **Email Search Usage:** `!search <search query>`\n\nExamples:\n• `!search from:john@example.com`\n• `!search subject:meeting`\n• `!search yesterday`")
-            return
-        
-        async with ctx.typing():
-            search_results = search_emails(query, 10)
-            await send_long_message(ctx.message, search_results)
-    except Exception as e:
-        print(f"❌ Search command error: {e}")
-        await ctx.send("📧 Email search unavailable. Please try again.")
-
 # ============================================================================
 # ERROR HANDLING
 # ============================================================================
@@ -2380,7 +1189,7 @@ if __name__ == "__main__":
     try:
         print(f"🚀 Launching {ASSISTANT_NAME}...")
         print(f"📅 Google Calendar API: {bool(accessible_calendars)} calendars accessible")
-        print(f"🔍 Planning Research: {bool(BRAVE_API_KEY)}")
+        print(f"📧 Gmail API: {bool(gmail_service)} gmail integration")
         print(f"🇨🇦 Timezone: Toronto (America/Toronto)")
         print("🎯 Starting Discord bot...")
         
