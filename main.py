@@ -1049,6 +1049,52 @@ async def handle_rose_functions_enhanced(run, thread_id):
 # MAIN CONVERSATION HANDLER
 # ============================================================================
 
+def format_calendar_response_simple(response_text):
+    """Simplify calendar responses by removing Strategic Analysis and Action Items"""
+    import re
+    
+    # Check if this is a calendar-related response
+    calendar_keywords = ["calendar", "meeting", "event", "scheduled", "appointment", "briefing"]
+    is_calendar_response = any(keyword in response_text.lower() for keyword in calendar_keywords)
+    
+    if not is_calendar_response:
+        return response_text  # Return unchanged for non-calendar responses
+    
+    # Extract Executive Summary
+    executive_summary = ""
+    summary_match = re.search(r'👑\s*\*\*Executive Summary:\*\*\s*([^👑📊🎯📅]*)', response_text, re.DOTALL)
+    if summary_match:
+        executive_summary = summary_match.group(1).strip()
+    
+    # Extract Calendar Details
+    calendar_details = ""
+    detail_patterns = [
+        r'📅\s*\*\*Calendar Coordination:\*\*\s*([^👑📊🎯📅]*)',
+        r'💼\s*\*\*Meeting Details:\*\*\s*([^👑📊🎯📅]*)',
+        r'📋\s*\*\*Event Details:\*\*\s*([^👑📊🎯📅]*)'
+    ]
+    
+    for pattern in detail_patterns:
+        details_match = re.search(pattern, response_text, re.DOTALL)
+        if details_match:
+            calendar_details = details_match.group(1).strip()
+            break
+    
+    # If no details found, extract basic info
+    if not calendar_details:
+        detail_lines = []
+        for line in response_text.split('\n'):
+            if any(word in line.lower() for word in ['title:', 'date & time:', 'location:', 'calendar:']):
+                detail_lines.append(f"• {line.strip()}")
+        calendar_details = "\n".join(detail_lines) if detail_lines else "Meeting details confirmed"
+    
+    # Return ONLY Executive Summary + Calendar Coordination
+    return f"""👑 **Executive Summary:**
+{executive_summary}
+
+📅 **Calendar Coordination:**
+{calendar_details}"""
+
 async def get_rose_response(message, user_id):
     """Get response from Rose's enhanced OpenAI assistant"""
     try:
@@ -1175,6 +1221,10 @@ Keep core content focused and always provide strategic context with calendar coo
             for msg in messages.data:
                 if msg.role == "assistant":
                     response = msg.content[0].text.value
+                    
+                    # NEW: Apply calendar response simplification
+                    response = format_calendar_response_simple(response)
+                    
                     return format_for_discord_rose(response)
         except Exception as e:
             print(f"❌ Error retrieving messages: {e}")
