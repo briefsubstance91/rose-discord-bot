@@ -1107,9 +1107,27 @@ def format_calendar_response_simple(response_text):
         simplified_response += f"\n\n{calendar_link}"
     
     return simplified_response.strip()
+
+async def get_rose_response(message, user_id):
+    """Get response from Rose's enhanced OpenAI assistant with fixed API calls"""
+    try:
+        if not ASSISTANT_ID:
+            return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
+        
+        # Create user thread if needed
+        if user_id not in user_conversations:
+            thread = client.beta.threads.create()
+            user_conversations[user_id] = thread.id
+            print(f"👑 Created executive thread for user {user_id}")
+        
+        thread_id = user_conversations[user_id]
+        
+        # Clean message
+        clean_message = message.replace(f'<@{bot.user.id}>', '').strip() if hasattr(bot, 'user') and bot.user else message.strip()
         
         # Get current date context for Rose
         toronto_tz = pytz.timezone('America/Toronto')
+
         now = datetime.now(toronto_tz)
         today_formatted = now.strftime('%A, %B %d, %Y')
         today_date = now.strftime('%Y-%m-%d')
