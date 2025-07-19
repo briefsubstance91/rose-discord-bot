@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (FIXED VERSION)
-Executive Assistant with Full Google Calendar API Integration & Advanced Task Management
+ROSE ASHCOMBE - DISCORD BOT (COMPLETE WITH GMAIL INTEGRATION)
+Executive Assistant with Full Google Calendar API Integration, Gmail Management & Advanced Task Management
 """
 import pytz
 import discord
@@ -12,6 +12,11 @@ import aiohttp
 import json
 import time
 import re
+import base64
+import email
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import parsedate_to_datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from google.oauth2.service_account import Credentials
@@ -26,7 +31,7 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Complete Enhanced)"
+ASSISTANT_ROLE = "Executive Assistant (Complete Enhanced with Gmail)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -35,7 +40,7 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Google Calendar integration
+# Google Calendar & Gmail integration
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
@@ -69,8 +74,9 @@ except Exception as e:
     print(f"❌ CRITICAL: OpenAI client initialization failed: {e}")
     exit(1)
 
-# Google Calendar setup
+# Google Calendar & Gmail setup
 calendar_service = None
+gmail_service = None
 accessible_calendars = []
 service_account_email = None
 
@@ -107,7 +113,7 @@ def test_calendar_access(calendar_id, calendar_name):
         print(f"❌ {calendar_name} error: {e}")
         return False
 
-# Initialize Google Calendar service
+# Initialize Google Calendar & Gmail services
 try:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
@@ -116,11 +122,16 @@ try:
             scopes=[
                 'https://www.googleapis.com/auth/calendar.readonly',
                 'https://www.googleapis.com/auth/calendar.events',
-                'https://www.googleapis.com/auth/calendar'
+                'https://www.googleapis.com/auth/calendar',
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.modify'
             ]
         )
         calendar_service = build('calendar', 'v3', credentials=credentials)
+        gmail_service = build('gmail', 'v1', credentials=credentials)
         print("✅ Google Calendar service initialized")
+        print("✅ Gmail service initialized")
         
         service_account_email = credentials_info.get('client_email')
         print(f"📧 Service Account: {service_account_email}")
@@ -144,11 +155,12 @@ try:
             print(f"   ✅ {name}")
             
     else:
-        print("⚠️ Google Calendar credentials not found")
+        print("⚠️ Google Calendar & Gmail credentials not found")
         
 except Exception as e:
-    print(f"❌ Google Calendar setup error: {e}")
+    print(f"❌ Google Calendar & Gmail setup error: {e}")
     calendar_service = None
+    gmail_service = None
     accessible_calendars = []
 
 # Memory and duplicate prevention systems
@@ -839,6 +851,184 @@ def find_free_time(duration_minutes=60, preferred_days=None, preferred_hours=Non
         return f"❌ **Free Time Search Failed:** {str(e)}"
 
 # ============================================================================
+# CORE GMAIL FUNCTIONS
+# ============================================================================
+
+def get_recent_emails(count=10, query="in:inbox"):
+    """Get recent emails with Gmail query support"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Search for messages
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Recent Emails:** No emails found for query: {query}"
+        
+        formatted_emails = []
+        
+        for message in messages[:count]:
+            msg = gmail_service.users().messages().get(
+                userId='me',
+                id=message['id'],
+                format='metadata',
+                metadataHeaders=['From', 'Subject', 'Date']
+            ).execute()
+            
+            headers = {h['name']: h['value'] for h in msg['payload'].get('headers', [])}
+            
+            from_email = headers.get('From', 'Unknown')
+            subject = headers.get('Subject', 'No Subject')
+            date_str = headers.get('Date', '')
+            
+            # Parse date for better formatting
+            try:
+                if date_str:
+                    date_obj = parsedate_to_datetime(date_str)
+                    toronto_tz = pytz.timezone('America/Toronto')
+                    local_date = date_obj.astimezone(toronto_tz)
+                    formatted_date = local_date.strftime('%m/%d %H:%M')
+                else:
+                    formatted_date = 'Unknown'
+            except:
+                formatted_date = 'Unknown'
+            
+            # Check if unread
+            labels = msg.get('labelIds', [])
+            unread_indicator = "🔴 " if 'UNREAD' in labels else ""
+            
+            formatted_emails.append(f"{unread_indicator}**{formatted_date}** | {from_email}\n📝 {subject}")
+        
+        return f"📧 **Recent Emails ({len(formatted_emails)}):**\n\n" + "\n\n".join(formatted_emails)
+        
+    except Exception as e:
+        print(f"❌ Gmail error: {e}")
+        return f"❌ Error retrieving emails: {str(e)}"
+
+def get_unread_emails(count=10):
+    """Get unread emails only"""
+    return get_recent_emails(count, "is:unread")
+
+def search_emails(query, count=10):
+    """Search emails using Gmail search syntax"""
+    return get_recent_emails(count, query)
+
+def send_email(to_email, subject, body):
+    """Send email through Gmail"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Create message
+        message = MIMEText(body)
+        message['to'] = to_email
+        message['subject'] = subject
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Send message
+        sent_message = gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"✅ **Email Sent Successfully**\n📧 To: {to_email}\n📝 Subject: {subject}\n🆔 Message ID: {sent_message['id']}"
+        
+    except Exception as e:
+        print(f"❌ Send email error: {e}")
+        return f"❌ Failed to send email: {str(e)}"
+
+def get_email_stats():
+    """Get email dashboard statistics"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Get unread count
+        unread_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:unread',
+            maxResults=1
+        ).execute()
+        unread_count = unread_results.get('resultSizeEstimate', 0)
+        
+        # Get today's emails
+        toronto_tz = pytz.timezone('America/Toronto')
+        today = datetime.now(toronto_tz).strftime('%Y/%m/%d')
+        today_results = gmail_service.users().messages().list(
+            userId='me',
+            q=f'newer_than:1d',
+            maxResults=1
+        ).execute()
+        today_count = today_results.get('resultSizeEstimate', 0)
+        
+        # Get important emails
+        important_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:important is:unread',
+            maxResults=1
+        ).execute()
+        important_count = important_results.get('resultSizeEstimate', 0)
+        
+        return f"""📧 **Executive Email Dashboard**
+
+🔴 **Unread:** {unread_count} emails
+📅 **Today:** {today_count} emails received
+⭐ **Important & Unread:** {important_count} emails
+
+💡 **Quick Actions:**
+• Use `!unread` for unread emails
+• Use `!emails` for recent inbox
+• Mention @Rose to process specific emails"""
+        
+    except Exception as e:
+        print(f"❌ Email stats error: {e}")
+        return f"❌ Error retrieving email statistics: {str(e)}"
+
+def delete_email(email_id):
+    """Move email to trash"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().trash(
+            userId='me',
+            id=email_id
+        ).execute()
+        
+        return f"✅ Email moved to trash (ID: {email_id})"
+        
+    except Exception as e:
+        print(f"❌ Delete email error: {e}")
+        return f"❌ Failed to delete email: {str(e)}"
+
+def archive_email(email_id):
+    """Archive email (remove from inbox)"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"✅ Email archived (ID: {email_id})"
+        
+    except Exception as e:
+        print(f"❌ Archive email error: {e}")
+        return f"❌ Failed to archive email: {str(e)}"
+
+# ============================================================================
 # ENHANCED PLANNING SEARCH
 # ============================================================================
 
@@ -907,7 +1097,7 @@ async def planning_search_enhanced(query, focus_area="general", num_results=3):
 # ============================================================================
 
 async def handle_rose_functions_enhanced(run, thread_id):
-    """Enhanced function handling with complete calendar management"""
+    """Enhanced function handling with complete calendar and email management"""
     
     if not run or not hasattr(run, 'required_action') or not run.required_action:
         return
@@ -1003,6 +1193,51 @@ async def handle_rose_functions_enhanced(run, thread_id):
                     output = delete_calendar_event(event_search)
                 else:
                     output = "❌ Missing required parameter: event_search"
+            
+            # EMAIL MANAGEMENT FUNCTIONS
+            elif function_name == "get_recent_emails":
+                count = arguments.get('count', 10)
+                query = arguments.get('query', 'in:inbox')
+                output = get_recent_emails(count, query)
+
+            elif function_name == "get_unread_emails":
+                count = arguments.get('count', 10)
+                output = get_unread_emails(count)
+
+            elif function_name == "search_emails":
+                query = arguments.get('query', '')
+                count = arguments.get('count', 10)
+                if query:
+                    output = search_emails(query, count)
+                else:
+                    output = "❌ Missing required parameter: query"
+
+            elif function_name == "send_email":
+                to_email = arguments.get('to_email', '')
+                subject = arguments.get('subject', '')
+                body = arguments.get('body', '')
+                
+                if to_email and subject and body:
+                    output = send_email(to_email, subject, body)
+                else:
+                    output = "❌ Missing required parameters: to_email, subject, body"
+
+            elif function_name == "get_email_stats":
+                output = get_email_stats()
+
+            elif function_name == "delete_email":
+                email_id = arguments.get('email_id', '')
+                if email_id:
+                    output = delete_email(email_id)
+                else:
+                    output = "❌ Missing required parameter: email_id"
+
+            elif function_name == "archive_email":
+                email_id = arguments.get('email_id', '')
+                if email_id:
+                    output = archive_email(email_id)
+                else:
+                    output = "❌ Missing required parameter: email_id"
             
             # PLANNING RESEARCH FUNCTIONS
             elif function_name == "planning_search":
@@ -1144,6 +1379,7 @@ CURRENT DATE & TIME CONTEXT:
 RESPONSE GUIDELINES:
 - Use professional executive formatting with strategic headers
 - AVAILABLE CALENDARS: {[name for name, _, _ in accessible_calendars]}
+- GMAIL INTEGRATION: {'Available' if gmail_service else 'Not available'}
 - Apply executive assistant tone: strategic, organized, action-oriented
 - Keep main content under 1200 characters for Discord efficiency
 - Use headers like: 👑 **Executive Summary:** or 📊 **Strategic Analysis:**
@@ -1179,21 +1415,21 @@ RESPONSE GUIDELINES:
             run = client.beta.threads.runs.create(
                 thread_id=thread_id,
                 assistant_id=ASSISTANT_ID,
-                instructions="""You are Rose Ashcombe, executive assistant specialist with Google Calendar integration.
+                instructions="""You are Rose Ashcombe, executive assistant specialist with Google Calendar and Gmail integration.
 
 EXECUTIVE APPROACH:
-- Use executive calendar functions to provide comprehensive scheduling insights
+- Use executive calendar and email functions to provide comprehensive insights
 - Apply strategic planning perspective with productivity optimization
 - Include actionable recommendations with clear timelines
 
-FORMATTING: Use professional executive formatting with strategic headers (👑 📊 📅 🎯 💼) and provide organized, action-oriented guidance.
+FORMATTING: Use professional executive formatting with strategic headers (👑 📧 📅 🎯 💼) and provide organized, action-oriented guidance.
 
 STRUCTURE:
-👑 **Executive Summary:** [strategic overview with calendar insights]
+👑 **Executive Summary:** [strategic overview with calendar and email insights]
 📊 **Strategic Analysis:** [research-backed recommendations]
 🎯 **Action Items:** [specific next steps with timing]
 
-Keep core content focused and always provide strategic context with calendar coordination."""
+Keep core content focused and always provide strategic context with calendar and email coordination."""
             )
         except Exception as e:
             print(f"❌ Run creation error: {e}")
@@ -1317,6 +1553,7 @@ async def on_ready():
         print(f"🤖 Connected as: {bot.user.name} (ID: {bot.user.id})")
         print(f"🎯 Role: {ASSISTANT_ROLE}")
         print(f"📅 Calendar Status: {len(accessible_calendars)} accessible calendars")
+        print(f"📧 Gmail Status: {'Available' if gmail_service else 'Not available'}")
         print(f"🔍 Research: {'Enabled' if BRAVE_API_KEY else 'Disabled'}")
         print(f"🏢 Allowed channels: {', '.join(ALLOWED_CHANNELS)}")
         
@@ -1324,7 +1561,7 @@ async def on_ready():
             status=discord.Status.online,
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="📅 Executive Calendar & Task Management"
+                name="📅📧 Executive Calendar & Email Management"
             )
         )
         print("👑 Rose is ready for complete executive assistance!")
@@ -1402,7 +1639,7 @@ async def ping_command(ctx):
 
 @bot.command(name='help')
 async def help_command(ctx):
-    """Enhanced help command"""
+    """Enhanced help command with email functions"""
     try:
         help_text = f"""👑 **{ASSISTANT_NAME} - Executive Assistant Commands**
 
@@ -1415,12 +1652,17 @@ async def help_command(ctx):
 • `!agenda` - Comprehensive executive agenda overview
 • `!overview` - Complete executive overview
 
+**📧 Email Management:**
+• `!emails [count]` - Recent emails (default 10)
+• `!unread [count]` - Unread emails only
+• `!emailstats` - Email dashboard overview
+
 **🔍 Planning & Research:**
 • `!research <query>` - Strategic planning research
 • `!planning <topic>` - Productivity insights
 
 **💼 Executive Functions:**
-• `!status` - System and calendar status
+• `!status` - System status (calendar, email, research)
 • `!ping` - Test connectivity
 • `!help` - This command menu
 
@@ -1428,12 +1670,17 @@ async def help_command(ctx):
 • Mention @{bot.user.name if bot.user else 'Rose'} in any message
 • Available in: {', '.join(ALLOWED_CHANNELS)}
 
-**💡 Example Commands:**
-• `!briefing` - Get comprehensive morning briefing
-• `!today` - See today's complete schedule
-• `!overview` - Complete executive overview
-• `!upcoming 3` - See next 3 days of events
-• "What's my day like?" - Natural language schedule request
+**💬 Natural Language Examples:**
+• "@Rose check my unread emails"
+• "@Rose send email to [person] about [topic]"
+• "@Rose what's my schedule today?"
+• "@Rose what emails came in today?"
+• "@Rose help me plan my week strategically"
+
+**💡 Pro Tips:**
+• Use `!briefing` for comprehensive morning overview
+• Use `!overview` for complete executive summary
+• Combine calendar and email: "@Rose morning briefing with emails"
 """
         
         await ctx.send(help_text)
@@ -1451,6 +1698,7 @@ async def status_command(ctx):
             calendar_names = [name for name, _, _ in accessible_calendars]
             calendar_status = f"✅ {len(accessible_calendars)} calendars: {', '.join(calendar_names)}"
         
+        gmail_status = "✅ Available" if gmail_service else "❌ Not available"
         research_status = "✅ Enabled" if BRAVE_API_KEY else "❌ Disabled"
         assistant_status = "✅ Connected" if ASSISTANT_ID else "❌ Not configured"
         
@@ -1468,6 +1716,10 @@ async def status_command(ctx):
 **📅 Calendar Integration:**
 • Status: {calendar_status}
 • Timezone: 🇨🇦 Toronto (America/Toronto)
+
+**📧 Gmail Integration:**
+• Status: {gmail_status}
+• Features: Read, Send, Search, Statistics
 
 **🔍 Planning Research:**
 • Brave Search API: {research_status}
@@ -1620,6 +1872,49 @@ async def overview_command(ctx):
         print(f"❌ Overview command error: {e}")
         await ctx.send("👑 Executive overview unavailable. Please try again.")
 
+# ============================================================================
+# EMAIL COMMANDS
+# ============================================================================
+
+@bot.command(name='emails')
+async def emails_command(ctx, count: int = 10):
+    """Recent emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_recent_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Emails command error: {e}")
+        await ctx.send("📧 Recent emails unavailable. Please try again.")
+
+@bot.command(name='unread')
+async def unread_command(ctx, count: int = 10):
+    """Unread emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_unread_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Unread command error: {e}")
+        await ctx.send("📧 Unread emails unavailable. Please try again.")
+
+@bot.command(name='emailstats')
+async def emailstats_command(ctx):
+    """Email statistics command"""
+    try:
+        async with ctx.typing():
+            stats = get_email_stats()
+            await ctx.send(stats)
+    except Exception as e:
+        print(f"❌ Email stats command error: {e}")
+        await ctx.send("📧 Email statistics unavailable. Please try again.")
+
+# ============================================================================
+# RESEARCH COMMANDS
+# ============================================================================
+
 @bot.command(name='research')
 async def research_command(ctx, *, query: str = None):
     """Planning research command"""
@@ -1689,6 +1984,7 @@ if __name__ == "__main__":
     try:
         print(f"🚀 Launching {ASSISTANT_NAME}...")
         print(f"📅 Google Calendar API: {bool(accessible_calendars)} calendars accessible")
+        print(f"📧 Gmail API: {bool(gmail_service)} service available")
         print(f"🔍 Planning Research: {bool(BRAVE_API_KEY)}")
         print(f"🇨🇦 Timezone: Toronto (America/Toronto)")
         print("🎯 Starting Discord bot...")

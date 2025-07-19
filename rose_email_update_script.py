@@ -13,7 +13,7 @@ load_dotenv()
 
 # Get environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-ROSE_ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID")
+ROSE_ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 
 if not OPENAI_API_KEY:
     print("❌ OPENAI_API_KEY not found in environment variables")
@@ -252,8 +252,39 @@ def update_rose_assistant():
         current_tools = list(assistant.tools) if assistant.tools else []
         print(f"📋 Current tools: {len(current_tools)}")
         
-        # Add email functions to existing tools
-        updated_tools = current_tools + EMAIL_FUNCTIONS
+        # Check for existing email functions
+        existing_function_names = set()
+        for tool in current_tools:
+            if hasattr(tool, 'function') and hasattr(tool.function, 'name'):
+                existing_function_names.add(tool.function.name)
+        
+        print(f"🔍 Existing functions: {existing_function_names}")
+        
+        # Filter out email functions that already exist
+        new_email_functions = []
+        skipped_functions = []
+        
+        for func in EMAIL_FUNCTIONS:
+            func_name = func['function']['name']
+            if func_name not in existing_function_names:
+                new_email_functions.append(func)
+                print(f"  ➕ Will add: {func_name}")
+            else:
+                skipped_functions.append(func_name)
+                print(f"  ⏭️ Already exists: {func_name}")
+        
+        if not new_email_functions:
+            print("✅ All email functions already exist! Updating instructions only...")
+            # Update the assistant with new instructions
+            updated_assistant = client.beta.assistants.update(
+                assistant_id=ROSE_ASSISTANT_ID,
+                instructions=UPDATED_INSTRUCTIONS
+            )
+            print(f"📝 Instructions updated with email management guidelines")
+            return True
+        
+        # Add new email functions to existing tools
+        updated_tools = current_tools + new_email_functions
         
         # Update the assistant
         updated_assistant = client.beta.assistants.update(
@@ -263,16 +294,21 @@ def update_rose_assistant():
         )
         
         print(f"✅ Assistant updated successfully!")
-        print(f"📧 Added {len(EMAIL_FUNCTIONS)} email functions")
+        print(f"📧 Added {len(new_email_functions)} new email functions")
+        print(f"⏭️ Skipped {len(skipped_functions)} existing functions")
         print(f"🔧 Total tools: {len(updated_tools)}")
         print(f"📝 Instructions updated with email management guidelines")
         
         # Show function summary
-        print("\n📧 Email Functions Added:")
-        for func in EMAIL_FUNCTIONS:
-            name = func['function']['name']
-            desc = func['function']['description']
-            print(f"  • {name}: {desc}")
+        if new_email_functions:
+            print("\n📧 New Email Functions Added:")
+            for func in new_email_functions:
+                name = func['function']['name']
+                desc = func['function']['description']
+                print(f"  • {name}: {desc}")
+        
+        if skipped_functions:
+            print(f"\n⏭️ Skipped Existing Functions: {', '.join(skipped_functions)}")
         
         print(f"\n👑 Rose is now ready for complete executive email management!")
         
@@ -280,6 +316,7 @@ def update_rose_assistant():
         
     except Exception as e:
         print(f"❌ Error updating assistant: {e}")
+        print(f"📋 Full error details: {str(e)}")
         return False
 
 def verify_update():
