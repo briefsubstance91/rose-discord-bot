@@ -17,9 +17,13 @@ import base64
 import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import parsedate_to_datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from google.oauth2.service_account import Credentials
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials as OAuthCredentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import traceback
@@ -45,6 +49,18 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
 GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
 BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')
+
+# Gmail OAuth setup
+GMAIL_OAUTH_JSON = os.getenv('GMAIL_OAUTH_JSON')
+GMAIL_TOKEN_JSON = os.getenv('GMAIL_TOKEN_JSON')
+GMAIL_TOKEN_FILE = os.getenv('GMAIL_TOKEN_FILE', 'gmail_token.json')
+
+# Gmail OAuth scopes
+GMAIL_SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.modify'
+]
 
 # Validate critical environment variables
 if not DISCORD_TOKEN:
@@ -242,29 +258,117 @@ def get_all_accessible_calendars():
         print(f"❌ Error listing calendars: {e}")
         return []
 
+# ============================================================================
+# GOOGLE SERVICES INITIALIZATION WITH OAUTH2 FOR GMAIL
+# ============================================================================
+
+def setup_gmail_oauth():
+    """Setup Gmail with OAuth authentication"""
+    try:
+        creds = None
+        
+        # First try to load token from environment variable (for Railway)
+        if GMAIL_TOKEN_JSON:
+            try:
+                token_info = json.loads(GMAIL_TOKEN_JSON)
+                creds = OAuthCredentials.from_authorized_user_info(token_info, GMAIL_SCOPES)
+                print("📧 Found Gmail token from environment variable")
+            except json.JSONDecodeError as e:
+                print(f"❌ Invalid JSON in GMAIL_TOKEN_JSON: {e}")
+                creds = None
+        
+        # Fallback to token file (for local development)
+        elif os.path.exists(GMAIL_TOKEN_FILE):
+            creds = OAuthCredentials.from_authorized_user_file(GMAIL_TOKEN_FILE, GMAIL_SCOPES)
+            print("📧 Found existing Gmail token file")
+        
+        # If no valid credentials, get new ones
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                print("🔄 Refreshing Gmail credentials...")
+                creds.refresh(Request())
+                
+                # Save refreshed token back to file (local) or print for env var (Railway)
+                if os.path.exists(GMAIL_TOKEN_FILE):
+                    with open(GMAIL_TOKEN_FILE, 'w') as token:
+                        token.write(creds.to_json())
+                        print("💾 Gmail token refreshed and saved to file")
+                else:
+                    print("💡 Token refreshed - update GMAIL_TOKEN_JSON environment variable with:")
+                    print(creds.to_json())
+            else:
+                print("🔑 Getting new Gmail credentials...")
+                
+                if not GMAIL_OAUTH_JSON:
+                    print("❌ GMAIL_OAUTH_JSON not found in environment variables")
+                    print("💡 Set GMAIL_OAUTH_JSON with your OAuth client JSON content")
+                    return None
+                
+                # Parse OAuth JSON from environment variable
+                try:
+                    oauth_info = json.loads(GMAIL_OAUTH_JSON)
+                except json.JSONDecodeError as e:
+                    print(f"❌ Invalid JSON in GMAIL_OAUTH_JSON: {e}")
+                    return None
+                
+                # Create flow from OAuth info
+                flow = InstalledAppFlow.from_client_config(oauth_info, GMAIL_SCOPES)
+                creds = flow.run_local_server(port=0)
+                print("✅ Gmail authentication completed")
+                
+                # Save credentials for next run
+                with open(GMAIL_TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+                    print("💾 Gmail token saved to file")
+                    print("💡 For Railway deployment, add this as GMAIL_TOKEN_JSON environment variable:")
+                    print(creds.to_json())
+        
+        # Build Gmail service
+        gmail_service = build('gmail', 'v1', credentials=creds)
+        print("✅ Gmail OAuth service initialized")
+        
+        # Test Gmail access
+        try:
+            profile = gmail_service.users().getProfile(userId='me').execute()
+            print(f"📧 Gmail account: {profile.get('emailAddress', 'Unknown')}")
+            return gmail_service
+        except Exception as test_error:
+            print(f"❌ Gmail test failed: {test_error}")
+            return None
+        
+    except Exception as e:
+        print(f"❌ Gmail OAuth setup error: {e}")
+        return None
+
 # Initialize Google Services
 try:
+    # Initialize Calendar with Service Account
     if GOOGLE_SERVICE_ACCOUNT_JSON:
         credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-        credentials = Credentials.from_service_account_info(
+        calendar_credentials = Credentials.from_service_account_info(
             credentials_info,
             scopes=[
                 'https://www.googleapis.com/auth/calendar.readonly',
                 'https://www.googleapis.com/auth/calendar.events',
-                'https://www.googleapis.com/auth/calendar',
-                'https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/gmail.send',
-                'https://www.googleapis.com/auth/gmail.modify'
+                'https://www.googleapis.com/auth/calendar'
             ]
         )
-        calendar_service = build('calendar', 'v3', credentials=credentials)
-        gmail_service = build('gmail', 'v1', credentials=credentials)
-        print("✅ Google Calendar and Gmail services initialized")
+        
+        calendar_service = build('calendar', 'v3', credentials=calendar_credentials)
+        print("✅ Google Calendar service initialized with service account")
         
         # Get service account email for sharing instructions
         service_account_email = credentials_info.get('client_email')
         print(f"📧 Service Account Email: {service_account_email}")
         
+    else:
+        print("⚠️ GOOGLE_SERVICE_ACCOUNT_JSON not found - calendar features disabled")
+        calendar_service = None
+    
+    # Initialize Gmail with OAuth2
+    gmail_service = setup_gmail_oauth()
+    
+    if calendar_service:
         # List all accessible calendars first
         all_calendars = get_all_accessible_calendars()
         
@@ -291,10 +395,7 @@ try:
         
         if not accessible_calendars:
             print("❌ No accessible calendars found")
-            
-    else:
-        print("⚠️ GOOGLE_SERVICE_ACCOUNT_JSON not found - calendar/email features disabled")
-        
+    
 except Exception as e:
     print(f"❌ Google services setup error: {e}")
     calendar_service = None
