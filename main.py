@@ -50,6 +50,7 @@ GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
 
 # Gmail OAuth setup
 GMAIL_OAUTH_JSON = os.getenv('GMAIL_OAUTH_JSON')
+GMAIL_TOKEN_JSON = os.getenv('GMAIL_TOKEN_JSON')  # New: Token from environment variable
 GMAIL_TOKEN_FILE = os.getenv('GMAIL_TOKEN_FILE', 'gmail_token.json')
 
 # Gmail OAuth scopes
@@ -99,16 +100,35 @@ def setup_gmail_oauth():
     try:
         creds = None
         
-        # Load existing token
-        if os.path.exists(GMAIL_TOKEN_FILE):
+        # First try to load token from environment variable (for Railway)
+        if GMAIL_TOKEN_JSON:
+            try:
+                token_info = json.loads(GMAIL_TOKEN_JSON)
+                creds = OAuthCredentials.from_authorized_user_info(token_info, GMAIL_SCOPES)
+                print("📧 Found Gmail token from environment variable")
+            except json.JSONDecodeError as e:
+                print(f"❌ Invalid JSON in GMAIL_TOKEN_JSON: {e}")
+                creds = None
+        
+        # Fallback to token file (for local development)
+        elif os.path.exists(GMAIL_TOKEN_FILE):
             creds = OAuthCredentials.from_authorized_user_file(GMAIL_TOKEN_FILE, GMAIL_SCOPES)
-            print("📧 Found existing Gmail token")
+            print("📧 Found existing Gmail token file")
         
         # If no valid credentials, get new ones
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 print("🔄 Refreshing Gmail credentials...")
                 creds.refresh(Request())
+                
+                # Save refreshed token back to file (local) or print for env var (Railway)
+                if os.path.exists(GMAIL_TOKEN_FILE):
+                    with open(GMAIL_TOKEN_FILE, 'w') as token:
+                        token.write(creds.to_json())
+                        print("💾 Gmail token refreshed and saved to file")
+                else:
+                    print("💡 Token refreshed - update GMAIL_TOKEN_JSON environment variable with:")
+                    print(creds.to_json())
             else:
                 print("🔑 Getting new Gmail credentials...")
                 
@@ -128,11 +148,13 @@ def setup_gmail_oauth():
                 flow = InstalledAppFlow.from_client_config(oauth_info, GMAIL_SCOPES)
                 creds = flow.run_local_server(port=0)
                 print("✅ Gmail authentication completed")
-            
-            # Save credentials for next run
-            with open(GMAIL_TOKEN_FILE, 'w') as token:
-                token.write(creds.to_json())
-                print("💾 Gmail token saved")
+                
+                # Save credentials for next run
+                with open(GMAIL_TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+                    print("💾 Gmail token saved to file")
+                    print("💡 For Railway deployment, add this as GMAIL_TOKEN_JSON environment variable:")
+                    print(creds.to_json())
         
         # Build Gmail service
         gmail_service = build('gmail', 'v1', credentials=creds)
