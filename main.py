@@ -101,6 +101,50 @@ service_account_email = None
 user_conversations = {}
 processing_messages = set()
 last_response_time = {}
+ASSISTANT_CONFIG = {
+    "name": "Rose Ashcombe",
+    "role": "Executive Assistant",
+    "description": "Strategic planning specialist with calendar integration, email management, and productivity optimization",
+    "emoji": "👑",
+    "color": 0xE91E63,  # Pink
+    "specialties": [
+        "📅 Executive Planning",
+        "🗓️ Calendar Management", 
+        "📊 Productivity Systems",
+        "📧 Email Management",
+        "⚡ Time Optimization",
+        "🎯 Life OS"
+    ],
+    "capabilities": [
+        "Gmail Integration - Read, send, organize, and batch delete emails",
+        "Calendar Management - Multi-calendar coordination with timezone handling",
+        "Strategic Planning - Research-backed productivity and planning insights",
+        "Morning Briefings - Comprehensive executive briefings with email and calendar data",
+        "Batch Email Cleanup - Process 25-200 emails per operation"
+    ],
+    "example_requests": [
+        "@Rose give me my morning briefing",
+        "@Rose check my unread emails",
+        "@Rose what's my schedule today?",
+        "@Rose delete all emails with 'newsletter' in subject",
+        "@Rose research time blocking strategies",
+        "@Rose help me plan my week strategically"
+    ],
+    "commands": [
+        "!briefing / !daily / !morning - Morning executive briefing",
+        "!schedule / !today - Today's executive schedule",
+        "!upcoming [days] - Upcoming events (default: 7 days)",
+        "!emails [count] - Recent emails (default: 10)",
+        "!unread [count] - Unread emails only",
+        "!emailstats - Email dashboard overview",
+        "!cleansender <email> [count] - Delete emails from sender",
+        "!plan [query] / !research [query] - Planning research",
+        "!ping - Test connectivity",
+        "!status - System status",
+        "!help - This help message"
+    ],
+    "channels": ["life-os", "calendar", "planning-hub", "general"]
+}
 
 def batch_delete_by_subject(subject_text, count=25):
     """Delete multiple emails containing specific text in subject line"""
