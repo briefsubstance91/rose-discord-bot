@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ROSE EMAIL RESPONSE OPTIMIZATION
-Script to update Rose's assistant with more concise email handling
+Script to update Rose's assistant with more concise email handling and restore briefing functions
 """
 
 import os
@@ -52,6 +52,9 @@ CALENDAR FUNCTIONS:
 - create_calendar_event(): Add new events
 - planning_search(): Research for strategic planning
 
+BRIEFING FUNCTIONS:
+- get_morning_briefing(): Comprehensive morning executive briefing with calendar and email insights
+
 GMAIL SEARCH SYNTAX EXAMPLES:
 - "from:john@company.com" - emails from specific sender
 - "subject:meeting" - emails with meeting in subject
@@ -83,9 +86,17 @@ FOR STRATEGIC PLANNING (only when explicitly requested):
 🎯 **Action Items:** [Specific next steps with timing]
 📅 **Calendar Coordination:** [Relevant scheduling information]
 
+FOR MORNING BRIEFINGS (comprehensive format):
+🌅 **Good Morning! Executive Briefing for [Date]**
+[Today's schedule details]
+[Tomorrow's preview]
+[Email summary]
+💼 **Executive Focus:** [Strategic recommendations]
+
 COMMUNICATION STYLE:
 - FOR EMAIL TASKS: Be direct, efficient, minimal formatting
 - FOR PLANNING TASKS: Use full strategic formatting with headers
+- FOR BRIEFINGS: Use comprehensive executive format
 - Professional tone but avoid unnecessary executive jargon for simple tasks
 - Keep responses under 500 characters for basic email operations
 - Toronto timezone (America/Toronto) for all scheduling
@@ -106,6 +117,7 @@ ONLY use full strategic formatting for:
 - Strategic advice requests
 - Complex coordination tasks
 - QBR and Life OS discussions
+- Morning briefings
 
 CHANNEL OWNERSHIP:
 - #life-os: Life operating system and quarterly reviews
@@ -113,6 +125,43 @@ CHANNEL OWNERSHIP:
 - #planning-hub: Strategic planning and productivity optimization
 
 Always provide executive-level insights when requested, but keep email management responses concise and action-focused."""
+
+# Briefing and planning functions that were missing
+BRIEFING_AND_PLANNING_FUNCTIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_morning_briefing",
+            "description": "Generate comprehensive morning executive briefing with calendar and strategic insights",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function", 
+        "function": {
+            "name": "planning_search",
+            "description": "Research planning and productivity topics for strategic insights",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Planning research query (e.g., 'time blocking strategies', 'executive productivity systems')"
+                    },
+                    "focus_area": {
+                        "type": "string",
+                        "description": "Focus area for research (e.g., 'productivity', 'time management', 'strategic planning')",
+                        "default": "general"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    }
+]
 
 # Additional email functions that might be missing
 ADDITIONAL_EMAIL_FUNCTIONS = [
@@ -175,9 +224,9 @@ ADDITIONAL_EMAIL_FUNCTIONS = [
 ]
 
 def update_rose_assistant():
-    """Update Rose's assistant with optimized email handling"""
+    """Update Rose's assistant with optimized email handling and restored briefing functions"""
     try:
-        print("🔄 Updating Rose's assistant for concise email responses...")
+        print("🔄 Updating Rose's assistant for concise email responses and briefing functions...")
         
         # Get current assistant details
         assistant = client.beta.assistants.retrieve(ROSE_ASSISTANT_ID)
@@ -189,14 +238,16 @@ def update_rose_assistant():
             instructions=UPDATED_INSTRUCTIONS,
         )
         
-        print("✅ Updated Rose's instructions for concise email responses")
+        print("✅ Updated Rose's instructions for concise email responses and briefings")
         
-        # Check for additional email functions
+        # Check for additional functions
         current_tools = list(assistant.tools) if assistant.tools else []
         existing_function_names = set()
         for tool in current_tools:
             if hasattr(tool, 'function') and hasattr(tool.function, 'name'):
                 existing_function_names.add(tool.function.name)
+        
+        print(f"🔍 Existing functions: {existing_function_names}")
         
         # Add missing email functions
         new_functions = []
@@ -204,7 +255,14 @@ def update_rose_assistant():
             func_name = func['function']['name']
             if func_name not in existing_function_names:
                 new_functions.append(func)
-                print(f"  ➕ Will add: {func_name}")
+                print(f"  ➕ Will add email function: {func_name}")
+        
+        # Add missing briefing and planning functions
+        for func in BRIEFING_AND_PLANNING_FUNCTIONS:
+            func_name = func['function']['name']
+            if func_name not in existing_function_names:
+                new_functions.append(func)
+                print(f"  ➕ Will add briefing function: {func_name}")
         
         if new_functions:
             # Combine existing tools with new functions
@@ -215,7 +273,9 @@ def update_rose_assistant():
                 tools=all_tools
             )
             
-            print(f"✅ Added {len(new_functions)} new email functions")
+            print(f"✅ Added {len(new_functions)} new functions")
+        else:
+            print("✅ All required functions already exist!")
         
         # Verify final configuration
         final_assistant = client.beta.assistants.retrieve(ROSE_ASSISTANT_ID)
@@ -223,9 +283,11 @@ def update_rose_assistant():
         
         print(f"\n🎯 ROSE OPTIMIZATION COMPLETE:")
         print(f"   📧 Email responses: More concise and direct")
+        print(f"   🌅 Briefing functions: Restored and enhanced")
+        print(f"   🔍 Planning research: Available")
         print(f"   🛠️ Total tools: {total_tools}")
         print(f"   📝 Instructions: Updated for context-aware formatting")
-        print(f"   ⚡ Ready for efficient email management")
+        print(f"   ⚡ Ready for efficient email management and strategic planning")
         
         return True
         
@@ -236,8 +298,9 @@ def update_rose_assistant():
 if __name__ == "__main__":
     success = update_rose_assistant()
     if success:
-        print("\n✨ Rose is now optimized for concise email management!")
+        print("\n✨ Rose is now optimized for concise email management and strategic briefings!")
         print("📧 Email operations will be brief and direct")
+        print("🌅 Morning briefings will be comprehensive and strategic")
         print("📋 Strategic responses only for planning/complex tasks")
     else:
         print("\n❌ Update failed - check error messages above")

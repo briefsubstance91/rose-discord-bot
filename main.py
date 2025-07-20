@@ -87,6 +87,100 @@ processing_messages = set()
 last_response_time = {}
 
 # ============================================================================
+# BRIEFING AND PLANNING FUNCTIONS
+# ============================================================================
+
+def get_morning_briefing():
+    """Comprehensive morning briefing with Toronto timezone handling"""
+    if not calendar_service or not accessible_calendars:
+        return "🌅 **Morning Briefing:** Calendar integration not available\n\n📋 **Manual Planning:** Review your calendar apps and prioritize your day"
+    
+    try:
+        # Use Toronto timezone for proper date calculation
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Get today's full schedule
+        today_schedule = get_today_schedule()
+        
+        # Get tomorrow's preview using Toronto timezone
+        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_toronto = today_toronto + timedelta(days=1)
+        day_after_toronto = tomorrow_toronto + timedelta(days=1)
+        
+        # Get tomorrow's events
+        tomorrow_events = get_upcoming_events(1)
+        
+        # Add email stats if Gmail is available
+        email_summary = ""
+        if gmail_service:
+            try:
+                stats = get_email_stats()
+                email_summary = f"\n\n📧 **Email Overview:**\n{stats}"
+            except Exception as e:
+                print(f"❌ Error getting email stats for briefing: {e}")
+        
+        # Combine into morning briefing with correct Toronto date
+        current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
+        briefing = f"🌅 **Good Morning! Executive Briefing for {current_time}**\n\n{today_schedule}\n\n{tomorrow_events}{email_summary}\n\n💼 **Executive Focus:** Prioritize high-impact activities during peak energy hours"
+        
+        return briefing
+        
+    except Exception as e:
+        print(f"❌ Morning briefing error: {e}")
+        print(f"📋 Morning briefing traceback: {traceback.format_exc()}")
+        return "🌅 **Morning Briefing:** Error generating briefing - please check calendar apps manually"
+
+async def planning_search(query, focus_area="general"):
+    """Research planning topics using Brave Search"""
+    if not BRAVE_API_KEY:
+        return "🔍 Research capability not available (missing API key)"
+    
+    try:
+        # Enhance query for planning content
+        planning_query = f"{query} {focus_area} productivity executive planning time management 2025"
+        
+        url = "https://api.search.brave.com/res/v1/web/search"
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": BRAVE_API_KEY
+        }
+        params = {
+            "q": planning_query,
+            "count": 5,
+            "search_lang": "en",
+            "country": "ca"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, params=params, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    results = data.get('web', {}).get('results', [])
+                    if not results:
+                        return f"🔍 No research results found for: {query}"
+                    
+                    formatted_results = []
+                    for i, result in enumerate(results[:3]):
+                        title = result.get('title', 'No title')
+                        description = result.get('description', 'No description')
+                        url_link = result.get('url', '')
+                        
+                        # Extract domain for credibility
+                        domain = url_link.split('/')[2] if len(url_link.split('/')) > 2 else 'Unknown'
+                        
+                        formatted_results.append(f"**{i+1}. {title}** ({domain})\n{description[:150]}...\n{url_link}")
+                    
+                    return f"🔍 **Planning Research: '{query}'**\n\n" + "\n\n".join(formatted_results)
+                else:
+                    return f"🔍 Research error: HTTP {response.status}"
+                    
+    except Exception as e:
+        print(f"❌ Planning search error: {e}")
+        return f"🔍 Research error: {str(e)}"
+
+# ============================================================================
 # GOOGLE SERVICES INITIALIZATION
 # ============================================================================
 
@@ -730,6 +824,25 @@ def handle_rose_functions_enhanced(run, thread_id):
                 else:
                     output = "❌ Missing required parameter: email_id"
 
+            # Briefing and planning functions
+            elif function_name == "get_morning_briefing":
+                output = get_morning_briefing()
+
+            elif function_name == "planning_search":
+                query = arguments.get('query', '')
+                focus_area = arguments.get('focus_area', 'general')
+                if query:
+                    # Run async function in sync context
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        output = loop.run_until_complete(planning_search(query, focus_area))
+                    except RuntimeError:
+                        # If no event loop is running, create a new one
+                        output = asyncio.run(planning_search(query, focus_area))
+                else:
+                    output = "❌ Missing required parameter: query"
+
             # Calendar functions
             elif function_name == "get_today_schedule":
                 output = get_today_schedule()
@@ -1145,8 +1258,35 @@ async def clean_sender_command(ctx, sender_email: str, count: int = 5):
         print(f"❌ Clean sender command error: {e}")
         await ctx.send(f"❌ Error cleaning emails from {sender_email}")
 
+# Briefing-specific Discord commands
+@bot.command(name='briefing', aliases=['daily', 'morning'])
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await send_long_message(ctx.message, briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
+
+@bot.command(name='plan', aliases=['research'])
+async def plan_command(ctx, *, query: str = ""):
+    """Planning research command"""
+    try:
+        if not query:
+            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
+            return
+        
+        async with ctx.typing():
+            research = await planning_search(query)
+            await send_long_message(ctx.message, research)
+    except Exception as e:
+        print(f"❌ Plan command error: {e}")
+        await ctx.send("🔍 Planning research unavailable. Please try again.")
+
 # Calendar-specific Discord commands
-@bot.command(name='schedule')
+@bot.command(name='schedule', aliases=['today'])
 async def schedule_command(ctx):
     """Today's schedule command"""
     try:
