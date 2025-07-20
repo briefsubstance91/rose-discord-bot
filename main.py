@@ -102,6 +102,187 @@ user_conversations = {}
 processing_messages = set()
 last_response_time = {}
 
+def batch_delete_by_subject(subject_text, count=25):
+    """Delete multiple emails containing specific text in subject line"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails with subject text
+        query = f"subject:{subject_text}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=min(count, 100)  # Cap at 100 for safety
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Batch Cleanup:** No emails found with '{subject_text}' in subject"
+        
+        deleted_count = 0
+        failed_count = 0
+        
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me', 
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as e:
+                print(f"❌ Error deleting email {message['id']}: {e}")
+                failed_count += 1
+        
+        status = "Success" if failed_count == 0 else f"Partial ({failed_count} failed)"
+        return f"📧 **Batch Cleanup:** Deleted emails with '{subject_text}'\n📊 **Processed:** {deleted_count} emails deleted\n🎯 **Status:** {status}"
+        
+    except Exception as e:
+        print(f"❌ Error in batch_delete_by_subject: {e}")
+        return f"❌ Error in batch cleanup: {str(e)}"
+
+def batch_archive_old_emails(days_old, query_filter="", count=50):
+    """Archive emails older than specified days"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Build query for old emails
+        query = f"older_than:{days_old}d"
+        if query_filter:
+            query += f" {query_filter}"
+        
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=min(count, 200)  # Cap at 200 for bulk operations
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Batch Cleanup:** No emails found older than {days_old} days"
+        
+        archived_count = 0
+        failed_count = 0
+        
+        for message in messages:
+            try:
+                gmail_service.users().messages().modify(
+                    userId='me',
+                    id=message['id'],
+                    body={'removeLabelIds': ['INBOX']}
+                ).execute()
+                archived_count += 1
+            except Exception as e:
+                print(f"❌ Error archiving email {message['id']}: {e}")
+                failed_count += 1
+        
+        status = "Success" if failed_count == 0 else f"Partial ({failed_count} failed)"
+        return f"📧 **Batch Cleanup:** Archived emails older than {days_old} days\n📊 **Processed:** {archived_count} emails archived\n🎯 **Status:** {status}"
+        
+    except Exception as e:
+        print(f"❌ Error in batch_archive_old_emails: {e}")
+        return f"❌ Error in batch archive: {str(e)}"
+
+def cleanup_promotional_emails(action="archive", count=50):
+    """Clean up promotional/marketing emails in bulk"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for promotional emails using common patterns
+        promotional_queries = [
+            "category:promotions",
+            "unsubscribe OR newsletter OR marketing OR promotion",
+            "from:noreply OR from:no-reply"
+        ]
+        
+        all_messages = []
+        for query in promotional_queries:
+            try:
+                search_result = gmail_service.users().messages().list(
+                    userId='me', 
+                    q=query, 
+                    maxResults=count // len(promotional_queries)  # Distribute across queries
+                ).execute()
+                all_messages.extend(search_result.get('messages', []))
+            except Exception as e:
+                print(f"❌ Error searching with query '{query}': {e}")
+        
+        # Remove duplicates
+        unique_messages = {msg['id']: msg for msg in all_messages}.values()
+        messages_to_process = list(unique_messages)[:count]
+        
+        if not messages_to_process:
+            return f"📧 **Batch Cleanup:** No promotional emails found"
+        
+        processed_count = 0
+        failed_count = 0
+        
+        for message in messages_to_process:
+            try:
+                if action == "delete":
+                    gmail_service.users().messages().trash(
+                        userId='me', 
+                        id=message['id']
+                    ).execute()
+                else:  # archive
+                    gmail_service.users().messages().modify(
+                        userId='me',
+                        id=message['id'],
+                        body={'removeLabelIds': ['INBOX']}
+                    ).execute()
+                processed_count += 1
+            except Exception as e:
+                print(f"❌ Error processing email {message['id']}: {e}")
+                failed_count += 1
+        
+        action_word = "deleted" if action == "delete" else "archived"
+        status = "Success" if failed_count == 0 else f"Partial ({failed_count} failed)"
+        return f"📧 **Batch Cleanup:** {action_word.title()} promotional emails\n📊 **Processed:** {processed_count} emails {action_word}\n🎯 **Status:** {status}"
+        
+    except Exception as e:
+        print(f"❌ Error in cleanup_promotional_emails: {e}")
+        return f"❌ Error in promotional cleanup: {str(e)}"
+
+def get_recent_emails_large(count=50, query="in:inbox"):
+    """Get large number of recent emails for review (up to 100)"""
+    try:
+        if not gmail_service:
+            return "📧 Gmail integration not available"
+        
+        # Cap the count at 100 for performance
+        safe_count = min(count, 100)
+        
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=safe_count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found for query: {query}"
+        
+        email_list = []
+        for msg in messages[:safe_count]:
+            email_data = get_email_details(msg['id'])
+            if email_data:
+                email_list.append(format_email_concise(email_data))
+        
+        if email_list:
+            total_size = results.get('resultSizeEstimate', len(email_list))
+            return f"📧 **Large Email Review** ({len(email_list)} of {total_size} emails):\n\n" + "\n\n".join(email_list)
+        else:
+            return "📧 No emails retrieved"
+            
+    except Exception as e:
+        print(f"❌ Error getting large email list: {e}")
+        return f"❌ Error retrieving emails: {str(e)}"
+
 # ============================================================================
 # BRIEFING AND PLANNING FUNCTIONS
 # ============================================================================
@@ -924,6 +1105,34 @@ def handle_rose_functions_enhanced(run, thread_id):
                     output = mark_email_as_important(email_id)
                 else:
                     output = "❌ Missing required parameter: email_id"
+
+            # Batch cleanup functions
+            elif function_name == "batch_delete_by_subject":
+                subject_text = arguments.get('subject_text', '')
+                count = arguments.get('count', 25)
+                if subject_text:
+                    output = batch_delete_by_subject(subject_text, count)
+                else:
+                    output = "❌ Missing required parameter: subject_text"
+
+            elif function_name == "batch_archive_old_emails":
+                days_old = arguments.get('days_old', 0)
+                query_filter = arguments.get('query_filter', '')
+                count = arguments.get('count', 50)
+                if days_old > 0:
+                    output = batch_archive_old_emails(days_old, query_filter, count)
+                else:
+                    output = "❌ Missing or invalid parameter: days_old (must be > 0)"
+
+            elif function_name == "cleanup_promotional_emails":
+                action = arguments.get('action', 'archive')
+                count = arguments.get('count', 50)
+                output = cleanup_promotional_emails(action, count)
+
+            elif function_name == "get_recent_emails_large":
+                count = arguments.get('count', 50)
+                query = arguments.get('query', 'in:inbox')
+                output = get_recent_emails_large(count, query)
 
             # Briefing and planning functions
             elif function_name == "get_morning_briefing":
