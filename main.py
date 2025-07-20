@@ -700,7 +700,76 @@ def get_email_stats():
         
     except Exception as e:
         print(f"❌ Email stats error: {e}")
-        return f"❌ Error retrieving email statistics: {str(e)}"
+def delete_email(email_id):
+    """Move email to trash"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().trash(
+            userId='me',
+            id=email_id
+        ).execute()
+        
+        return f"✅ Email moved to trash (ID: {email_id})"
+        
+    except Exception as e:
+        print(f"❌ Delete email error: {e}")
+        return f"❌ Failed to delete email: {str(e)}"
+
+def archive_email(email_id):
+    """Archive email (remove from inbox)"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"✅ Email archived (ID: {email_id})"
+        
+    except Exception as e:
+        print(f"❌ Archive email error: {e}")
+        return f"❌ Failed to archive email: {str(e)}"
+
+def delete_emails_from_sender(sender_email, count=10):
+    """Delete emails from a specific sender"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Search for emails from sender
+        query = f"from:{sender_email}"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found from {sender_email}"
+        
+        deleted_count = 0
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as e:
+                print(f"❌ Error deleting message {message['id']}: {e}")
+        
+        return f"✅ **{deleted_count} emails deleted** from {sender_email}\n📧 Moved to trash successfully"
+        
+    except Exception as e:
+        print(f"❌ Delete emails error: {e}")
+        return f"❌ Failed to delete emails from {sender_email}: {str(e)}"
 
 # ============================================================================
 # ENHANCED FUNCTION HANDLING
@@ -775,6 +844,28 @@ async def handle_rose_functions_enhanced(run, thread_id):
 
             elif function_name == "get_email_stats":
                 output = get_email_stats()
+
+            elif function_name == "delete_email":
+                email_id = arguments.get('email_id', '')
+                if email_id:
+                    output = delete_email(email_id)
+                else:
+                    output = "❌ Missing required parameter: email_id"
+
+            elif function_name == "archive_email":
+                email_id = arguments.get('email_id', '')
+                if email_id:
+                    output = archive_email(email_id)
+                else:
+                    output = "❌ Missing required parameter: email_id"
+
+            elif function_name == "delete_emails_from_sender":
+                sender_email = arguments.get('sender_email', '')
+                count = arguments.get('count', 10)
+                if sender_email:
+                    output = delete_emails_from_sender(sender_email, count)
+                else:
+                    output = "❌ Missing required parameter: sender_email"
                 
             else:
                 output = f"❓ Function {function_name} not implemented yet"
