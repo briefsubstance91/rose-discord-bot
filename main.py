@@ -665,7 +665,9 @@ if __name__ == "__main__":
     
     try:
         # Initialize services
-        asyncio.run(initialize_services())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(initialize_services())
         
         # Run the bot
         bot.run(DISCORD_TOKEN)
@@ -673,7 +675,7 @@ if __name__ == "__main__":
         print(f"\n👑 {ASSISTANT_NAME} shutting down gracefully...")
     except Exception as e:
         print(f"❌ Fatal error: {e}")
-        print(traceback.format_exc()) e:
+        print(traceback.format_exc())
         print(f"❌ Error initializing Gmail Calendar service: {e}")
         return None
 
