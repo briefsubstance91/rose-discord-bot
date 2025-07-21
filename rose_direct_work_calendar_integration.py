@@ -2,7 +2,7 @@
 """
 ROSE DIRECT WORK CALENDAR INTEGRATION
 Rose accesses work calendar directly from Gmail account
-Eliminates need for Vivian intermediary - cleaner architecture
+Run this script to update Rose's OpenAI assistant with direct Gmail calendar functions
 """
 
 from openai import OpenAI

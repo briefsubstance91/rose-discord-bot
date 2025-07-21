@@ -1,0 +1,4 @@
+# Rose Gmail Calendar Integration Environment Variables
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+GMAIL_WORK_CALENDAR_ID=primary
+WEATHER_API_KEY=your_weather_key_optional
