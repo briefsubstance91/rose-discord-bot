@@ -919,9 +919,9 @@ async def ping_command(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f"👑 Rose responding in {latency}ms")
 
-@bot.command(name='help')
-async def help_command(ctx):
-    """Show enhanced help with weather commands"""
+@bot.command(name='commands')
+async def commands_command(ctx):
+    """Show enhanced help with weather commands (renamed from 'help' to avoid conflict)"""
     help_text = f"""👑 **{ASSISTANT_NAME} - Executive Assistant Commands**
 
 🌤️ **Weather & Briefing:**
@@ -938,7 +938,7 @@ async def help_command(ctx):
 ⚙️ **System Commands:**
    `!status` - System status & integration check
    `!ping` - Response time test
-   `!help` - This help message
+   `!commands` - This help message
 
 💼 **Executive Features:**
    • Weather-integrated morning briefings
@@ -964,11 +964,11 @@ async def on_error(event, *args, **kwargs):
 async def on_command_error(ctx, error):
     """Enhanced command error handling"""
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send("👑 Rose: I don't recognize that command. Use `!help` for available commands.")
+        await ctx.send("👑 Rose: I don't recognize that command. Use `!commands` for available commands.")
     elif isinstance(error, commands.BadArgument):
         await ctx.send("👑 Rose: Invalid argument. Please check the command format.")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("👑 Rose: Missing required argument. Use `!help` for command details.")
+        await ctx.send("👑 Rose: Missing required argument. Use `!commands` for command details.")
     else:
         print(f"❌ Command error: {error}")
         await ctx.send("👑 Rose: I encountered an error processing your command. Please try again.")
@@ -1026,7 +1026,15 @@ if __name__ == "__main__":
     # Test weather if configured
     if WEATHER_API_KEY:
         print("🧪 Testing weather integration...")
-        asyncio.create_task(test_weather_integration())
+        try:
+            # Run weather test in main thread since we're not in async context yet
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(test_weather_integration())
+            loop.close()
+        except Exception as e:
+            print(f"⚠️ Weather test failed: {e}")
     
     # Start the Discord bot
     try:
