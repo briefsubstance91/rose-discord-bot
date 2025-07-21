@@ -495,7 +495,7 @@ def get_upcoming_events(days=7):
         print(f"📋 Calendar traceback: {traceback.format_exc()}")
         return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
 
-def get_morning_briefing():
+async def get_morning_briefing():
     """ENHANCED morning briefing with WEATHER at the top + calendar integration"""
     try:
         # Use Toronto timezone for proper date calculation
@@ -503,7 +503,7 @@ def get_morning_briefing():
         current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
         
         # 1. GET WEATHER FIRST (NEW - at the top!)
-        weather_section = asyncio.run(get_weather_briefing())
+        weather_section = await get_weather_briefing()
         
         # 2. Get today's schedule
         if calendar_service and accessible_calendars:
@@ -682,7 +682,7 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 output = get_upcoming_events(days)
                 
             elif function_name == "get_morning_briefing":
-                output = get_morning_briefing()
+                output = await get_morning_briefing()
                 
             else:
                 output = f"❓ Function {function_name} not fully implemented yet"
@@ -848,7 +848,7 @@ async def on_message(message):
 async def morning_briefing_command(ctx):
     """Get Rose's comprehensive morning briefing with weather"""
     async with ctx.typing():
-        briefing = get_morning_briefing()
+        briefing = await get_morning_briefing()
         
         # Split if too long for Discord
         if len(briefing) <= 2000:
