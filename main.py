@@ -32,6 +32,56 @@ ASSISTANT_NAME = "Rose Ashcombe"
 ASSISTANT_ROLE = "Executive Assistant (Enhanced with Weather)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
+# Rose configuration for Universal Status System
+ROSE_CONFIG = {
+    "name": "Rose Ashcombe",
+    "role": "Executive Assistant",
+    "description": "Strategic planning specialist with calendar integration, email management, and productivity optimization",
+    "emoji": "👑",
+    "color": 0xE91E63,  # Pink
+    "specialties": [
+        "📅 Executive Planning",
+        "🗓️ Calendar Management", 
+        "📊 Productivity Systems",
+        "⚡ Time Optimization",
+        "🎯 Life OS"
+    ],
+    "capabilities": [
+        "Multi-calendar coordination (personal + work)",
+        "Weather-integrated morning briefings",
+        "Strategic planning & productivity research",
+        "Email management & organization",
+        "Executive schedule optimization"
+    ],
+    "example_requests": [
+        "@Rose give me my morning briefing",
+        "@Rose check my unread emails",
+        "@Rose what's my schedule today?",
+        "@Rose delete all emails with 'newsletter' in subject",
+        "@Rose research time blocking strategies",
+        "@Rose help me plan my week strategically"
+    ],
+    "commands": [
+        "!briefing - Complete morning briefing with weather",
+        "!weather - Current weather & UV index",
+        "!schedule - Today's calendar (all calendars)",
+        "!upcoming [days] - View upcoming events",
+        "!emails [count] - Recent emails (default: 10)",
+        "!unread [count] - Unread emails only",
+        "!emailstats - Email dashboard overview",
+        "!quickemails [count] - Concise email view",
+        "!emailcount - Just email counts",
+        "!cleansender <email> [count] - Delete emails from sender",
+        "!ping - Test connectivity",
+        "!status - Show system status",
+        "!help - Show this help message"
+    ],
+    "channels": ["life-os", "calendar", "planning-hub", "general"]
+}
+
+# Set the assistant config for universal commands
+ASSISTANT_CONFIG = ROSE_CONFIG
+
 # Environment variables with fallbacks
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("ROSE_DISCORD_TOKEN")
 ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
@@ -64,11 +114,11 @@ if not ASSISTANT_ID:
     print("❌ CRITICAL: ROSE_ASSISTANT_ID not found in environment variables")
     exit(1)
 
-# Discord setup with error handling
+# Discord setup with error handling - DISABLE DEFAULT HELP
 try:
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = commands.Bot(command_prefix='!', intents=intents)
+    bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)  # Disable default help
     
     # Initialize OpenAI client
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -894,65 +944,173 @@ async def upcoming_command(ctx, days: int = 7):
                 await ctx.send(chunk)
                 await asyncio.sleep(0.5)
 
-@bot.command(name='status')
-async def status_command(ctx):
-    """Check Rose's system status including weather integration"""
-    status_report = f"""👑 **{ASSISTANT_NAME} System Status**
-
-🤖 **OpenAI Assistant:** {'✅ Connected' if ASSISTANT_ID else '❌ Not Configured'}
-📅 **Calendar Integration:** {'✅ Active' if google_services_initialized else '❌ Inactive'}
-🌤️ **Weather API:** {'✅ Configured' if WEATHER_API_KEY else '❌ Not Configured'}
-🔍 **Planning Search:** {'✅ Available' if BRAVE_API_KEY else '❌ Not Available'}
-
-📊 **Accessible Calendars:** {len(accessible_calendars) if accessible_calendars else 0}
-🎯 **Active Channels:** {', '.join(ALLOWED_CHANNELS)}
-⚡ **Active Runs:** {len(active_runs)}
-
-💼 **Executive Features:**
-   • Morning briefing with weather
-   • Calendar integration & scheduling (including work calendar)
-   • Planning research & productivity
-   • UV index & weather advisory"""
-    
-    await ctx.send(status_report)
-
 @bot.command(name='ping')
-async def ping_command(ctx):
-    """Test Rose's responsiveness"""
-    latency = round(bot.latency * 1000)
-    await ctx.send(f"👑 Rose responding in {latency}ms")
+async def ping(ctx):
+    """Universal ping command - Rose's version"""
+    try:
+        latency = round(bot.latency * 1000)
+        config = ASSISTANT_CONFIG
+        await ctx.send(f"{config['emoji']} Pong! Latency: {latency}ms - {config['role']} operations running smoothly!")
+    except Exception as e:
+        print(f"❌ Ping command error: {e}")
 
-@bot.command(name='commands')
-async def commands_command(ctx):
-    """Show enhanced help with weather commands (renamed from 'help' to avoid conflict)"""
-    help_text = f"""👑 **{ASSISTANT_NAME} - Executive Assistant Commands**
+@bot.command(name='status')
+async def status(ctx):
+    """Universal status command - Rose's enhanced version"""
+    try:
+        config = ASSISTANT_CONFIG
+        
+        embed = discord.Embed(
+            title=f"{config['emoji']} {config['name']} - {config['role']}",
+            description=config['description'],
+            color=config['color']
+        )
+        
+        # Connection status
+        embed.add_field(
+            name="🔗 OpenAI Assistant",
+            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
+            inline=True
+        )
+        
+        # Calendar Access
+        embed.add_field(
+            name="📅 Calendar Access", 
+            value="✅ Connected" if calendar_service else "❌ Not configured",
+            inline=True
+        )
+        
+        # Gmail Access (if configured)
+        embed.add_field(
+            name="📧 Gmail Access",
+            value="🔧 Email functions pending" if not globals().get('gmail_service') else "✅ Connected",
+            inline=True
+        )
+        
+        # Weather capability
+        embed.add_field(
+            name="🌤️ Weather API",
+            value="✅ Available" if WEATHER_API_KEY else "❌ Not configured",
+            inline=True
+        )
+        
+        # Search capability
+        embed.add_field(
+            name="🔍 Web Search",
+            value="✅ Available" if BRAVE_API_KEY else "❌ Not configured",
+            inline=True
+        )
+        
+        # Accessible calendars detail
+        calendars_detail = f"{len(accessible_calendars)} calendars"
+        if accessible_calendars:
+            calendar_types = [cal[0] for cal in accessible_calendars]
+            calendars_detail = "\n".join(calendar_types[:5])  # Limit to 5 for space
+        
+        embed.add_field(
+            name="📊 Accessible Calendars",
+            value=calendars_detail,
+            inline=True
+        )
+        
+        # Specialties
+        specialties_text = "\n".join([f"• {spec}" for spec in config['specialties']])
+        embed.add_field(
+            name="🎯 Specialties",
+            value=specialties_text,
+            inline=False
+        )
+        
+        # Active status
+        embed.add_field(
+            name="📊 Active Status",
+            value=f"👥 Active Runs: {len(active_runs)}\n📍 Location: {USER_CITY}\n🎯 Channels: {len(ALLOWED_CHANNELS)}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        print(f"❌ Status command error: {e}")
+        await ctx.send("❌ Error generating status report")
 
-🌤️ **Weather & Briefing:**
-   `!briefing` - Complete morning briefing with weather
-   `!weather` - Current weather & UV index
-
-📅 **Calendar Management:**
-   `!schedule` - Today's calendar (all calendars including work)
-   `!upcoming [days]` - Upcoming events (default 7 days)
-
-🔍 **Planning & Research:**
-   Just mention @Rose or start with "Rose" for planning assistance
-
-⚙️ **System Commands:**
-   `!status` - System status & integration check
-   `!ping` - Response time test
-   `!commands` - This help message
-
-💼 **Executive Features:**
-   • Weather-integrated morning briefings
-   • Multi-calendar schedule optimization (personal + work)
-   • UV index & outdoor planning advice
-   • Strategic planning research
-
-📍 **Current Location:** {USER_CITY}
-🎯 **Active Channels:** {', '.join(ALLOWED_CHANNELS)}"""
-    
-    await ctx.send(help_text)
+@bot.command(name='help')
+async def help_command(ctx):
+    """Universal help command - Rose's version"""
+    try:
+        config = ASSISTANT_CONFIG
+        
+        embed = discord.Embed(
+            title=f"{config['emoji']} {config['name']} - {config['role']}",
+            description=config['description'],
+            color=config['color']
+        )
+        
+        # How to use
+        embed.add_field(
+            name="💬 How to Use",
+            value=f"• Mention @{config['name']} for executive assistance and strategic planning\n• Use commands below for specific functions\n• I monitor: {', '.join([f'#{ch}' for ch in config['channels']])}",
+            inline=False
+        )
+        
+        # Commands - Split into sections for better organization
+        calendar_commands = [
+            "!briefing - Complete morning briefing",
+            "!schedule - Today's calendar", 
+            "!upcoming [days] - Upcoming events",
+            "!weather - Current weather & UV"
+        ]
+        
+        email_commands = [
+            "!emails [count] - Recent emails",
+            "!unread [count] - Unread only",
+            "!emailstats - Email dashboard",
+            "!cleansender <email> - Delete from sender"
+        ]
+        
+        system_commands = [
+            "!status - System status",
+            "!ping - Test response",
+            "!help - This message"
+        ]
+        
+        embed.add_field(
+            name="📅 Calendar & Briefing",
+            value="\n".join([f"• {cmd}" for cmd in calendar_commands]),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📧 Email Management",
+            value="\n".join([f"• {cmd}" for cmd in email_commands]) + "\n*(Email functions coming soon)*",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="⚙️ System",
+            value="\n".join([f"• {cmd}" for cmd in system_commands]),
+            inline=False
+        )
+        
+        # Example requests
+        examples_text = "\n".join([f"• {ex}" for ex in config['example_requests'][:4]])  # Limit to 4
+        embed.add_field(
+            name="✨ Example Requests",
+            value=examples_text,
+            inline=False
+        )
+        
+        # Capabilities
+        capabilities_text = "\n".join([f"• {cap}" for cap in config['capabilities']])
+        embed.add_field(
+            name="🎯 Executive Capabilities",
+            value=capabilities_text,
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        print(f"❌ Help command error: {e}")
+        await ctx.send("❌ Error generating help information")
 
 # ============================================================================
 # ERROR HANDLING AND LOGGING
