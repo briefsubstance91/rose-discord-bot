@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Executive Assistant with Direct Work Calendar Access, Weather Integration & Planning
-UPDATED: Added direct Gmail work calendar access - no dependency on Vivian
+ROSE ASHCOMBE - DISCORD BOT (ENHANCED WITH WORK CALENDAR INTEGRATION)
+Executive Assistant with Work Calendar Access, Weather Integration & Planning
+UPDATED: Added work calendar access while preserving all personal calendar functionality
 """
 
 import pytz
@@ -28,7 +29,6 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Direct Work Calendar)"
 ASSISTANT_ROLE = "Executive Assistant (Work + Personal Calendar)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
