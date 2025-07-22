@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ROSE ASHCOMBE - DISCORD BOT (ENHANCED WITH WORK CALENDAR INTEGRATION)
-Executive Assistant with Work Calendar Access, Weather Integration & Planning
-UPDATED: Added work calendar access while preserving all personal calendar functionality
+ROSE ASHCOMBE - DISCORD BOT (ENHANCED WITH WEATHER INTEGRATION)
+Executive Assistant with Enhanced Error Handling, Planning, Calendar & Weather Functions
+UPDATED: Added WeatherAPI.com integration to morning briefings
+UPDATED: Added Gmail Work Calendar integration
 """
-
 import pytz
 import discord
 from discord.ext import commands
@@ -29,7 +29,7 @@ load_dotenv()
 
 # Rose's executive configuration
 ASSISTANT_NAME = "Rose Ashcombe"
-ASSISTANT_ROLE = "Executive Assistant (Work + Personal Calendar)"
+ASSISTANT_ROLE = "Executive Assistant (Enhanced with Weather)"
 ALLOWED_CHANNELS = ['life-os', 'calendar', 'planning-hub', 'general']
 
 # Environment variables with fallbacks
@@ -38,22 +38,18 @@ ASSISTANT_ID = os.getenv("ROSE_ASSISTANT_ID") or os.getenv("ASSISTANT_ID")
 BRAVE_API_KEY = os.getenv('BRAVE_API_KEY')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Weather API configuration
+# Weather API configuration (NEW)
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
-USER_CITY = os.getenv('USER_CITY', 'Toronto')
-USER_LAT = os.getenv('USER_LAT')
+USER_CITY = os.getenv('USER_CITY', 'Toronto')  # Default to Toronto
+USER_LAT = os.getenv('USER_LAT')  # Optional coordinates for precision
 USER_LON = os.getenv('USER_LON')
 
-# Enhanced calendar integration
+# Enhanced calendar integration with better error handling
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-
-# Work calendar configuration (separate)
-GMAIL_WORK_CALENDAR_ID = os.getenv('GMAIL_WORK_CALENDAR_ID', 'primary')
-
-# Personal calendar configuration (preserved as original)
-GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
-GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')
-BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')
+GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')  # Primary BG Calendar
+GOOGLE_TASKS_CALENDAR_ID = os.getenv('GOOGLE_TASKS_CALENDAR_ID')  # BG Tasks
+BRITT_ICLOUD_CALENDAR_ID = os.getenv('BRITT_ICLOUD_CALENDAR_ID')  # Britt iCloud
+GMAIL_WORK_CALENDAR_ID = os.getenv('GMAIL_WORK_CALENDAR_ID')  # Gmail Work Calendar
 
 # Validate critical environment variables
 if not DISCORD_TOKEN:
@@ -73,537 +69,721 @@ try:
     intents = discord.Intents.default()
     intents.message_content = True
     bot = commands.Bot(command_prefix='!', intents=intents)
+    
+    # Initialize OpenAI client
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    
+    # Active runs tracking for rate limiting
+    active_runs = {}
+    
+    print(f"✅ {ASSISTANT_NAME} initialized successfully")
+    print(f"🤖 OpenAI Assistant ID: {ASSISTANT_ID}")
+    print(f"🌤️ Weather API configured: {'✅ Yes' if WEATHER_API_KEY else '❌ No'}")
+    
 except Exception as e:
-    print(f"❌ Discord setup error: {e}")
+    print(f"❌ CRITICAL: Failed to initialize {ASSISTANT_NAME}: {e}")
     exit(1)
 
-# Initialize OpenAI client
-try:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    print("✅ OpenAI client initialized")
-except Exception as e:
-    print(f"❌ OpenAI initialization error: {e}")
-    exit(1)
-
-# Global variables for system state
-google_services_initialized = False
-accessible_calendars = []
-work_calendar_service = None  # NEW: Separate work calendar service
-active_runs = {}
-
 # ============================================================================
-# WORK CALENDAR INTEGRATION FUNCTIONS (NEW)
+# WEATHER INTEGRATION FUNCTIONS (NEW)
 # ============================================================================
 
-def initialize_work_calendar_service():
-    """Initialize work calendar service (separate from personal calendars)"""
-    global work_calendar_service
-    
-    if not GOOGLE_SERVICE_ACCOUNT_JSON:
-        print("⚠️ Work calendar credentials not configured")
-        return None
-    
+def get_uv_advice(uv_index):
+    """Convert UV index number to actionable advice for executive briefing"""
     try:
-        # Parse the JSON credentials for work calendar
-        credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-        credentials = Credentials.from_service_account_info(
-            credentials_info,
-            scopes=['https://www.googleapis.com/auth/calendar.readonly']
-        )
-        
-        # Build work calendar service
-        work_calendar_service = build('calendar', 'v3', credentials=credentials)
-        
-        # Test work calendar access
-        try:
-            calendar_id = GMAIL_WORK_CALENDAR_ID
-            work_calendar_service.events().list(
-                calendarId=calendar_id,
-                maxResults=1,
-                timeMin=datetime.now().isoformat() + 'Z'
-            ).execute()
-            print(f"✅ Work Calendar (Gmail) accessible - {calendar_id}")
-            return work_calendar_service
-        except Exception as e:
-            print(f"❌ Work Calendar inaccessible: {e}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Work Calendar initialization error: {e}")
-        return None
+        uv = float(uv_index)
+        if uv <= 2:
+            return "Low - Minimal protection needed"
+        elif uv <= 5:
+            return "Moderate - Seek shade during midday"
+        elif uv <= 7:
+            return "High - Protection essential (sunscreen, hat)"
+        elif uv <= 10:
+            return "Very High - Extra precautions required"
+        else:
+            return "Extreme - Avoid outdoor exposure"
+    except (ValueError, TypeError):
+        return "Monitor conditions throughout day"
 
-def get_work_events_for_briefing(days_ahead=1):
-    """Get work events specifically for briefings (minimal function)"""
-    if not work_calendar_service:
-        return {"error": "Work calendar service not available"}
+def get_weather_emoji(condition_text):
+    """Convert weather condition to appropriate emoji for briefing"""
+    condition = condition_text.lower()
     
-    try:
-        # Set timezone to Toronto
-        tz = timezone(timedelta(hours=-4))  # EDT (adjust for EST/EDT as needed)
-        
-        # Get today's work events
-        start_time = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        end_time = start_time + timedelta(days=days_ahead)
-        
-        # Query work calendar
-        events_result = work_calendar_service.events().list(
-            calendarId=GMAIL_WORK_CALENDAR_ID,
-            timeMin=start_time.isoformat(),
-            timeMax=end_time.isoformat(),
-            singleEvents=True,
-            orderBy='startTime',
-            maxResults=20
-        ).execute()
-        
-        events = events_result.get('items', [])
-        
-        work_events = []
-        for event in events:
-            summary = event.get('summary', 'No title')
-            start = event.get('start', {})
-            
-            if 'dateTime' in start:
-                try:
-                    start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
-                    formatted_time = start_dt.strftime("%I:%M %p")
-                except:
-                    formatted_time = "Time TBD"
-            else:
-                formatted_time = "All day"
-            
-            work_events.append({
-                'summary': summary,
-                'time': formatted_time,
-                'raw_start': start
-            })
-        
-        return {
-            "success": True,
-            "events": work_events,
-            "count": len(work_events)
-        }
-        
-    except Exception as e:
-        return {"error": f"Error accessing work calendar: {e}"}
-
-# ============================================================================
-# WEATHER INTEGRATION FUNCTIONS (PRESERVED)
-# ============================================================================
+    if 'sunny' in condition or 'clear' in condition:
+        return "☀️"
+    elif 'partly cloudy' in condition or 'partly' in condition:
+        return "⛅"
+    elif 'cloudy' in condition or 'overcast' in condition:
+        return "☁️"
+    elif 'rain' in condition or 'drizzle' in condition:
+        return "🌧️"
+    elif 'snow' in condition:
+        return "❄️"
+    elif 'storm' in condition or 'thunder' in condition:
+        return "⛈️"
+    elif 'fog' in condition or 'mist' in condition:
+        return "🌫️"
+    else:
+        return "🌤️"  # Default weather emoji
 
 async def get_weather_briefing():
-    """Get current weather conditions with UV index"""
+    """
+    Get comprehensive weather briefing for Rose's executive summary
+    Returns formatted weather section for the morning briefing
+    """
     if not WEATHER_API_KEY:
-        return "🌤️ **Weather**: Weather API not configured"
+        return "🌤️ **Weather:** Configure WEATHER_API_KEY for weather updates"
     
     try:
-        # Use coordinates if available, otherwise city name
+        # Determine location parameter (coordinates preferred for accuracy)
         if USER_LAT and USER_LON:
             location = f"{USER_LAT},{USER_LON}"
+            location_display = f"{USER_CITY} ({USER_LAT}, {USER_LON})"
         else:
             location = USER_CITY
+            location_display = USER_CITY
         
-        url = f"http://api.weatherapi.com/v1/current.json"
+        # WeatherAPI.com current weather endpoint (includes UV index)
+        url = "http://api.weatherapi.com/v1/current.json"
         params = {
             'key': WEATHER_API_KEY,
             'q': location,
-            'aqi': 'no'
+            'aqi': 'no'  # We don't need air quality for basic briefing
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    current = data['current']
-                    location_data = data['location']
-                    
-                    # Get weather condition emoji
-                    condition = current['condition']['text']
-                    temp_c = current['temp_c']
-                    feels_like = current['feelslike_c']
-                    humidity = current['humidity']
-                    uv_index = current['uv']
-                    
-                    # UV advisory
-                    if uv_index <= 2:
-                        uv_advisory = "Low - Minimal protection needed"
-                    elif uv_index <= 5:
-                        uv_advisory = "Moderate - Protection recommended"
-                    elif uv_index <= 7:
-                        uv_advisory = "High - Protection essential"
-                    elif uv_index <= 10:
-                        uv_advisory = "Very High - Extra protection required"
-                    else:
-                        uv_advisory = "Extreme - Avoid sun exposure"
-                    
-                    # Weather emoji mapping
-                    condition_lower = condition.lower()
-                    if 'sunny' in condition_lower or 'clear' in condition_lower:
-                        emoji = '☀️'
-                    elif 'partly' in condition_lower or 'cloud' in condition_lower:
-                        emoji = '⛅'
-                    elif 'overcast' in condition_lower:
-                        emoji = '☁️'
-                    elif 'rain' in condition_lower:
-                        emoji = '🌧️'
-                    elif 'snow' in condition_lower:
-                        emoji = '❄️'
-                    else:
-                        emoji = '🌤️'
-                    
-                    return {
-                        'temperature': temp_c,
-                        'condition': condition,
-                        'emoji': emoji,
-                        'feels_like': feels_like,
-                        'humidity': humidity,
-                        'uv_index': uv_index,
-                        'uv_advisory': uv_advisory,
-                        'location': location_data['name']
-                    }
-                else:
-                    return "🌤️ **Weather**: Unable to fetch weather data"
-                    
+        print(f"🌍 Fetching weather for {location_display}...")
+        
+        # Make API request with timeout
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Extract weather data
+            current = data['current']
+            location_data = data['location']
+            
+            temp_c = current['temp_c']
+            feels_like_c = current['feelslike_c']
+            humidity = current['humidity']
+            condition = current['condition']['text']
+            uv_index = current['uv']
+            wind_kph = current['wind_kph']
+            wind_dir = current['wind_dir']
+            
+            # Get weather emoji and UV advice
+            weather_emoji = get_weather_emoji(condition)
+            uv_advice = get_uv_advice(uv_index)
+            
+            # Format local time
+            local_time = location_data['localtime']
+            
+            # Create comprehensive weather briefing
+            weather_briefing = f"""🌤️ **Weather Update** ({local_time})
+📍 **{location_data['name']}, {location_data['country']}:** {temp_c}°C {weather_emoji} {condition}
+🌡️ **Feels like:** {feels_like_c}°C | **Humidity:** {humidity}%
+🌬️ **Wind:** {wind_kph} km/h {wind_dir}
+🔆 **UV Index:** {uv_index} - {uv_advice}"""
+            
+            print(f"✅ Weather data retrieved successfully: {temp_c}°C, UV: {uv_index}")
+            return weather_briefing
+            
+        elif response.status_code == 401:
+            return "🌤️ **Weather:** Invalid API key - check WEATHER_API_KEY configuration"
+        elif response.status_code == 400:
+            return f"🌤️ **Weather:** Location '{location}' not found - check USER_CITY setting"
+        else:
+            return f"🌤️ **Weather:** Service temporarily unavailable (Status: {response.status_code})"
+            
+    except requests.exceptions.Timeout:
+        return "🌤️ **Weather:** Request timeout - service may be slow"
+    except requests.exceptions.ConnectionError:
+        return "🌤️ **Weather:** Connection error - check internet connectivity"
+    except KeyError as e:
+        print(f"❌ Weather API response missing key: {e}")
+        return f"🌤️ **Weather:** Data format error - missing {e}"
     except Exception as e:
-        print(f"❌ Weather API error: {e}")
-        return "🌤️ **Weather**: Weather service temporarily unavailable"
+        print(f"❌ Weather briefing error: {e}")
+        print(f"📋 Weather briefing traceback: {traceback.format_exc()}")
+        return f"🌤️ **Weather:** Error retrieving conditions - {str(e)[:50]}"
 
 # ============================================================================
-# PERSONAL CALENDAR FUNCTIONS (PRESERVED UNCHANGED)
+# ENHANCED GOOGLE CALENDAR INTEGRATION
 # ============================================================================
+
+# Initialize Google Calendar service
+calendar_service = None
+accessible_calendars = []
 
 def initialize_google_services():
-    """Initialize Google Calendar services for personal calendars (BG Tasks, BG Calendar, Britt iCloud)"""
-    global google_services_initialized, accessible_calendars
+    """Initialize Google Calendar service with enhanced error handling"""
+    global calendar_service, accessible_calendars
     
     if not GOOGLE_SERVICE_ACCOUNT_JSON:
-        print("⚠️ Personal calendar credentials not configured")
-        return None
+        print("❌ No Google service account JSON found - calendar features disabled")
+        return False
     
     try:
-        # Parse service account credentials
-        credentials_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+        # Parse service account JSON
+        service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+        
+        # Create credentials
         credentials = Credentials.from_service_account_info(
-            credentials_info,
+            service_account_info,
             scopes=['https://www.googleapis.com/auth/calendar.readonly']
         )
         
-        # Initialize Calendar service
-        service = build('calendar', 'v3', credentials=credentials)
+        # Build Calendar service
+        calendar_service = build('calendar', 'v3', credentials=credentials)
+        
+        print(f"✅ Google services initialized")
+        print(f"📧 Service Account: {service_account_info.get('client_email', 'Unknown')}")
         
         # Test calendar access and build accessible calendars list
-        accessible_calendars = []
-        calendar_configs = [
-            ('BG Calendar', GOOGLE_CALENDAR_ID),
-            ('BG Tasks', GOOGLE_TASKS_CALENDAR_ID),
-            ('Britt iCloud', BRITT_ICLOUD_CALENDAR_ID)
-        ]
+        test_calendar_access()
         
-        for name, calendar_id in calendar_configs:
-            if calendar_id:
-                try:
-                    # Test access to this calendar
-                    service.events().list(
-                        calendarId=calendar_id,
-                        maxResults=1,
-                        timeMin=datetime.now().isoformat() + 'Z'
-                    ).execute()
-                    accessible_calendars.append((name, calendar_id))
-                    print(f"✅ {name} calendar accessible")
-                except Exception as e:
-                    print(f"❌ {name} calendar inaccessible: {e}")
+        return True
         
-        if accessible_calendars:
-            google_services_initialized = True
-            print(f"✅ Personal Calendar service initialized with {len(accessible_calendars)} accessible calendars")
-            return service
-        else:
-            print("❌ No accessible personal calendars found")
-            return None
-            
+    except json.JSONDecodeError:
+        print("❌ Invalid Google service account JSON format")
+        return False
     except Exception as e:
-        print(f"❌ Personal Calendar initialization error: {e}")
-        return None
+        print(f"❌ Google Calendar initialization error: {e}")
+        print(f"📋 Google Calendar traceback: {traceback.format_exc()}")
+        return False
+
+def test_calendar_access():
+    """Test access to configured calendars and populate accessible_calendars"""
+    global accessible_calendars
+    
+    calendars_to_test = [
+        ('🐝 BG Personal', GOOGLE_CALENDAR_ID, 'personal'),
+        ('📋 BG Tasks', GOOGLE_TASKS_CALENDAR_ID, 'tasks'),
+        ('🍎 Britt iCloud', BRITT_ICLOUD_CALENDAR_ID, 'icloud'),
+        ('💼 BG Work', GMAIL_WORK_CALENDAR_ID, 'work')
+    ]
+    
+    accessible_calendars = []
+    
+    for calendar_name, calendar_id, calendar_type in calendars_to_test:
+        if not calendar_id:
+            print(f"⚠️ {calendar_name}: No calendar ID configured")
+            continue
+            
+        try:
+            # Test calendar access
+            calendar_info = calendar_service.calendars().get(calendarId=calendar_id).execute()
+            accessible_calendars.append((calendar_name, calendar_id, calendar_type))
+            print(f"✅ {calendar_name} accessible: {calendar_info.get('summary', 'Unknown')}")
+            
+        except HttpError as e:
+            if e.resp.status == 404:
+                print(f"❌ {calendar_name}: Calendar not found (404)")
+            elif e.resp.status == 403:
+                print(f"❌ {calendar_name}: Access forbidden (403)")
+            else:
+                print(f"❌ {calendar_name}: HTTP error {e.resp.status}")
+        except Exception as e:
+            print(f"❌ {calendar_name}: Error testing access - {e}")
+    
+    print(f"📅 Total accessible calendars: {len(accessible_calendars)}")
+
+def get_calendar_events(calendar_id, time_min, time_max, max_results=25):
+    """Get events from a specific calendar with enhanced error handling"""
+    if not calendar_service:
+        return []
+    
+    try:
+        events_result = calendar_service.events().list(
+            calendarId=calendar_id,
+            timeMin=time_min.isoformat(),
+            timeMax=time_max.isoformat(),
+            maxResults=max_results,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        return events_result.get('items', [])
+        
+    except HttpError as e:
+        print(f"❌ Calendar API error for {calendar_id}: HTTP {e.resp.status}")
+        return []
+    except Exception as e:
+        print(f"❌ Calendar error for {calendar_id}: {e}")
+        return []
+
+def format_event(event, calendar_type, timezone_obj):
+    """Format a calendar event for display with enhanced timezone handling"""
+    try:
+        summary = event.get('summary', 'Untitled Event')
+        
+        # Handle different start time formats
+        start = event.get('start', {})
+        if 'dateTime' in start:
+            # Timed event
+            start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=timezone.utc)
+            local_start = start_dt.astimezone(timezone_obj)
+            time_str = local_start.strftime('%-I:%M %p')
+        elif 'date' in start:
+            # All-day event
+            time_str = 'All day'
+        else:
+            time_str = 'Time TBD'
+        
+        # Add calendar type indicator
+        type_emoji = {
+            'personal': '🐝',
+            'tasks': '📋',
+            'icloud': '🍎',
+            'work': '💼'
+        }.get(calendar_type, '📅')
+        
+        return f"   {type_emoji} **{time_str}** - {summary}"
+        
+    except Exception as e:
+        print(f"❌ Event formatting error: {e}")
+        return f"   📅 **Event formatting error** - {event.get('summary', 'Unknown')}"
+
+# Initialize Google services on startup
+print("🔧 Initializing Google Calendar integration...")
+google_services_initialized = initialize_google_services()
+
+# ============================================================================
+# ENHANCED CALENDAR FUNCTIONS
+# ============================================================================
 
 def get_today_schedule():
-    """Get today's calendar events from personal calendars (BG Tasks & BG Calendar)"""
-    if not google_services_initialized:
-        return "📅 **Today's Schedule**: Calendar integration not available"
+    """Get today's complete schedule from all accessible calendars with Toronto timezone handling"""
+    if not calendar_service or not accessible_calendars:
+        return "📅 **Today's Schedule:** Calendar integration not available\n\n🎯 **Manual Planning:** Check your calendar apps and prioritize high-impact activities"
     
     try:
-        service = build('calendar', 'v3', 
-                       credentials=Credentials.from_service_account_info(
-                           json.loads(GOOGLE_SERVICE_ACCOUNT_JSON),
-                           scopes=['https://www.googleapis.com/auth/calendar.readonly']
-                       ))
-        
-        # Get today's date range
+        # Use Toronto timezone for proper date calculation
         toronto_tz = pytz.timezone('America/Toronto')
-        today = datetime.now(toronto_tz)
-        start_of_day = today.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_day = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Get today's date range in Toronto timezone
+        today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_toronto = today_toronto + timedelta(days=1)
+        
+        # Convert to UTC for API calls
+        today_utc = today_toronto.astimezone(pytz.UTC)
+        tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
         
         all_events = []
         
-        # Fetch events from all accessible personal calendars
-        for calendar_name, calendar_id in accessible_calendars:
-            try:
-                events_result = service.events().list(
-                    calendarId=calendar_id,
-                    timeMin=start_of_day.isoformat(),
-                    timeMax=end_of_day.isoformat(),
-                    singleEvents=True,
-                    orderBy='startTime'
-                ).execute()
-                
-                events = events_result.get('items', [])
-                for event in events:
-                    event['calendar_source'] = calendar_name
-                    all_events.append(event)
-                    
-            except Exception as e:
-                print(f"❌ Error fetching from {calendar_name}: {e}")
-        
-        # Sort all events by start time
-        all_events.sort(key=lambda x: x.get('start', {}).get('dateTime', x.get('start', {}).get('date', '')))
+        # Get events from all accessible calendars
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, today_utc, tomorrow_utc)
+            for event in events:
+                formatted = format_event(event, calendar_type, toronto_tz)
+                all_events.append((event, formatted, calendar_type, calendar_name))
         
         if not all_events:
-            return "📅 **Today's Schedule**: No events scheduled for today"
+            return "📅 **Today's Schedule:** No events scheduled\n\n🎯 **Strategic Focus:** Perfect day for deep work and planning"
         
-        # Format events
-        schedule_text = f"📅 **Today's Schedule** ({today.strftime('%A, %B %d, %Y')})\n\n"
-        
-        for event in all_events:
-            title = event.get('summary', 'Untitled Event')
+        # Sort events by start time
+        def get_event_time(event_tuple):
+            event = event_tuple[0]
             start = event.get('start', {})
             
-            if 'dateTime' in start:
-                # Timed event
-                event_time = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
-                event_time_toronto = event_time.astimezone(toronto_tz)
-                time_str = event_time_toronto.strftime('%I:%M %p')
-            else:
-                # All-day event
-                time_str = 'All day'
-            
-            calendar_source = event.get('calendar_source', 'Unknown')
-            schedule_text += f"🕐 **{time_str}**: {title}\n   📋 *{calendar_source}*\n\n"
+            try:
+                if 'dateTime' in start:
+                    start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
+                    if start_dt.tzinfo is None:
+                        start_dt = start_dt.replace(tzinfo=timezone.utc)
+                    return start_dt.astimezone(toronto_tz)
+                else:
+                    return datetime.fromisoformat(start)
+            except:
+                return datetime.now(toronto_tz)
         
-        return schedule_text
+        all_events.sort(key=get_event_time)
+        
+        # Format response
+        formatted_events = [event_tuple[1] for event_tuple in all_events]
+        
+        # Count by type
+        calendar_counts = {}
+        for _, _, calendar_type, calendar_name in all_events:
+            calendar_counts[calendar_name] = calendar_counts.get(calendar_name, 0) + 1
+        
+        header = f"📅 **Today's Executive Schedule:** {len(all_events)} events"
+        
+        # Add breakdown by calendar
+        if calendar_counts:
+            breakdown = []
+            for calendar_name, count in calendar_counts.items():
+                breakdown.append(f"{count} {calendar_name}")
+            header += f" ({', '.join(breakdown)})"
+        
+        return header + "\n\n" + "\n".join(formatted_events[:15])  # Limit for Discord
         
     except Exception as e:
-        print(f"❌ Schedule fetch error: {e}")
-        return f"📅 **Today's Schedule**: Error fetching schedule - {str(e)[:100]}"
+        print(f"❌ Calendar error: {e}")
+        print(f"📋 Calendar traceback: {traceback.format_exc()}")
+        return "📅 **Today's Schedule:** Error retrieving calendar data\n\n🎯 **Backup Plan:** Check your calendar apps directly"
 
 def get_upcoming_events(days=7):
-    """Get upcoming events from personal calendars (BG Tasks & BG Calendar)"""
-    if not google_services_initialized:
-        return f"📅 **Upcoming Events**: Calendar integration not available"
+    """Get upcoming events from all accessible calendars with Toronto timezone handling"""
+    if not calendar_service or not accessible_calendars:
+        return f"📅 **Upcoming {days} Days:** Calendar integration not available\n\n🎯 **Manual Planning:** Review your calendar apps for the next {days} days"
     
     try:
-        service = build('calendar', 'v3', 
-                       credentials=Credentials.from_service_account_info(
-                           json.loads(GOOGLE_SERVICE_ACCOUNT_JSON),
-                           scopes=['https://www.googleapis.com/auth/calendar.readonly']
-                       ))
-        
-        # Get date range
+        # Use Toronto timezone
         toronto_tz = pytz.timezone('America/Toronto')
-        now = datetime.now(toronto_tz)
-        end_date = now + timedelta(days=days)
+        
+        # Get date range in Toronto timezone then convert to UTC
+        start_toronto = datetime.now(toronto_tz)
+        end_toronto = start_toronto + timedelta(days=days)
+        
+        start_utc = start_toronto.astimezone(pytz.UTC)
+        end_utc = end_toronto.astimezone(pytz.UTC)
         
         all_events = []
         
-        # Fetch events from all accessible personal calendars
-        for calendar_name, calendar_id in accessible_calendars:
-            try:
-                events_result = service.events().list(
-                    calendarId=calendar_id,
-                    timeMin=now.isoformat(),
-                    timeMax=end_date.isoformat(),
-                    singleEvents=True,
-                    orderBy='startTime',
-                    maxResults=50
-                ).execute()
-                
-                events = events_result.get('items', [])
-                for event in events:
-                    event['calendar_source'] = calendar_name
-                    all_events.append(event)
-                    
-            except Exception as e:
-                print(f"❌ Error fetching from {calendar_name}: {e}")
-        
-        # Sort all events by start time
-        all_events.sort(key=lambda x: x.get('start', {}).get('dateTime', x.get('start', {}).get('date', '')))
+        # Get events from all accessible calendars
+        for calendar_name, calendar_id, calendar_type in accessible_calendars:
+            events = get_calendar_events(calendar_id, start_utc, end_utc)
+            for event in events:
+                all_events.append((event, calendar_type, calendar_name))
         
         if not all_events:
-            return f"📅 **Upcoming Events** ({days} days): No upcoming events"
+            return f"📅 **Upcoming {days} Days:** No events scheduled\n\n🎯 **Strategic Planning:** Great opportunity for proactive scheduling"
         
-        # Format events
-        events_text = f"📅 **Upcoming Events** ({days} days)\n\n"
+        # Group events by date
+        events_by_date = defaultdict(list)
         
-        current_date = None
-        for event in all_events[:20]:  # Limit to 20 events
-            title = event.get('summary', 'Untitled Event')
-            start = event.get('start', {})
-            
-            if 'dateTime' in start:
-                # Timed event
-                event_time = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
-                event_time_toronto = event_time.astimezone(toronto_tz)
-                event_date = event_time_toronto.strftime('%A, %B %d')
-                time_str = event_time_toronto.strftime('%I:%M %p')
-            else:
-                # All-day event
-                event_date = start.get('date', 'Unknown Date')
-                time_str = 'All day'
-            
-            # Add date header if this is a new date
-            if current_date != event_date:
-                current_date = event_date
-                events_text += f"📆 **{event_date}**\n"
-            
-            calendar_source = event.get('calendar_source', 'Unknown')
-            events_text += f"   🕐 {time_str}: {title} *({calendar_source})*\n"
+        for event, calendar_type, calendar_name in all_events:
+            try:
+                start = event.get('start', {})
+                if 'dateTime' in start:
+                    start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
+                    if start_dt.tzinfo is None:
+                        start_dt = start_dt.replace(tzinfo=timezone.utc)
+                    local_start = start_dt.astimezone(toronto_tz)
+                    date_key = local_start.strftime('%Y-%m-%d')
+                elif 'date' in start:
+                    date_key = start['date']
+                else:
+                    continue
+                
+                formatted = format_event(event, calendar_type, toronto_tz)
+                events_by_date[date_key].append(formatted)
+                
+            except Exception as e:
+                print(f"❌ Event processing error: {e}")
+                continue
         
-        if len(all_events) > 20:
-            events_text += f"\n... and {len(all_events) - 20} more events"
+        # Format output
+        formatted = []
+        for date_key in sorted(events_by_date.keys())[:days]:  # Limit to requested days
+            try:
+                date_obj = datetime.strptime(date_key, '%Y-%m-%d')
+                date_str = date_obj.strftime('%A, %B %d')
+                events_for_date = events_by_date[date_key][:5]  # Limit events per day
+                
+                formatted.append(f"**{date_str}:**")
+                formatted.extend(events_for_date)
+                formatted.append("")  # Empty line between dates
+            except:
+                continue
         
-        return events_text
+        header = f"📅 **Upcoming {days} Days:** {len(all_events)} total events"
+        return header + "\n\n" + "\n".join(formatted)
         
     except Exception as e:
-        print(f"❌ Upcoming events fetch error: {e}")
-        return f"📅 **Upcoming Events**: Error fetching events - {str(e)[:100]}"
-
-# ============================================================================
-# ENHANCED BRIEFING FUNCTION (PRESERVES EXISTING + ADDS WORK)
-# ============================================================================
+        print(f"❌ Calendar error: {e}")
+        print(f"📋 Calendar traceback: {traceback.format_exc()}")
+        return f"📅 **Upcoming {days} Days:** Error retrieving calendar data"
 
 async def get_morning_briefing():
-    """Enhanced morning briefing - preserves personal calendar + adds work calendar"""
-    briefing = f"👑 **Executive Morning Briefing** - {datetime.now().strftime('%A, %B %d, %Y')}\n\n"
-    
-    # Weather section (unchanged)
-    weather = await get_weather_briefing()
-    if isinstance(weather, dict):
-        briefing += f"🌤️ **Weather Update ({weather['location']})**: {weather['temperature']}°C {weather['emoji']} {weather['condition']}\n"
-        briefing += f"🌡️ Feels like: {weather['feels_like']}°C | Humidity: {weather['humidity']}%\n"
-        briefing += f"🔆 UV Index: {weather['uv_index']} - {weather['uv_advisory']}\n\n"
-    else:
-        briefing += f"{weather}\n\n"
-    
-    # NEW: Work calendar section (added functionality)
-    if work_calendar_service:
-        work_events = get_work_events_for_briefing(days_ahead=1)
-        if work_events and 'error' not in work_events:
-            briefing += f"💼 **Work Calendar**: {work_events['count']} work meetings\n"
+    """ENHANCED morning briefing with WEATHER at the top + calendar integration"""
+    try:
+        # Use Toronto timezone for proper date calculation
+        toronto_tz = pytz.timezone('America/Toronto')
+        current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
+        
+        # 1. GET WEATHER FIRST (NEW - at the top!)
+        weather_section = await get_weather_briefing()
+        
+        # 2. Get today's schedule
+        if calendar_service and accessible_calendars:
+            today_schedule = get_today_schedule()
+        else:
+            today_schedule = "📅 **Today's Schedule:** Calendar integration not available\n\n📋 **Manual Planning:** Review your calendar apps and prioritize your day"
+        
+        # 3. Get tomorrow's preview
+        if calendar_service and accessible_calendars:
+            # Get tomorrow's events using Toronto timezone
+            today_toronto = datetime.now(toronto_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+            tomorrow_toronto = today_toronto + timedelta(days=1)
+            day_after_toronto = tomorrow_toronto + timedelta(days=1)
             
-            if work_events['events']:
-                for event in work_events['events']:
-                    briefing += f"   💼 {event['time']}: {event['summary']}\n"
-                briefing += "\n"
+            # Convert to UTC for API calls
+            tomorrow_utc = tomorrow_toronto.astimezone(pytz.UTC)
+            day_after_utc = day_after_toronto.astimezone(pytz.UTC)
+            
+            tomorrow_events = []
+            
+            # Get tomorrow's events from all accessible calendars
+            for calendar_name, calendar_id, calendar_type in accessible_calendars:
+                events = get_calendar_events(calendar_id, tomorrow_utc, day_after_utc)
+                tomorrow_events.extend([(event, calendar_type, calendar_name) for event in events])
+            
+            # Format tomorrow's preview
+            if tomorrow_events:
+                tomorrow_formatted = []
+                for event, calendar_type, calendar_name in tomorrow_events[:4]:  # Limit to 4 for briefing
+                    formatted = format_event(event, calendar_type, toronto_tz)
+                    tomorrow_formatted.append(formatted)
+                tomorrow_preview = "📅 **Tomorrow Preview:**\n" + "\n".join(tomorrow_formatted)
             else:
-                briefing += "   ✅ No work meetings scheduled for today.\n\n"
+                tomorrow_preview = "📅 **Tomorrow Preview:** Clear schedule - great for strategic planning"
         else:
-            briefing += f"💼 **Work Calendar**: ⚠️ Unable to access work calendar\n\n"
-    else:
-        briefing += "💼 **Work Calendar**: ⚠️ Not configured\n\n"
-    
-    # PRESERVED: Personal calendar section (unchanged from original Rose)
-    personal_schedule = get_today_schedule()  # This is your existing function
-    if "No events scheduled" not in personal_schedule and "Calendar integration not available" not in personal_schedule:
-        # Show personal calendar section
-        briefing += "📅 **Personal Calendar (BG Tasks & BG Calendar)**: Events scheduled\n"
-        # Extract just the events, not the full header
-        events_part = personal_schedule.split('\n\n', 1)
-        if len(events_part) > 1:
-            briefing += f"{events_part[1]}\n"
-    else:
-        briefing += "📅 **Personal Calendar (BG Tasks & BG Calendar)**: No personal events scheduled\n\n"
-    
-    # Strategic recommendations (unchanged)
-    briefing += "📋 **Strategic Focus**: Balance work priorities with personal commitments and weather conditions.\n"
-    
-    return briefing
+            tomorrow_preview = "📅 **Tomorrow Preview:** Calendar integration not available"
+        
+        # 4. Combine into executive briefing with WEATHER AT THE TOP
+        briefing = f"""👑 **Executive Briefing for {current_time}**
+
+{weather_section}
+
+{today_schedule}
+
+{tomorrow_preview}
+
+💼 **Executive Focus:** Consider weather conditions when planning outdoor meetings and commute timing"""
+        
+        print("✅ Enhanced morning briefing generated with weather data")
+        return briefing
+        
+    except Exception as e:
+        print(f"❌ Morning briefing error: {e}")
+        print(f"📋 Morning briefing traceback: {traceback.format_exc()}")
+        return "🌅 **Morning Briefing:** Error generating briefing - please check calendar apps manually"
 
 # ============================================================================
-# SIMPLE WORK CALENDAR COMMANDS (NEW - OPTIONAL)
+# ENHANCED PLANNING SEARCH WITH ERROR HANDLING
 # ============================================================================
 
-async def handle_work_calendar_commands(message):
-    """Handle simple work calendar commands (optional addition)"""
-    
-    if message.content.startswith('!work-today'):
-        if work_calendar_service:
-            work_events = get_work_events_for_briefing(days_ahead=1)
-            if work_events and 'error' not in work_events:
-                response = f"💼 **Today's Work Calendar**: {work_events['count']} meetings\n\n"
-                
-                if work_events['events']:
-                    for event in work_events['events']:
-                        response += f"💼 {event['time']}: {event['summary']}\n"
-                else:
-                    response += "✅ No work meetings scheduled for today.\n"
-                
-                await message.reply(response)
-            else:
-                await message.reply(f"💼 **Work Calendar Error**: {work_events.get('error', 'Unable to access')}")
-        else:
-            await message.reply("💼 **Work Calendar**: Not configured")
-        return True
-    
-    return False  # Command not handled
-
-# ============================================================================
-# OPENAI ASSISTANT INTERACTION (PRESERVED)
-# ============================================================================
-
-async def get_rose_response(message_content, user_id):
-    """Get response from Rose's OpenAI assistant"""
-    # Rate limiting
-    if user_id in active_runs:
-        return "👑 Rose: I'm currently processing your previous request. Please wait a moment."
-    
-    active_runs[user_id] = time.time()
+async def planning_search_enhanced(query, focus_area="general", num_results=3):
+    """Enhanced planning and productivity research with comprehensive error handling"""
+    if not BRAVE_API_KEY:
+        return "🔍 Planning research requires Brave Search API configuration", []
     
     try:
-        # Create thread
-        thread = openai_client.beta.threads.create()
+        # Enhance query for planning content
+        planning_query = f"{query} {focus_area} productivity executive planning time management 2025"
         
-        # Add message
-        openai_client.beta.threads.messages.create(
-            thread_id=thread.id,
+        headers = {
+            'X-Subscription-Token': BRAVE_API_KEY,
+            'Accept': 'application/json'
+        }
+        
+        params = {
+            'q': planning_query,
+            'count': num_results,
+            'country': 'US',
+            'search_lang': 'en',
+            'ui_lang': 'en',
+            'safesearch': 'moderate'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.search.brave.com/res/v1/web/search', 
+                                   headers=headers, params=params, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = data.get('web', {}).get('results', [])
+                    
+                    if not results:
+                        return "🔍 No planning research results found for this query", []
+                    
+                    formatted_results = []
+                    sources = []
+                    
+                    for i, result in enumerate(results[:num_results]):
+                        title = result.get('title', 'No title')
+                        snippet = result.get('description', 'No description')
+                        url = result.get('url', '')
+                        
+                        # Extract domain for credibility
+                        domain = url.split('/')[2] if len(url.split('/')) > 2 else 'Unknown'
+                        
+                        formatted_results.append(f"**{i+1}. {title}**\n{snippet}")
+                        sources.append({
+                            'number': i+1,
+                            'title': title,
+                            'url': url,
+                            'domain': domain
+                        })
+                    
+                    return "\n\n".join(formatted_results), sources
+                else:
+                    return f"🔍 Planning search error: HTTP {response.status}", []
+                    
+    except asyncio.TimeoutError:
+        return "🔍 Planning search timed out", []
+    except Exception as e:
+        print(f"❌ Planning search error: {e}")
+        return f"🔍 Planning search error: Please try again", []
+
+# ============================================================================
+# ENHANCED FUNCTION HANDLING WITH FIXED OPENAI API CALLS
+# ============================================================================
+
+async def handle_rose_functions_enhanced(run, thread_id):
+    """Enhanced function handling with fixed OpenAI API calls"""
+    
+    if not run or not hasattr(run, 'required_action') or not run.required_action:
+        return
+        
+    if not hasattr(run.required_action, 'submit_tool_outputs') or not run.required_action.submit_tool_outputs:
+        return
+    
+    if not hasattr(run.required_action.submit_tool_outputs, 'tool_calls') or not run.required_action.submit_tool_outputs.tool_calls:
+        return
+    
+    tool_outputs = []
+    
+    for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+        function_name = getattr(tool_call.function, 'name', 'unknown')
+        
+        try:
+            arguments_str = getattr(tool_call.function, 'arguments', '{}')
+            arguments = json.loads(arguments_str) if arguments_str else {}
+        except (json.JSONDecodeError, AttributeError) as e:
+            print(f"❌ Error parsing function arguments: {e}")
+            arguments = {}
+        
+        print(f"👑 Rose Function: {function_name}")
+        print(f"📋 Arguments: {arguments}")
+        
+        try:
+            if function_name == "planning_search":
+                query = arguments.get('query', '')
+                focus = arguments.get('focus', 'general')
+                num_results = arguments.get('num_results', 3)
+                
+                if query:
+                    search_results, sources = await planning_search_enhanced(query, focus, num_results)
+                    output = f"📊 **Planning Research:** {query}\n\n{search_results}"
+                    
+                    if sources:
+                        output += "\n\n📚 **Sources:**\n"
+                        for source in sources:
+                            output += f"({source['number']}) {source['title']} - {source['domain']}\n"
+                else:
+                    output = "🔍 No planning research query provided"
+                    
+            elif function_name == "get_today_schedule":
+                output = get_today_schedule()
+                    
+            elif function_name == "get_upcoming_events":
+                days = arguments.get('days', 7)
+                output = get_upcoming_events(days)
+                
+            elif function_name == "get_morning_briefing":
+                output = await get_morning_briefing()
+                
+            else:
+                output = f"❓ Function {function_name} not fully implemented yet"
+                
+        except Exception as e:
+            print(f"❌ Function execution error: {e}")
+            output = f"❌ Error executing {function_name}: Please try again"
+        
+        tool_outputs.append({
+            "tool_call_id": tool_call.id,
+            "output": output[:1500]  # Keep within reasonable limits
+        })
+    
+    # Submit tool outputs with error handling
+    try:
+        if tool_outputs:
+            client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread_id,
+                run_id=run.id,
+                tool_outputs=tool_outputs
+            )
+            print(f"✅ Submitted {len(tool_outputs)} tool outputs successfully")
+    except Exception as e:
+        print(f"❌ Error submitting tool outputs: {e}")
+
+# ============================================================================
+# MAIN CONVERSATION HANDLER WITH FIXED OPENAI API CALLS
+# ============================================================================
+
+async def get_rose_response(message, user_id):
+    """Get response from Rose's enhanced OpenAI assistant with fixed API calls"""
+    try:
+        if not ASSISTANT_ID:
+            return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
+        
+        # Check if user already has an active run
+        if user_id in active_runs:
+            return "👑 Rose is currently analyzing your executive strategy. Please wait for completion."
+        
+        # Create or get existing thread
+        thread = client.beta.threads.create()
+        thread_id = thread.id
+        
+        # Add message to thread
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
             role="user",
-            content=message_content
+            content=message
         )
         
-        # Run assistant
-        run = openai_client.beta.threads.runs.create(
-            thread_id=thread.id,
+        # Mark user as having active run
+        active_runs[user_id] = thread_id
+        
+        # Create run with assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
             assistant_id=ASSISTANT_ID
         )
         
-        # Wait for completion
-        max_wait = 45  # seconds
-        start_time = time.time()
+        # Wait for completion with timeout
+        max_wait = 30  # seconds
+        wait_time = 0
         
-        while run.status in ['queued', 'in_progress']:
-            if time.time() - start_time > max_wait:
+        while wait_time < max_wait:
+            run = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run.id
+            )
+            
+            if run.status == 'completed':
+                break
+            elif run.status == 'requires_action':
+                await handle_rose_functions_enhanced(run, thread_id)
+                await asyncio.sleep(1)
+            elif run.status in ['failed', 'cancelled', 'expired']:
                 active_runs.pop(user_id, None)
-                return "👑 Rose: Request timeout. Please try again with a simpler query."
+                return f"👑 Rose: Analysis failed with status: {run.status}"
             
             await asyncio.sleep(1)
-            run = openai_client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            wait_time += 1
         
-        if run.status == 'completed':
-            messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
-            response_message = messages.data[0].content[0].text.value
-            active_runs.pop(user_id, None)
-            return f"👑 Rose: {response_message}"
+        # Remove user from active runs
+        active_runs.pop(user_id, None)
+        
+        if wait_time >= max_wait:
+            return "👑 Rose: Analysis is taking longer than expected. Please try again."
+        
+        # Get the response
+        messages = client.beta.threads.messages.list(
+            thread_id=thread_id
+        )
+        
+        if messages.data:
+            response = messages.data[0].content[0].text.value
+            return response
         else:
-            active_runs.pop(user_id, None)
-            return f"👑 Rose: I encountered an issue processing your request. Status: {run.status}"
-    
+            return "👑 Rose: I apologize, but I couldn't generate a response. Please try again."
+            
     except Exception as e:
         active_runs.pop(user_id, None)
         print(f"❌ Rose response error: {e}")
@@ -611,16 +791,15 @@ async def get_rose_response(message_content, user_id):
         return f"👑 Rose: I encountered an error. Please try again. ({str(e)[:50]})"
 
 # ============================================================================
-# DISCORD EVENT HANDLERS (ENHANCED)
+# DISCORD EVENT HANDLERS
 # ============================================================================
 
 @bot.event
 async def on_ready():
-    """Enhanced startup message with work + personal calendar status"""
+    """Enhanced startup message with weather status"""
     print(f"✅ {ASSISTANT_NAME} is online!")
     print(f"🤖 Connected as {bot.user} (ID: {bot.user.id})")
-    print(f"💼 Work Calendar Status: {'✅ Integrated' if work_calendar_service else '❌ Not Available'}")
-    print(f"📅 Personal Calendar Status: {'✅ Integrated' if google_services_initialized else '❌ Not Available'}")
+    print(f"📅 Calendar Status: {'✅ Integrated' if google_services_initialized else '❌ Not Available'}")
     print(f"🌤️ Weather Status: {'✅ Configured' if WEATHER_API_KEY else '❌ Not Configured'}")
     print(f"🔍 Planning Search: {'✅ Available' if BRAVE_API_KEY else '❌ Not Available'}")
     print(f"🎯 Allowed Channels: {', '.join(ALLOWED_CHANNELS)}")
@@ -628,13 +807,13 @@ async def on_ready():
     # Set bot activity status
     activity = discord.Activity(
         type=discord.ActivityType.watching,
-        name="work & personal calendars"
+        name="executive schedules & weather"
     )
     await bot.change_presence(activity=activity)
 
 @bot.event
 async def on_message(message):
-    """Enhanced message handler with work calendar commands"""
+    """Enhanced message handler with weather-aware responses"""
     # Ignore bot messages
     if message.author == bot.user:
         return
@@ -642,10 +821,6 @@ async def on_message(message):
     # Check if message is in allowed channels
     if message.channel.name not in ALLOWED_CHANNELS:
         return
-    
-    # Handle work calendar commands FIRST (optional)
-    if await handle_work_calendar_commands(message):
-        return  # Command was handled, exit early
     
     # Check if bot is mentioned or message starts with Rose
     is_mentioned = bot.user in message.mentions
@@ -673,16 +848,16 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Enhanced briefing with work calendar integration"""
+async def morning_briefing_command(ctx):
+    """Get Rose's comprehensive morning briefing with weather"""
     async with ctx.typing():
-        result = await get_morning_briefing()
+        briefing = await get_morning_briefing()
         
-        if len(result) <= 2000:
-            await ctx.send(result)
+        # Split if too long for Discord
+        if len(briefing) <= 2000:
+            await ctx.send(briefing)
         else:
-            # Split into chunks
-            chunks = [result[i:i+2000] for i in range(0, len(result), 2000)]
+            chunks = [briefing[i:i+2000] for i in range(0, len(briefing), 2000)]
             for chunk in chunks:
                 await ctx.send(chunk)
                 await asyncio.sleep(0.5)
@@ -691,48 +866,19 @@ async def briefing_command(ctx):
 async def weather_command(ctx):
     """Get current weather conditions"""
     async with ctx.typing():
-        weather = await get_weather_briefing()
-        if isinstance(weather, dict):
-            weather_text = f"🌤️ **Weather Update ({weather['location']})**\n\n"
-            weather_text += f"{weather['emoji']} **{weather['temperature']}°C** - {weather['condition']}\n"
-            weather_text += f"🌡️ Feels like: {weather['feels_like']}°C\n"
-            weather_text += f"💧 Humidity: {weather['humidity']}%\n"
-            weather_text += f"🔆 UV Index: {weather['uv_index']} - {weather['uv_advisory']}"
-            await ctx.send(weather_text)
-        else:
-            await ctx.send(weather)
-
-@bot.command(name='work-today')
-async def work_today_command(ctx):
-    """Get today's work calendar (new command)"""
-    async with ctx.typing():
-        if work_calendar_service:
-            work_events = get_work_events_for_briefing(days_ahead=1)
-            if work_events and 'error' not in work_events:
-                response = f"💼 **Today's Work Calendar**: {work_events['count']} meetings\n\n"
-                
-                if work_events['events']:
-                    for event in work_events['events']:
-                        response += f"💼 {event['time']}: {event['summary']}\n"
-                else:
-                    response += "✅ No work meetings scheduled for today.\n"
-                
-                await ctx.send(response)
-            else:
-                await ctx.send(f"💼 **Work Calendar Error**: {work_events.get('error', 'Unable to access')}")
-        else:
-            await ctx.send("💼 **Work Calendar**: Not configured")
+        weather_info = await get_weather_briefing()
+        await ctx.send(weather_info)
 
 @bot.command(name='schedule')
 async def schedule_command(ctx):
-    """Get today's personal calendar schedule"""
+    """Get today's calendar schedule"""
     async with ctx.typing():
         schedule = get_today_schedule()
         await ctx.send(schedule)
 
 @bot.command(name='upcoming')
 async def upcoming_command(ctx, days: int = 7):
-    """Get upcoming personal events (default 7 days)"""
+    """Get upcoming events (default 7 days)"""
     async with ctx.typing():
         if days < 1 or days > 30:
             await ctx.send("📅 Please specify between 1-30 days")
@@ -750,27 +896,23 @@ async def upcoming_command(ctx, days: int = 7):
 
 @bot.command(name='status')
 async def status_command(ctx):
-    """Enhanced status including work calendar integration"""
+    """Check Rose's system status including weather integration"""
     status_report = f"""👑 **{ASSISTANT_NAME} System Status**
 
 🤖 **OpenAI Assistant:** {'✅ Connected' if ASSISTANT_ID else '❌ Not Configured'}
-💼 **Work Calendar (Gmail):** {'✅ Active' if work_calendar_service else '❌ Inactive'}
-📅 **Personal Calendars (BG):** {'✅ Active' if google_services_initialized else '❌ Inactive'}
+📅 **Calendar Integration:** {'✅ Active' if google_services_initialized else '❌ Inactive'}
 🌤️ **Weather API:** {'✅ Configured' if WEATHER_API_KEY else '❌ Not Configured'}
 🔍 **Planning Search:** {'✅ Available' if BRAVE_API_KEY else '❌ Not Available'}
 
-📊 **Calendar Access:**
-   • Work Calendar: {'✅ Gmail integrated' if work_calendar_service else '❌ Not available'}
-   • Personal Calendars: {len(accessible_calendars) if accessible_calendars else 0} (BG Tasks, BG Calendar, Britt iCloud)
-
+📊 **Accessible Calendars:** {len(accessible_calendars) if accessible_calendars else 0}
 🎯 **Active Channels:** {', '.join(ALLOWED_CHANNELS)}
 ⚡ **Active Runs:** {len(active_runs)}
 
-💼 **Enhanced Features:**
-   • Morning briefings with work + personal calendars
-   • Weather integration
-   • Strategic daily focus
-   • Work-life balance optimization"""
+💼 **Executive Features:**
+   • Morning briefing with weather
+   • Calendar integration & scheduling (including work calendar)
+   • Planning research & productivity
+   • UV index & weather advisory"""
     
     await ctx.send(status_report)
 
@@ -782,19 +924,16 @@ async def ping_command(ctx):
 
 @bot.command(name='commands')
 async def commands_command(ctx):
-    """Enhanced help showing work calendar integration"""
+    """Show enhanced help with weather commands (renamed from 'help' to avoid conflict)"""
     help_text = f"""👑 **{ASSISTANT_NAME} - Executive Assistant Commands**
 
-🌤️ **Enhanced Briefing:**
-   `!briefing` - Complete briefing (weather + work calendar + personal calendar)
+🌤️ **Weather & Briefing:**
+   `!briefing` - Complete morning briefing with weather
    `!weather` - Current weather & UV index
 
-💼 **Work Calendar (New!):**
-   `!work-today` - Today's work meetings (direct Gmail access)
-
-📅 **Personal Calendar Management (BG Tasks & BG Calendar):**
-   `!schedule` - Today's personal calendar
-   `!upcoming [days]` - Upcoming personal events (default 7 days)
+📅 **Calendar Management:**
+   `!schedule` - Today's calendar (all calendars including work)
+   `!upcoming [days]` - Upcoming events (default 7 days)
 
 🔍 **Planning & Research:**
    Just mention @Rose or start with "Rose" for planning assistance
@@ -804,15 +943,11 @@ async def commands_command(ctx):
    `!ping` - Response time test
    `!commands` - This help message
 
-💼 **NEW: Work Calendar Integration:**
-   • Morning briefings now include work calendar events
-   • Direct Gmail calendar access (no Vivian dependency)
-   • Work-personal calendar balance in briefings
-
-📅 **Personal Calendar Features (Preserved):**
-   • BG Tasks and BG Calendar grouped together
-   • Britt iCloud calendar included
-   • All existing functionality maintained
+💼 **Executive Features:**
+   • Weather-integrated morning briefings
+   • Multi-calendar schedule optimization (personal + work)
+   • UV index & outdoor planning advice
+   • Strategic planning research
 
 📍 **Current Location:** {USER_CITY}
 🎯 **Active Channels:** {', '.join(ALLOWED_CHANNELS)}"""
@@ -820,12 +955,12 @@ async def commands_command(ctx):
     await ctx.send(help_text)
 
 # ============================================================================
-# ERROR HANDLING AND LOGGING (PRESERVED)
+# ERROR HANDLING AND LOGGING
 # ============================================================================
 
 @bot.event
 async def on_error(event, *args, **kwargs):
-    """Enhanced error handling with calendar-specific logging"""
+    """Enhanced error handling with weather-specific logging"""
     print(f"❌ Discord error in {event}: {traceback.format_exc()}")
 
 @bot.event
@@ -842,43 +977,71 @@ async def on_command_error(ctx, error):
         await ctx.send("👑 Rose: I encountered an error processing your command. Please try again.")
 
 # ============================================================================
-# INITIALIZATION AND STARTUP (ENHANCED)
+# ENHANCED TESTING FUNCTIONS
 # ============================================================================
 
-async def initialize_services():
-    """Initialize all services on startup - enhanced with work calendar"""
-    global work_calendar_service
+async def test_weather_integration():
+    """Test the weather integration independently"""
+    print("🧪 Testing WeatherAPI.com integration...")
+    print(f"🔑 API Key configured: {'✅ Yes' if WEATHER_API_KEY else '❌ No'}")
+    print(f"📍 Location: {USER_CITY}")
     
-    print("🔄 Initializing Rose's services...")
+    weather_result = await get_weather_briefing()
+    print("\n" + "="*50)
+    print("WEATHER BRIEFING TEST RESULT:")
+    print("="*50)
+    print(weather_result)
+    print("="*50)
     
-    # KEEP existing personal calendar initialization
-    initialize_google_services()  # Your existing function - don't change
+    return weather_result
+
+def check_weather_config():
+    """Check if weather API is properly configured"""
+    config_status = {
+        'api_key': bool(WEATHER_API_KEY),
+        'city': bool(USER_CITY),
+        'coordinates': bool(USER_LAT and USER_LON)
+    }
     
-    # ADD work calendar initialization
-    work_calendar_service = initialize_work_calendar_service()
+    print("🔧 Weather API Configuration Status:")
+    print(f"   API Key: {'✅ Configured' if config_status['api_key'] else '❌ Missing WEATHER_API_KEY'}")
+    print(f"   City: {'✅ ' + USER_CITY if config_status['city'] else '❌ Missing USER_CITY'}")
+    print(f"   Coordinates: {'✅ Precise location' if config_status['coordinates'] else '⚠️ Using city name only'}")
     
-    print("✅ Service initialization complete")
+    if not config_status['api_key']:
+        print("\n📝 Next Steps:")
+        print("1. Sign up at https://www.weatherapi.com/")
+        print("2. Get your free API key")
+        print("3. Add WEATHER_API_KEY to Railway environment variables")
+    
+    return config_status
 
 # ============================================================================
-# MAIN EXECUTION
+# STARTUP SEQUENCE
 # ============================================================================
 
 if __name__ == "__main__":
-    print(f"🚀 Starting {ASSISTANT_NAME}...")
-    print(f"💼 Work Calendar (Gmail): {'✅ Configured' if GOOGLE_SERVICE_ACCOUNT_JSON else '❌ Not Configured'}")
-    print(f"📅 Personal Calendars (BG): {'✅ Configured' if GOOGLE_SERVICE_ACCOUNT_JSON else '❌ Not Configured'}")
-    print(f"🌤️ Weather: {'✅ Configured' if WEATHER_API_KEY else '❌ Not Configured'}")
+    print("🚀 Starting Rose Ashcombe Enhanced Executive Assistant...")
     
+    # Check weather configuration
+    check_weather_config()
+    
+    # Test weather if configured
+    if WEATHER_API_KEY:
+        print("🧪 Testing weather integration...")
+        try:
+            # Run weather test in main thread since we're not in async context yet
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(test_weather_integration())
+            loop.close()
+        except Exception as e:
+            print(f"⚠️ Weather test failed: {e}")
+    
+    # Start the Discord bot
     try:
-        # Initialize services
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(initialize_services())
-        
-        # Run the bot
         bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print(f"\n👑 {ASSISTANT_NAME} shutting down gracefully...")
     except Exception as e:
-        print(f"❌ Fatal error: {e}")
-        print(traceback.format_exc())
+        print(f"❌ CRITICAL: Failed to start Rose: {e}")
+        exit(1)
