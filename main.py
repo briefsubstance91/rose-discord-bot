@@ -128,6 +128,15 @@ try:
     # Active runs tracking for rate limiting
     active_runs = {}
     
+    # Memory management variables (fixed location)
+    user_conversations = {}  # user_id -> thread_id
+    channel_conversations = {}  # channel_id -> thread_id  
+    conversation_metadata = {}  # thread_id -> metadata
+    processing_messages = set()
+    last_response_time = {}
+
+
+    
     print(f"✅ {ASSISTANT_NAME} initialized successfully")
     print(f"🤖 OpenAI Assistant ID: {ASSISTANT_ID}")
     print(f"🌤️ Weather API configured: {'✅ Yes' if WEATHER_API_KEY else '❌ No'}")
@@ -1195,12 +1204,76 @@ async def handle_rose_functions_enhanced(run, thread_id):
     except Exception as e:
         print(f"❌ Error submitting tool outputs: {e}")
 
+
+# ============================================================================
+# MEMORY MANAGEMENT FUNCTIONS (AUTO-ADDED)
+# ============================================================================
+
+def get_or_create_user_thread(user_id, channel_id=None):
+    """Get existing thread for user or create new one"""
+    try:
+        # Try user-specific thread first
+        if user_id in user_conversations:
+            thread_id = user_conversations[user_id]
+            
+            # Verify thread still exists
+            try:
+                client.beta.threads.retrieve(thread_id)
+                print(f"✅ Reusing existing thread for user {user_id}: {thread_id}")
+                return thread_id
+            except Exception as e:
+                print(f"⚠️ Thread {thread_id} no longer exists, creating new one")
+                del user_conversations[user_id]
+        
+        # Create new thread
+        thread = client.beta.threads.create()
+        thread_id = thread.id
+        
+        # Store thread for user
+        user_conversations[user_id] = thread_id
+        
+        # Store metadata
+        conversation_metadata[thread_id] = {
+            'user_id': user_id,
+            'channel_id': channel_id,
+            'created_at': time.time(),
+            'message_count': 0
+        }
+        
+        print(f"✅ Created new thread for user {user_id}: {thread_id}")
+        return thread_id
+        
+    except Exception as e:
+        print(f"❌ Error managing user thread: {e}")
+        # Fallback: create new thread
+        thread = client.beta.threads.create()
+        return thread.id
+
+def clear_user_memory(user_id):
+    """Clear conversation memory for specific user"""
+    if user_id in user_conversations:
+        thread_id = user_conversations[user_id]
+        del user_conversations[user_id]
+        if thread_id in conversation_metadata:
+            del conversation_metadata[thread_id]
+        print(f"✅ Cleared memory for user {user_id}")
+        return True
+    return False
+
+def get_memory_stats():
+    """Get memory usage statistics"""
+    return {
+        'user_conversations': len(user_conversations),
+        'channel_conversations': len(channel_conversations),
+        'total_threads': len(conversation_metadata),
+        'active_runs': len(active_runs)
+    }
 # ============================================================================
 # MAIN CONVERSATION HANDLER WITH FIXED OPENAI API CALLS
 # ============================================================================
 
 async def get_rose_response(message, user_id):
-    """Get response from Rose's enhanced OpenAI assistant with fixed API calls"""
+    """Get response from Rose's enhanced OpenAI assistant with MEMORY ENABLED"""
     try:
         if not ASSISTANT_ID:
             return "⚠️ Rose not configured - check ROSE_ASSISTANT_ID environment variable"
@@ -1209,16 +1282,20 @@ async def get_rose_response(message, user_id):
         if user_id in active_runs:
             return "👑 Rose is currently analyzing your executive strategy. Please wait for completion."
         
-        # Create or get existing thread
-        thread = client.beta.threads.create()
-        thread_id = thread.id
+        # GET OR CREATE THREAD WITH MEMORY (FIXED!)
+        thread_id = get_or_create_user_thread(user_id)
         
-        # Add message to thread
+        # Add message to EXISTING thread (preserves conversation history)
         client.beta.threads.messages.create(
             thread_id=thread_id,
             role="user",
             content=message
         )
+        
+        # Update metadata
+        if thread_id in conversation_metadata:
+            conversation_metadata[thread_id]['message_count'] += 1
+            conversation_metadata[thread_id]['last_activity'] = time.time()
         
         # Mark user as having active run
         active_runs[user_id] = thread_id
@@ -1228,6 +1305,8 @@ async def get_rose_response(message, user_id):
             thread_id=thread_id,
             assistant_id=ASSISTANT_ID
         )
+        
+        print(f"👑 Rose run created: {run.id} on thread: {thread_id}")
         
         # Wait for completion with timeout
         max_wait = 30  # seconds
@@ -1257,14 +1336,21 @@ async def get_rose_response(message, user_id):
         if wait_time >= max_wait:
             return "👑 Rose: Analysis is taking longer than expected. Please try again."
         
-        # Get the response
+        # Get the response (most recent assistant message)
         messages = client.beta.threads.messages.list(
-            thread_id=thread_id
+            thread_id=thread_id,
+            limit=5  # Get recent messages for context
         )
         
         if messages.data:
-            response = messages.data[0].content[0].text.value
-            return response
+            # Find the most recent assistant response
+            for message in messages.data:
+                if message.role == "assistant":
+                    response = message.content[0].text.value
+                    print(f"✅ Rose response retrieved from thread {thread_id}")
+                    return response
+            
+            return "👑 Rose: I generated a response but couldn't retrieve it. Please try again."
         else:
             return "👑 Rose: I apologize, but I couldn't generate a response. Please try again."
             
@@ -1274,9 +1360,6 @@ async def get_rose_response(message, user_id):
         print(f"📋 Rose response traceback: {traceback.format_exc()}")
         return f"👑 Rose: I encountered an error. Please try again. ({str(e)[:50]})"
 
-# ============================================================================
-# DISCORD EVENT HANDLERS
-# ============================================================================
 
 @bot.event
 async def on_ready():
@@ -1741,32 +1824,37 @@ def check_weather_config():
     
     return config_status
 
+
+# ============================================================================
+# MEMORY MANAGEMENT COMMANDS (AUTO-ADDED)
+# ============================================================================
+
+@bot.command(name='memory-stats')
+async def memory_stats_command(ctx):
+    """Show memory usage statistics"""
+    stats = get_memory_stats()
+    
+    embed = discord.Embed(
+        title="👑 Rose Memory Statistics",
+        color=0xE91E63
+    )
+    
+    embed.add_field(name="User Conversations", value=stats['user_conversations'], inline=True)
+    embed.add_field(name="Total Threads", value=stats['total_threads'], inline=True)
+    embed.add_field(name="Active Runs", value=stats['active_runs'], inline=True)
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name='clear-my-memory')
+async def clear_user_memory_command(ctx):
+    """Clear conversation memory for the requesting user"""
+    user_id = str(ctx.author.id)
+    if clear_user_memory(user_id):
+        await ctx.send("👑 Rose: Your conversation memory has been cleared. We'll start fresh!")
+    else:
+        await ctx.send("👑 Rose: You don't have any stored conversation memory to clear.")
 # ============================================================================
 # STARTUP SEQUENCE
 # ============================================================================
 
-if __name__ == "__main__":
-    print("🚀 Starting Rose Ashcombe Enhanced Executive Assistant...")
-    
-    # Check weather configuration
-    check_weather_config()
-    
-    # Test weather if configured
-    if WEATHER_API_KEY:
-        print("🧪 Testing weather integration...")
-        try:
-            # Run weather test in main thread since we're not in async context yet
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(test_weather_integration())
-            loop.close()
-        except Exception as e:
-            print(f"⚠️ Weather test failed: {e}")
-    
-    # Start the Discord bot
-    try:
-        bot.run(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"❌ CRITICAL: Failed to start Rose: {e}")
-        exit(1)
+
