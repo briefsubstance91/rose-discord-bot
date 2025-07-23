@@ -1858,3 +1858,29 @@ async def clear_user_memory_command(ctx):
 # ============================================================================
 
 
+
+if __name__ == "__main__":
+    print("🚀 Starting Rose Ashcombe Enhanced Executive Assistant...")
+    
+    # Check weather configuration
+    check_weather_config()
+    
+    # Test weather if configured
+    if WEATHER_API_KEY:
+        print("🧪 Testing weather integration...")
+        try:
+            # Run weather test in main thread since we're not in async context yet
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(test_weather_integration())
+            loop.close()
+        except Exception as e:
+            print(f"⚠️ Weather test failed: {e}")
+    
+    # Start the Discord bot
+    try:
+        bot.run(DISCORD_TOKEN)
+    except Exception as e:
+        print(f"❌ CRITICAL: Failed to start Rose: {e}")
+        exit(1)
