@@ -279,7 +279,10 @@ accessible_calendars = []
 
 
 def initialize_oauth_gmail_service():
-    """Initialize Gmail service using OAuth2 token"""
+    """
+    Initialize Gmail service using OAuth2 token with full permissions
+    This is Rose's PRIMARY Gmail authentication method
+    """
     global gmail_service
     
     # Get OAuth token from environment
@@ -293,6 +296,23 @@ def initialize_oauth_gmail_service():
         # Parse token JSON
         token_data = json.loads(gmail_token_json)
         
+        # Ensure we have the required scopes
+        required_scopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.modify',
+            'https://www.googleapis.com/auth/gmail.compose'
+        ]
+        
+        current_scopes = token_data.get('scopes', [])
+        
+        # Check if we have sufficient permissions
+        if not all(scope in current_scopes for scope in required_scopes[:2]):
+            print("❌ Gmail token lacks required modify permissions")
+            print(f"   Current scopes: {current_scopes}")
+            print(f"   Required scopes: {required_scopes}")
+            print("   Please regenerate OAuth token with gmail.modify scope")
+            return False
+        
         # Create OAuth credentials
         creds = OAuthCredentials(
             token=token_data.get('token'),
@@ -300,18 +320,19 @@ def initialize_oauth_gmail_service():
             token_uri=token_data.get('token_uri', 'https://oauth2.googleapis.com/token'),
             client_id=token_data.get('client_id'),
             client_secret=token_data.get('client_secret'),
-            scopes=token_data.get('scopes', ['https://www.googleapis.com/auth/gmail.readonly'])
+            scopes=current_scopes
         )
         
         # Refresh token if expired
         if creds.expired and creds.refresh_token:
             print("🔄 Refreshing Gmail token...")
+            from google.auth.transport.requests import Request
             creds.refresh(Request())
         
         # Build Gmail service
         gmail_service = build('gmail', 'v1', credentials=creds)
         
-        print("✅ OAuth Gmail service initialized")
+        print("✅ OAuth Gmail service initialized with modify permissions")
         return True
         
     except json.JSONDecodeError:
@@ -456,8 +477,12 @@ def format_event(event, calendar_type, timezone_obj):
 # Initialize Google services on startup
 print("🔧 Initializing Google Calendar integration...")
 google_services_initialized = initialize_google_services()
+
+print("🔧 Initializing Gmail OAuth2 integration...")
 oauth_gmail_initialized = initialize_oauth_gmail_service()
-# Gmail integration - will be added later
+
+print(f"📅 Calendar Service: {'✅ Ready' if google_services_initialized else '❌ Failed'}")
+print(f"📧 Gmail Service: {'✅ Ready' if oauth_gmail_initialized else '❌ Failed'}")
 
 # ============================================================================
 # ENHANCED CALENDAR FUNCTIONS
@@ -743,40 +768,7 @@ async def planning_search_enhanced(query, focus_area="general", num_results=3):
 # GMAIL INTEGRATION FUNCTIONS (ADDED BY SCRIPT)
 # ============================================================================
 
-def initialize_gmail_service():
-    """Initialize Gmail service alongside calendar service"""
-    global gmail_service
-    
-    if not GOOGLE_SERVICE_ACCOUNT_JSON:
-        print("❌ No Google service account JSON found - Gmail features disabled")
-        return False
-    
-    try:
-        # Parse service account JSON
-        service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-        
-        # Create credentials with Gmail scope
-        credentials = Credentials.from_service_account_info(
-            service_account_info,
-            scopes=[
-                'https://www.googleapis.com/auth/calendar.readonly',
-                'https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/gmail.modify'
-            ]
-        )
-        
-        # Build Gmail service
-        gmail_service = build('gmail', 'v1', credentials=credentials)
-        
-        print(f"✅ Gmail service initialized")
-        return True
-        
-    except json.JSONDecodeError:
-        print("❌ Invalid Google service account JSON format")
-        return False
-    except Exception as e:
-        print(f"❌ Gmail service initialization error: {e}")
-        return False
+
 
 def search_emails(query, max_results=10, include_body=False):
     """Search Gmail messages with query"""
