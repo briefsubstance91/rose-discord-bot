@@ -400,7 +400,7 @@ def format_event(event, calendar_type, timezone_obj):
 # Initialize Google services on startup
 print("🔧 Initializing Google Calendar integration...")
 google_services_initialized = initialize_google_services()
-# Gmail integration - will be added later
+gmail_services_initialized = initialize_gmail_service()
 
 # ============================================================================
 # ENHANCED CALENDAR FUNCTIONS
