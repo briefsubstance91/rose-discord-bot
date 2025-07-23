@@ -18,6 +18,8 @@ import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 from google.oauth2.service_account import Credentials
+from google.oauth2.credentials import Credentials as OAuthCredentials
+import pickle
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import traceback
@@ -266,6 +268,51 @@ calendar_service = None
 gmail_service = None
 accessible_calendars = []
 
+
+def initialize_oauth_gmail_service():
+    """Initialize Gmail service using OAuth2 token"""
+    global gmail_service
+    
+    # Get OAuth token from environment
+    gmail_token_json = os.getenv('GMAIL_TOKEN_JSON')
+    
+    if not gmail_token_json:
+        print("❌ GMAIL_TOKEN_JSON not found - Gmail features disabled")
+        return False
+    
+    try:
+        # Parse token JSON
+        token_data = json.loads(gmail_token_json)
+        
+        # Create OAuth credentials
+        creds = OAuthCredentials(
+            token=token_data.get('token'),
+            refresh_token=token_data.get('refresh_token'),
+            token_uri=token_data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            client_id=token_data.get('client_id'),
+            client_secret=token_data.get('client_secret'),
+            scopes=token_data.get('scopes', ['https://www.googleapis.com/auth/gmail.readonly'])
+        )
+        
+        # Refresh token if expired
+        if creds.expired and creds.refresh_token:
+            print("🔄 Refreshing Gmail token...")
+            creds.refresh(Request())
+        
+        # Build Gmail service
+        gmail_service = build('gmail', 'v1', credentials=creds)
+        
+        print("✅ OAuth Gmail service initialized")
+        return True
+        
+    except json.JSONDecodeError:
+        print("❌ Invalid JSON in GMAIL_TOKEN_JSON")
+        return False
+    except Exception as e:
+        print(f"❌ OAuth Gmail initialization error: {e}")
+        return False
+
+
 def initialize_google_services():
     """Initialize Google Calendar service with enhanced error handling"""
     global calendar_service, accessible_calendars
@@ -400,6 +447,7 @@ def format_event(event, calendar_type, timezone_obj):
 # Initialize Google services on startup
 print("🔧 Initializing Google Calendar integration...")
 google_services_initialized = initialize_google_services()
+oauth_gmail_initialized = initialize_oauth_gmail_service()
 # Gmail integration - will be added later
 
 # ============================================================================
