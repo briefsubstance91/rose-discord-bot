@@ -1975,7 +1975,7 @@ async def cleansender_command(ctx, sender_email: str, count: int = 50):
             await msg.add_reaction("❌")
             
             # Wait for reaction
-            def check(reaction, user):
+            async def check(reaction, user):
                 return user == ctx.author and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == msg.id
             
             try:
@@ -10533,7 +10533,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -10823,7 +10823,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -10893,7 +10893,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def planning_search(query, focus_area="general"):
+async def planning_search(query, focus_area="general"):
     """Research planning topics using Brave Search"""
     if not BRAVE_API_KEY:
         return "🔍 Research capability not available (missing API key)"
@@ -12202,7 +12202,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -13284,7 +13284,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -14894,7 +14894,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def status_command(ctx):
+async def status_command(ctx):
     """Show Rose's comprehensive status with new visual identity"""
     try:
         embed = discord.Embed(
