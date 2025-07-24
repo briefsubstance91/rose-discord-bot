@@ -926,14 +926,10 @@ def get_email_stats(days=7):
         print(f"❌ Gmail stats error: {e}")
         return f"📊 **Gmail Stats Error:** {str(e)[:100]}"
 
-def delete_emails_from_sender(sender_email, max_delete=50, confirm=False):
+def delete_emails_from_sender(sender_email, max_delete=50):
     """Delete emails from specific sender"""
     if not gmail_service:
-        return "📧 Gmail service not available"
-    
-    if not confirm:
-        return f"⚠️ **Email Deletion:** Use `confirm=True` to delete emails from {sender_email}"
-    
+        return "📧 Gmail service not available"    
     try:
         # Search for emails from sender
         query = f"from:{sender_email}"
@@ -1361,7 +1357,7 @@ async def handle_rose_functions_enhanced(run, thread_id):
             elif function_name == "delete_emails_from_sender":
                 sender_email = arguments.get('sender_email', '')
                 max_delete = arguments.get('max_delete', 50)
-                confirm = arguments.get('confirm', False)
+                
                 
                 if sender_email:
                     output = delete_emails_from_sender(sender_email, max_delete, confirm)
@@ -1983,7 +1979,7 @@ async def cleansender_command(ctx, sender_email: str, count: int = 50):
                 
                 if str(reaction.emoji) == "✅":
                     # Proceed with deletion
-                    result = delete_emails_from_sender(sender_email, count, confirm=True)
+                    result = delete_emails_from_sender(sender_email, count)
                     await ctx.send(result)
                 else:
                     await ctx.send("❌ Email deletion cancelled.")
