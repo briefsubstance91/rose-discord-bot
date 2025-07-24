@@ -2590,7 +2590,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -2675,6 +2675,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -2712,7 +2713,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -2881,7 +2882,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -2893,7 +2894,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -2904,185 +2905,6 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
-    """Clean emails from a specific sender"""
-    try:
-        async with ctx.typing():
-            if '@' not in sender_email:
-                await ctx.send("❌ Please provide a valid email address")
-                return
-            
-            count = max(1, min(count, 20))
-            result = delete_emails_from_sender(sender_email, count)
-            await ctx.send(result)
-    except Exception as e:
-        print(f"❌ Clean sender command error: {e}")
-        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
-
-# Briefing-specific Discord commands
-@bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await send_long_message(ctx.message, briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
-
-@bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
-            return
-        
-        async with ctx.typing():
-            research = await planning_search(query)
-            await send_long_message(ctx.message, research)
-    except Exception as e:
-        print(f"❌ Plan command error: {e}")
-        await ctx.send("🔍 Planning research unavailable. Please try again.")
-
-# Calendar-specific Discord commands
-@bot.command(name='schedule', aliases=['today'])
-async def schedule_command(ctx):
-    """Today's schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await send_long_message(ctx.message, schedule)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("📅 Schedule unavailable. Please try again.")
-
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await send_long_message(ctx.message, events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("📅 Upcoming events unavailable. Please try again.")
-
-# ============================================================================
-# ERROR HANDLING AND STARTUP
-# ============================================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    """Handle command errors gracefully"""
-    if isinstance(error, commands.CommandNotFound):
-        return
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
-    else:
-        print(f"❌ Command error: {error}")
-        await ctx.send("❌ Command error occurred. Please try again.")
-
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
-if __name__ == "__main__":
-    try:
-        print("🌹 Starting Rose Ashcombe Discord Bot...")
-        bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print("\n👑 Rose Ashcombe shutting down gracefully...")
-    except Exception as e:
-        print(f"❌ Critical startup error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-
-
-async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await send_long_message(ctx.message, briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
-
-@bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
-            return
-        
-        async with ctx.typing():
-            research = await planning_search(query)
-            await send_long_message(ctx.message, research)
-    except Exception as e:
-        print(f"❌ Plan command error: {e}")
-        await ctx.send("🔍 Planning research unavailable. Please try again.")
-
-# Calendar-specific Discord commands
-@bot.command(name='schedule', aliases=['today'])
-async def schedule_command(ctx):
-    """Today's schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await send_long_message(ctx.message, schedule)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("📅 Schedule unavailable. Please try again.")
-
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await send_long_message(ctx.message, events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("📅 Upcoming events unavailable. Please try again.")
-
-# ============================================================================
-# ERROR HANDLING AND STARTUP
-# ============================================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    """Handle command errors gracefully"""
-    if isinstance(error, commands.CommandNotFound):
-        return
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
-    else:
-        print(f"❌ Command error: {error}")
-        await ctx.send("❌ Command error occurred. Please try again.")
-
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
-if __name__ == "__main__":
-    try:
-        print("🌹 Starting Rose Ashcombe Discord Bot...")
-        bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print("\n👑 Rose Ashcombe shutting down gracefully...")
-    except Exception as e:
-        print(f"❌ Critical startup error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-
-
 async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
@@ -3100,7 +2922,7 @@ async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -3111,7 +2933,186 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
+    """Planning research command"""
+    try:
+        if not query:
+            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
+            return
+        
+        async with ctx.typing():
+            research = await planning_search(query)
+            await send_long_message(ctx.message, research)
+    except Exception as e:
+        print(f"❌ Plan command error: {e}")
+        await ctx.send("🔍 Planning research unavailable. Please try again.")
+
+# Calendar-specific Discord commands
+@bot.command(name='schedule', aliases=['today'])
+async def schedule_command(ctx):
+    """Today's schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await send_long_message(ctx.message, schedule)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("📅 Schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await send_long_message(ctx.message, events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("📅 Upcoming events unavailable. Please try again.")
+
+# ============================================================================
+# ERROR HANDLING AND STARTUP
+# ============================================================================
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors gracefully"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
+    else:
+        print(f"❌ Command error: {error}")
+        await ctx.send("❌ Command error occurred. Please try again.")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    try:
+        print("🌹 Starting Rose Ashcombe Discord Bot...")
+        bot.run(DISCORD_TOKEN)
+    except KeyboardInterrupt:
+        print("\n👑 Rose Ashcombe shutting down gracefully...")
+    except Exception as e:
+        print(f"❌ Critical startup error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+
+
+def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await send_long_message(ctx.message, briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
+
+@bot.command(name='plan', aliases=['research'])
+async def plan_command(ctx, *, query: str = ""):
+    """Planning research command"""
+    try:
+        if not query:
+            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
+            return
+        
+        async with ctx.typing():
+            research = await planning_search(query)
+            await send_long_message(ctx.message, research)
+    except Exception as e:
+        print(f"❌ Plan command error: {e}")
+        await ctx.send("🔍 Planning research unavailable. Please try again.")
+
+# Calendar-specific Discord commands
+@bot.command(name='schedule', aliases=['today'])
+async def schedule_command(ctx):
+    """Today's schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await send_long_message(ctx.message, schedule)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("📅 Schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await send_long_message(ctx.message, events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("📅 Upcoming events unavailable. Please try again.")
+
+# ============================================================================
+# ERROR HANDLING AND STARTUP
+# ============================================================================
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors gracefully"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
+    else:
+        print(f"❌ Command error: {error}")
+        await ctx.send("❌ Command error occurred. Please try again.")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    try:
+        print("🌹 Starting Rose Ashcombe Discord Bot...")
+        bot.run(DISCORD_TOKEN)
+    except KeyboardInterrupt:
+        print("\n👑 Rose Ashcombe shutting down gracefully...")
+    except Exception as e:
+        print(f"❌ Critical startup error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+
+
+def clean_sender_command(ctx, sender_email: str, count: int = 5):
+    """Clean emails from a specific sender"""
+    try:
+        async with ctx.typing():
+            if '@' not in sender_email:
+                await ctx.send("❌ Please provide a valid email address")
+                return
+            
+            count = max(1, min(count, 20))
+            result = delete_emails_from_sender(sender_email, count)
+            await ctx.send(result)
+    except Exception as e:
+        print(f"❌ Clean sender command error: {e}")
+        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
+
+# Briefing-specific Discord commands
+@bot.command(name='briefing', aliases=['daily', 'morning'])
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await send_long_message(ctx.message, briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
+
+@bot.command(name='plan', aliases=['research'])
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -3667,7 +3668,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -3752,6 +3753,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -3789,7 +3791,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -3958,7 +3960,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -3970,7 +3972,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -3981,7 +3983,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -3998,7 +4000,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -4009,7 +4011,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -4079,7 +4081,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-async def email_count_command(ctx):
+def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -4090,7 +4092,7 @@ async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -4107,7 +4109,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -4118,7 +4120,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -4799,7 +4801,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -4884,6 +4886,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -4921,7 +4924,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -5090,7 +5093,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -5102,7 +5105,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -5113,7 +5116,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -5130,7 +5133,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -5141,7 +5144,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -5233,7 +5236,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -5318,6 +5321,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -5355,7 +5359,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -5524,7 +5528,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -5536,7 +5540,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -5547,7 +5551,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -5564,7 +5568,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -5575,7 +5579,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -6454,7 +6458,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -6539,6 +6543,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -6576,7 +6581,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -6745,7 +6750,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -6757,7 +6762,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -6768,7 +6773,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -6785,7 +6790,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -6796,7 +6801,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -7507,7 +7512,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -7592,6 +7597,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -7629,7 +7635,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -7798,7 +7804,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -7810,7 +7816,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -7821,7 +7827,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -7838,7 +7844,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -7849,7 +7855,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -8475,7 +8481,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -8560,6 +8566,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -8597,7 +8604,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -8766,7 +8773,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -8778,7 +8785,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -8789,7 +8796,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -8806,7 +8813,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -8817,7 +8824,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -9284,7 +9291,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -9369,6 +9376,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -9406,7 +9414,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -9575,7 +9583,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -9587,7 +9595,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -9598,7 +9606,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -9615,7 +9623,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -9626,7 +9634,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -10111,7 +10119,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -10196,6 +10204,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -10233,296 +10242,6 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
-    """Test Rose's connectivity with executive flair"""
-    try:
-        latency = round(bot.latency * 1000)
-        await ctx.send(f"👑 Pong! Latency: {latency}ms - Executive operations running smoothly!")
-    except Exception as e:
-        print(f"❌ Ping command error: {e}")
-        await ctx.send("👑 Executive ping experiencing issues.")
-
-@bot.command(name='status')
-async def status_command(ctx):
-    """Show Rose's comprehensive status with new visual identity"""
-    try:
-        embed = discord.Embed(
-            title="👑 Rose Ashcombe - Executive Assistant",
-            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
-            color=0xDC2626  # Red color
-        )
-        
-        # Connection statuses
-        embed.add_field(
-            name="🔗 OpenAI Assistant",
-            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📧 Gmail Access",
-            value="✅ Connected" if gmail_service else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📅 Calendar Access",
-            value="✅ Connected" if calendar_service else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="🔍 Research Capability",
-            value="✅ Available" if BRAVE_API_KEY else "❌ Not configured",
-            inline=True
-        )
-        
-        # Specialties
-        specialties_text = "\n".join([f"• {spec}" for spec in ASSISTANT_CONFIG['specialties']])
-        embed.add_field(
-            name="🎯 Executive Specialties",
-            value=specialties_text,
-            inline=False
-        )
-        
-        # Calendar status if available
-        if accessible_calendars:
-            calendar_list = "\n".join([f"• {name}" for name, _ in accessible_calendars])
-            embed.add_field(
-                name="📅 Accessible Calendars",
-                value=calendar_list,
-                inline=False
-            )
-        
-        # Active status
-        embed.add_field(
-            name="📊 Executive Status",
-            value=f"👥 Active Conversations: {len(user_conversations)}\n📋 Monitored Channels: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-    except Exception as e:
-        print(f"❌ Status command error: {e}")
-        await ctx.send("👑 Executive status check experiencing issues.")
-
-@bot.command(name='help', aliases=['commands'])
-async def help_command(ctx):
-    """Show Rose's comprehensive help information with new visual identity"""
-    try:
-        embed = discord.Embed(
-            title="👑 Rose Ashcombe - Executive Assistant",
-            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
-            color=0xDC2626  # Red color
-        )
-        
-        # How to use
-        embed.add_field(
-            name="💬 How to Work with Rose",
-            value=f"• Mention @{ASSISTANT_CONFIG['name']} for executive assistance and strategic planning\n• Use commands below for specific functions\n• I monitor: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
-            inline=False
-        )
-        
-        # All commands organized by category
-        embed.add_field(
-            name="📧 Email Commands",
-            value="• `!emails [count]` - Recent emails (default: 10)\n• `!unread [count]` - Unread emails only\n• `!emailstats` - Email dashboard overview\n• `!quickemails [count]` - Concise email view\n• `!emailcount` - Just email counts\n• `!cleansender <email> [count]` - Delete emails from sender",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="📅 Calendar Commands",
-            value="• `!briefing` / `!daily` / `!morning` - Morning executive briefing\n• `!schedule` / `!today` - Today's executive schedule\n• `!upcoming [days]` - Upcoming events (default: 7 days)",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="🔍 Planning & Research Commands",
-            value="• `!plan [query]` / `!research [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
-            inline=False
-        )
-        
-        # Example requests
-        examples_text = "\n".join([f"• {ex}" for ex in ASSISTANT_CONFIG['example_requests']])
-        embed.add_field(
-            name="✨ Example Executive Requests",
-            value=examples_text,
-            inline=False
-        )
-        
-        # Core capabilities
-        capabilities_text = "\n".join([f"• {cap}" for cap in ASSISTANT_CONFIG['capabilities']])
-        embed.add_field(
-            name="🎯 Executive Capabilities",
-            value=capabilities_text,
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-    except Exception as e:
-        print(f"❌ Help command error: {e}")
-        await ctx.send("👑 Executive help experiencing issues.")
-
-# Email-specific Discord commands
-@bot.command(name='emails')
-async def emails_command(ctx, count: int = 10):
-    """Recent emails command"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 20))
-            emails = get_recent_emails(count)
-            await send_long_message(ctx.message, emails)
-    except Exception as e:
-        print(f"❌ Emails command error: {e}")
-        await ctx.send("📧 Recent emails unavailable. Please try again.")
-
-@bot.command(name='unread')
-async def unread_command(ctx, count: int = 10):
-    """Unread emails command"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 20))
-            emails = get_unread_emails(count)
-            await send_long_message(ctx.message, emails)
-    except Exception as e:
-        print(f"❌ Unread command error: {e}")
-        await ctx.send("📧 Unread emails unavailable. Please try again.")
-
-@bot.command(name='emailstats')
-async def emailstats_command(ctx):
-    """Email statistics command"""
-    try:
-        async with ctx.typing():
-            stats = get_email_stats()
-            await ctx.send(stats)
-    except Exception as e:
-        print(f"❌ Email stats command error: {e}")
-        await ctx.send("📧 Email statistics unavailable. Please try again.")
-
-@bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
-    """Quick email overview with minimal formatting"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 10))
-            emails = get_recent_emails(count)
-            await ctx.send(emails)
-    except Exception as e:
-        print(f"❌ Quick emails command error: {e}")
-        await ctx.send("📧 Quick email check unavailable")
-
-@bot.command(name='emailcount')
-async async def email_count_command(ctx):
-    """Just show email counts without details"""
-    try:
-        async with ctx.typing():
-            stats = get_email_stats()
-            await ctx.send(stats)
-    except Exception as e:
-        print(f"❌ Email count command error: {e}")
-        await ctx.send("📧 Email count unavailable")
-
-@bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
-    """Clean emails from a specific sender"""
-    try:
-        async with ctx.typing():
-            if '@' not in sender_email:
-                await ctx.send("❌ Please provide a valid email address")
-                return
-            
-            count = max(1, min(count, 20))
-            result = delete_emails_from_sender(sender_email, count)
-            await ctx.send(result)
-    except Exception as e:
-        print(f"❌ Clean sender command error: {e}")
-        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
-
-# Briefing-specific Discord commands
-@bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await send_long_message(ctx.message, briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
-
-@bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
-            return
-        
-        async with ctx.typing():
-            research = await planning_search(query)
-            await send_long_message(ctx.message, research)
-    except Exception as e:
-        print(f"❌ Plan command error: {e}")
-        await ctx.send("🔍 Planning research unavailable. Please try again.")
-
-# Calendar-specific Discord commands
-@bot.command(name='schedule', aliases=['today'])
-async def schedule_command(ctx):
-    """Today's schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await send_long_message(ctx.message, schedule)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("📅 Schedule unavailable. Please try again.")
-
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await send_long_message(ctx.message, events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("📅 Upcoming events unavailable. Please try again.")
-
-# ============================================================================
-# ERROR HANDLING AND STARTUP
-# ============================================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    """Handle command errors gracefully"""
-    if isinstance(error, commands.CommandNotFound):
-        return
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
-    else:
-        print(f"❌ Command error: {error}")
-        await ctx.send("❌ Command error occurred. Please try again.")
-
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
-if __name__ == "__main__":
-    try:
-        print("🌹 Starting Rose Ashcombe Discord Bot...")
-        bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print("\n👑 Rose Ashcombe shutting down gracefully...")
-    except Exception as e:
-        print(f"❌ Critical startup error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-
-
 async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
@@ -10692,7 +10411,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -10704,7 +10423,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -10715,7 +10434,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -10732,7 +10451,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -10743,7 +10462,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -10813,7 +10532,297 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
+def ping_command(ctx):
+    """Test Rose's connectivity with executive flair"""
+    try:
+        latency = round(bot.latency * 1000)
+        await ctx.send(f"👑 Pong! Latency: {latency}ms - Executive operations running smoothly!")
+    except Exception as e:
+        print(f"❌ Ping command error: {e}")
+        await ctx.send("👑 Executive ping experiencing issues.")
+
+@bot.command(name='status')
+async def status_command(ctx):
+    """Show Rose's comprehensive status with new visual identity"""
+    try:
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
+            color=0xDC2626  # Red color
+        )
+        
+        # Connection statuses
+        embed.add_field(
+            name="🔗 OpenAI Assistant",
+            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📧 Gmail Access",
+            value="✅ Connected" if gmail_service else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Access",
+            value="✅ Connected" if calendar_service else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔍 Research Capability",
+            value="✅ Available" if BRAVE_API_KEY else "❌ Not configured",
+            inline=True
+        )
+        
+        # Specialties
+        specialties_text = "\n".join([f"• {spec}" for spec in ASSISTANT_CONFIG['specialties']])
+        embed.add_field(
+            name="🎯 Executive Specialties",
+            value=specialties_text,
+            inline=False
+        )
+        
+        # Calendar status if available
+        if accessible_calendars:
+            calendar_list = "\n".join([f"• {name}" for name, _ in accessible_calendars])
+            embed.add_field(
+                name="📅 Accessible Calendars",
+                value=calendar_list,
+                inline=False
+            )
+        
+        # Active status
+        embed.add_field(
+            name="📊 Executive Status",
+            value=f"👥 Active Conversations: {len(user_conversations)}\n📋 Monitored Channels: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"❌ Status command error: {e}")
+        await ctx.send("👑 Executive status check experiencing issues.")
+
+@bot.command(name='help', aliases=['commands'])
+async def help_command(ctx):
+    """Show Rose's comprehensive help information with new visual identity"""
+    try:
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
+            color=0xDC2626  # Red color
+        )
+        
+        # How to use
+        embed.add_field(
+            name="💬 How to Work with Rose",
+            value=f"• Mention @{ASSISTANT_CONFIG['name']} for executive assistance and strategic planning\n• Use commands below for specific functions\n• I monitor: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
+            inline=False
+        )
+        
+        # All commands organized by category
+        embed.add_field(
+            name="📧 Email Commands",
+            value="• `!emails [count]` - Recent emails (default: 10)\n• `!unread [count]` - Unread emails only\n• `!emailstats` - Email dashboard overview\n• `!quickemails [count]` - Concise email view\n• `!emailcount` - Just email counts\n• `!cleansender <email> [count]` - Delete emails from sender",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Commands",
+            value="• `!briefing` / `!daily` / `!morning` - Morning executive briefing\n• `!schedule` / `!today` - Today's executive schedule\n• `!upcoming [days]` - Upcoming events (default: 7 days)",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🔍 Planning & Research Commands",
+            value="• `!plan [query]` / `!research [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
+            inline=False
+        )
+        
+        # Example requests
+        examples_text = "\n".join([f"• {ex}" for ex in ASSISTANT_CONFIG['example_requests']])
+        embed.add_field(
+            name="✨ Example Executive Requests",
+            value=examples_text,
+            inline=False
+        )
+        
+        # Core capabilities
+        capabilities_text = "\n".join([f"• {cap}" for cap in ASSISTANT_CONFIG['capabilities']])
+        embed.add_field(
+            name="🎯 Executive Capabilities",
+            value=capabilities_text,
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"❌ Help command error: {e}")
+        await ctx.send("👑 Executive help experiencing issues.")
+
+# Email-specific Discord commands
+@bot.command(name='emails')
+async def emails_command(ctx, count: int = 10):
+    """Recent emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_recent_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Emails command error: {e}")
+        await ctx.send("📧 Recent emails unavailable. Please try again.")
+
+@bot.command(name='unread')
+async def unread_command(ctx, count: int = 10):
+    """Unread emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_unread_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Unread command error: {e}")
+        await ctx.send("📧 Unread emails unavailable. Please try again.")
+
+@bot.command(name='emailstats')
+async def emailstats_command(ctx):
+    """Email statistics command"""
+    try:
+        async with ctx.typing():
+            stats = get_email_stats()
+            await ctx.send(stats)
+    except Exception as e:
+        print(f"❌ Email stats command error: {e}")
+        await ctx.send("📧 Email statistics unavailable. Please try again.")
+
+@bot.command(name='quickemails')
+async def quick_emails_command(ctx, count: int = 5):
+    """Quick email overview with minimal formatting"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 10))
+            emails = get_recent_emails(count)
+            await ctx.send(emails)
+    except Exception as e:
+        print(f"❌ Quick emails command error: {e}")
+        await ctx.send("📧 Quick email check unavailable")
+
+@bot.command(name='emailcount')
+async def email_count_command(ctx):
+    """Just show email counts without details"""
+    try:
+        async with ctx.typing():
+            stats = get_email_stats()
+            await ctx.send(stats)
+    except Exception as e:
+        print(f"❌ Email count command error: {e}")
+        await ctx.send("📧 Email count unavailable")
+
+@bot.command(name='cleansender')
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+    """Clean emails from a specific sender"""
+    try:
+        async with ctx.typing():
+            if '@' not in sender_email:
+                await ctx.send("❌ Please provide a valid email address")
+                return
+            
+            count = max(1, min(count, 20))
+            result = delete_emails_from_sender(sender_email, count)
+            await ctx.send(result)
+    except Exception as e:
+        print(f"❌ Clean sender command error: {e}")
+        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
+
+# Briefing-specific Discord commands
+@bot.command(name='briefing', aliases=['daily', 'morning'])
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await send_long_message(ctx.message, briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
+
+@bot.command(name='plan', aliases=['research'])
 async def plan_command(ctx, *, query: str = ""):
+    """Planning research command"""
+    try:
+        if not query:
+            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
+            return
+        
+        async with ctx.typing():
+            research = await planning_search(query)
+            await send_long_message(ctx.message, research)
+    except Exception as e:
+        print(f"❌ Plan command error: {e}")
+        await ctx.send("🔍 Planning research unavailable. Please try again.")
+
+# Calendar-specific Discord commands
+@bot.command(name='schedule', aliases=['today'])
+async def schedule_command(ctx):
+    """Today's schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await send_long_message(ctx.message, schedule)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("📅 Schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await send_long_message(ctx.message, events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("📅 Upcoming events unavailable. Please try again.")
+
+# ============================================================================
+# ERROR HANDLING AND STARTUP
+# ============================================================================
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors gracefully"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
+    else:
+        print(f"❌ Command error: {error}")
+        await ctx.send("❌ Command error occurred. Please try again.")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    try:
+        print("🌹 Starting Rose Ashcombe Discord Bot...")
+        bot.run(DISCORD_TOKEN)
+    except KeyboardInterrupt:
+        print("\n👑 Rose Ashcombe shutting down gracefully...")
+    except Exception as e:
+        print(f"❌ Critical startup error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+
+
+def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -11779,7 +11788,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -11864,6 +11873,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -11901,7 +11911,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -12070,7 +12080,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -12082,7 +12092,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -12093,7 +12103,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -12110,7 +12120,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -12121,7 +12131,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -12191,7 +12201,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-async def quick_emails_command(ctx, count: int = 5):
+def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -12203,7 +12213,7 @@ async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -12214,7 +12224,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -12231,7 +12241,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -12242,7 +12252,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -12860,418 +12870,6 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
-    """Send response with length handling and error recovery"""
-    try:
-        if len(response) <= 2000:
-            await original_message.reply(response)
-        else:
-            chunks = []
-            current_chunk = ""
-            
-            for line in response.split('\n'):
-                if len(current_chunk + line + '\n') > 1900:
-                    if current_chunk:
-                        chunks.append(current_chunk.strip())
-                    current_chunk = line + '\n'
-                else:
-                    current_chunk += line + '\n'
-            
-            if current_chunk:
-                chunks.append(current_chunk.strip())
-            
-            for i, chunk in enumerate(chunks):
-                if i == 0:
-                    await original_message.reply(chunk)
-                else:
-                    await original_message.channel.send(chunk)
-                    
-    except discord.HTTPException as e:
-        print(f"❌ Discord HTTP error: {e}")
-        try:
-            await original_message.reply("👑 Executive guidance too complex for Discord. Please try a more specific request.")
-        except:
-            pass
-
-# ============================================================================
-# DISCORD EVENT HANDLERS
-# ============================================================================
-
-@bot.event
-async def on_ready():
-    """Rose startup confirmation"""
-    try:
-        print(f"\n🌹 ======================================")
-        print(f"👑 ROSE ASHCOMBE - EXECUTIVE ASSISTANT")
-        print(f"🌹 ======================================")
-        print(f"✅ Discord: Connected as {bot.user}")
-        print(f"📧 Gmail: {'✅ Connected' if gmail_service else '❌ Not available'}")
-        print(f"📅 Calendar: {'✅ Connected' if calendar_service else '❌ Not available'}")
-        print(f"🛠️  Assistant: {'✅ Connected' if ASSISTANT_ID else '❌ Not configured'}")
-        print(f"🔍 Research: {'✅ Connected' if BRAVE_API_KEY else '❌ Not available'}")
-        print(f"📋 Channels: {', '.join(ALLOWED_CHANNELS)}")
-        
-        if accessible_calendars:
-            print(f"📅 Accessible Calendars: {len(accessible_calendars)}")
-            for name, _ in accessible_calendars:
-                print(f"   • {name}")
-        
-        print(f"🌹 ======================================")
-        print(f"👑 Ready for executive assistance!")
-        print(f"🌹 ======================================\n")
-        
-    except Exception as e:
-        print(f"❌ Startup error: {e}")
-
-@bot.event
-async def on_error(event, *args, **kwargs):
-    """Global error handler"""
-    print(f"❌ Discord error in {event}: {traceback.format_exc()}")
-
-@bot.event
-async def on_message(message):
-    """Enhanced message handling following team patterns"""
-    try:
-        if message.author == bot.user:
-            return
-        
-        await bot.process_commands(message)
-        
-        channel_name = message.channel.name.lower() if hasattr(message.channel, 'name') else 'dm'
-        is_dm = isinstance(message.channel, discord.DMChannel)
-        is_allowed_channel = any(allowed in channel_name for allowed in ALLOWED_CHANNELS)
-        
-        if not (is_dm or is_allowed_channel):
-            return
-
-        if bot.user.mentioned_in(message) or is_dm:
-            
-            message_key = f"{message.author.id}_{message.content[:50]}"
-            current_time = time.time()
-            
-            if message_key in processing_messages:
-                return
-            
-            if message.author.id in last_response_time:
-                if current_time - last_response_time[message.author.id] < 5:
-                    return
-            
-            processing_messages.add(message_key)
-            last_response_time[message.author.id] = current_time
-            
-            try:
-                async with message.channel.typing():
-                    response = await get_rose_response(message.content, message.author.id)
-                    await send_long_message(message, response)
-            except Exception as e:
-                print(f"❌ Message error: {e}")
-                print(f"📋 Message traceback: {traceback.format_exc()}")
-                try:
-                    await message.reply("❌ Something went wrong with executive consultation. Please try again!")
-                except:
-                    pass
-            finally:
-                processing_messages.discard(message_key)
-                    
-    except Exception as e:
-        print(f"❌ Message event error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-
-# ============================================================================
-# DISCORD COMMANDS WITH NEW VISUAL IDENTITY
-# ============================================================================
-
-@bot.command(name='ping')
-async async def ping_command(ctx):
-    """Test Rose's connectivity with executive flair"""
-    try:
-        latency = round(bot.latency * 1000)
-        await ctx.send(f"👑 Pong! Latency: {latency}ms - Executive operations running smoothly!")
-    except Exception as e:
-        print(f"❌ Ping command error: {e}")
-        await ctx.send("👑 Executive ping experiencing issues.")
-
-@bot.command(name='status')
-async def status_command(ctx):
-    """Show Rose's comprehensive status with new visual identity"""
-    try:
-        embed = discord.Embed(
-            title="👑 Rose Ashcombe - Executive Assistant",
-            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
-            color=0xDC2626  # Red color
-        )
-        
-        # Connection statuses
-        embed.add_field(
-            name="🔗 OpenAI Assistant",
-            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📧 Gmail Access",
-            value="✅ Connected" if gmail_service else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📅 Calendar Access",
-            value="✅ Connected" if calendar_service else "❌ Not configured",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="🔍 Research Capability",
-            value="✅ Available" if BRAVE_API_KEY else "❌ Not configured",
-            inline=True
-        )
-        
-        # Specialties
-        specialties_text = "\n".join([f"• {spec}" for spec in ASSISTANT_CONFIG['specialties']])
-        embed.add_field(
-            name="🎯 Executive Specialties",
-            value=specialties_text,
-            inline=False
-        )
-        
-        # Calendar status if available
-        if accessible_calendars:
-            calendar_list = "\n".join([f"• {name}" for name, _ in accessible_calendars])
-            embed.add_field(
-                name="📅 Accessible Calendars",
-                value=calendar_list,
-                inline=False
-            )
-        
-        # Active status
-        embed.add_field(
-            name="📊 Executive Status",
-            value=f"👥 Active Conversations: {len(user_conversations)}\n📋 Monitored Channels: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-    except Exception as e:
-        print(f"❌ Status command error: {e}")
-        await ctx.send("👑 Executive status check experiencing issues.")
-
-@bot.command(name='help', aliases=['commands'])
-async def help_command(ctx):
-    """Show Rose's comprehensive help information with new visual identity"""
-    try:
-        embed = discord.Embed(
-            title="👑 Rose Ashcombe - Executive Assistant",
-            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
-            color=0xDC2626  # Red color
-        )
-        
-        # How to use
-        embed.add_field(
-            name="💬 How to Work with Rose",
-            value=f"• Mention @{ASSISTANT_CONFIG['name']} for executive assistance and strategic planning\n• Use commands below for specific functions\n• I monitor: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
-            inline=False
-        )
-        
-        # All commands organized by category
-        embed.add_field(
-            name="📧 Email Commands",
-            value="• `!emails [count]` - Recent emails (default: 10)\n• `!unread [count]` - Unread emails only\n• `!emailstats` - Email dashboard overview\n• `!quickemails [count]` - Concise email view\n• `!emailcount` - Just email counts\n• `!cleansender <email> [count]` - Delete emails from sender",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="📅 Calendar Commands",
-            value="• `!briefing` / `!daily` / `!morning` - Morning executive briefing\n• `!schedule` / `!today` - Today's executive schedule\n• `!upcoming [days]` - Upcoming events (default: 7 days)",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="🔍 Planning & Research Commands",
-            value="• `!plan [query]` / `!research [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
-            inline=False
-        )
-        
-        # Example requests
-        examples_text = "\n".join([f"• {ex}" for ex in ASSISTANT_CONFIG['example_requests']])
-        embed.add_field(
-            name="✨ Example Executive Requests",
-            value=examples_text,
-            inline=False
-        )
-        
-        # Core capabilities
-        capabilities_text = "\n".join([f"• {cap}" for cap in ASSISTANT_CONFIG['capabilities']])
-        embed.add_field(
-            name="🎯 Executive Capabilities",
-            value=capabilities_text,
-            inline=False
-        )
-        
-        await ctx.send(embed=embed)
-        
-    except Exception as e:
-        print(f"❌ Help command error: {e}")
-        await ctx.send("👑 Executive help experiencing issues.")
-
-# Email-specific Discord commands
-@bot.command(name='emails')
-async def emails_command(ctx, count: int = 10):
-    """Recent emails command"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 20))
-            emails = get_recent_emails(count)
-            await send_long_message(ctx.message, emails)
-    except Exception as e:
-        print(f"❌ Emails command error: {e}")
-        await ctx.send("📧 Recent emails unavailable. Please try again.")
-
-@bot.command(name='unread')
-async def unread_command(ctx, count: int = 10):
-    """Unread emails command"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 20))
-            emails = get_unread_emails(count)
-            await send_long_message(ctx.message, emails)
-    except Exception as e:
-        print(f"❌ Unread command error: {e}")
-        await ctx.send("📧 Unread emails unavailable. Please try again.")
-
-@bot.command(name='emailstats')
-async def emailstats_command(ctx):
-    """Email statistics command"""
-    try:
-        async with ctx.typing():
-            stats = get_email_stats()
-            await ctx.send(stats)
-    except Exception as e:
-        print(f"❌ Email stats command error: {e}")
-        await ctx.send("📧 Email statistics unavailable. Please try again.")
-
-@bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
-    """Quick email overview with minimal formatting"""
-    try:
-        async with ctx.typing():
-            count = max(1, min(count, 10))
-            emails = get_recent_emails(count)
-            await ctx.send(emails)
-    except Exception as e:
-        print(f"❌ Quick emails command error: {e}")
-        await ctx.send("📧 Quick email check unavailable")
-
-@bot.command(name='emailcount')
-async async def email_count_command(ctx):
-    """Just show email counts without details"""
-    try:
-        async with ctx.typing():
-            stats = get_email_stats()
-            await ctx.send(stats)
-    except Exception as e:
-        print(f"❌ Email count command error: {e}")
-        await ctx.send("📧 Email count unavailable")
-
-@bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
-    """Clean emails from a specific sender"""
-    try:
-        async with ctx.typing():
-            if '@' not in sender_email:
-                await ctx.send("❌ Please provide a valid email address")
-                return
-            
-            count = max(1, min(count, 20))
-            result = delete_emails_from_sender(sender_email, count)
-            await ctx.send(result)
-    except Exception as e:
-        print(f"❌ Clean sender command error: {e}")
-        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
-
-# Briefing-specific Discord commands
-@bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
-    """Morning executive briefing command"""
-    try:
-        async with ctx.typing():
-            briefing = get_morning_briefing()
-            await send_long_message(ctx.message, briefing)
-    except Exception as e:
-        print(f"❌ Briefing command error: {e}")
-        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
-
-@bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
-    """Planning research command"""
-    try:
-        if not query:
-            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
-            return
-        
-        async with ctx.typing():
-            research = await planning_search(query)
-            await send_long_message(ctx.message, research)
-    except Exception as e:
-        print(f"❌ Plan command error: {e}")
-        await ctx.send("🔍 Planning research unavailable. Please try again.")
-
-# Calendar-specific Discord commands
-@bot.command(name='schedule', aliases=['today'])
-async def schedule_command(ctx):
-    """Today's schedule command"""
-    try:
-        async with ctx.typing():
-            schedule = get_today_schedule()
-            await send_long_message(ctx.message, schedule)
-    except Exception as e:
-        print(f"❌ Schedule command error: {e}")
-        await ctx.send("📅 Schedule unavailable. Please try again.")
-
-@bot.command(name='upcoming')
-async def upcoming_command(ctx, days: int = 7):
-    """Upcoming events command"""
-    try:
-        async with ctx.typing():
-            days = max(1, min(days, 30))
-            events = get_upcoming_events(days)
-            await send_long_message(ctx.message, events)
-    except Exception as e:
-        print(f"❌ Upcoming command error: {e}")
-        await ctx.send("📅 Upcoming events unavailable. Please try again.")
-
-# ============================================================================
-# ERROR HANDLING AND STARTUP
-# ============================================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    """Handle command errors gracefully"""
-    if isinstance(error, commands.CommandNotFound):
-        return
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
-    else:
-        print(f"❌ Command error: {error}")
-        await ctx.send("❌ Command error occurred. Please try again.")
-
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
-if __name__ == "__main__":
-    try:
-        print("🌹 Starting Rose Ashcombe Discord Bot...")
-        bot.run(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        print("\n👑 Rose Ashcombe shutting down gracefully...")
-    except Exception as e:
-        print(f"❌ Critical startup error: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-
-
 async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
@@ -13357,6 +12955,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -13394,7 +12993,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -13563,7 +13162,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -13575,7 +13174,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -13586,7 +13185,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -13603,7 +13202,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -13614,7 +13213,420 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
+    """Planning research command"""
+    try:
+        if not query:
+            await ctx.send("🔍 Please provide a planning research query. Example: `!plan time blocking strategies`")
+            return
+        
+        async with ctx.typing():
+            research = await planning_search(query)
+            await send_long_message(ctx.message, research)
+    except Exception as e:
+        print(f"❌ Plan command error: {e}")
+        await ctx.send("🔍 Planning research unavailable. Please try again.")
+
+# Calendar-specific Discord commands
+@bot.command(name='schedule', aliases=['today'])
+async def schedule_command(ctx):
+    """Today's schedule command"""
+    try:
+        async with ctx.typing():
+            schedule = get_today_schedule()
+            await send_long_message(ctx.message, schedule)
+    except Exception as e:
+        print(f"❌ Schedule command error: {e}")
+        await ctx.send("📅 Schedule unavailable. Please try again.")
+
+@bot.command(name='upcoming')
+async def upcoming_command(ctx, days: int = 7):
+    """Upcoming events command"""
+    try:
+        async with ctx.typing():
+            days = max(1, min(days, 30))
+            events = get_upcoming_events(days)
+            await send_long_message(ctx.message, events)
+    except Exception as e:
+        print(f"❌ Upcoming command error: {e}")
+        await ctx.send("📅 Upcoming events unavailable. Please try again.")
+
+# ============================================================================
+# ERROR HANDLING AND STARTUP
+# ============================================================================
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors gracefully"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument. Use `!help` for command usage.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send(f"❌ Invalid argument provided. Use `!help` for command usage.")
+    else:
+        print(f"❌ Command error: {error}")
+        await ctx.send("❌ Command error occurred. Please try again.")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    try:
+        print("🌹 Starting Rose Ashcombe Discord Bot...")
+        bot.run(DISCORD_TOKEN)
+    except KeyboardInterrupt:
+        print("\n👑 Rose Ashcombe shutting down gracefully...")
+    except Exception as e:
+        print(f"❌ Critical startup error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+
+
+def send_long_message(original_message, response):
+    """Send response with length handling and error recovery"""
+    try:
+        if len(response) <= 2000:
+            await original_message.reply(response)
+        else:
+            chunks = []
+            current_chunk = ""
+            
+            for line in response.split('\n'):
+                if len(current_chunk + line + '\n') > 1900:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = line + '\n'
+                else:
+                    current_chunk += line + '\n'
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            for i, chunk in enumerate(chunks):
+                if i == 0:
+                    await original_message.reply(chunk)
+                else:
+                    await original_message.channel.send(chunk)
+                    
+    except discord.HTTPException as e:
+        print(f"❌ Discord HTTP error: {e}")
+        try:
+            await original_message.reply("👑 Executive guidance too complex for Discord. Please try a more specific request.")
+        except:
+            pass
+
+# ============================================================================
+# DISCORD EVENT HANDLERS
+# ============================================================================
+
+@bot.event
+async def on_ready():
+    """Rose startup confirmation"""
+    try:
+        print(f"\n🌹 ======================================")
+        print(f"👑 ROSE ASHCOMBE - EXECUTIVE ASSISTANT")
+        print(f"🌹 ======================================")
+        print(f"✅ Discord: Connected as {bot.user}")
+        print(f"📧 Gmail: {'✅ Connected' if gmail_service else '❌ Not available'}")
+        print(f"📅 Calendar: {'✅ Connected' if calendar_service else '❌ Not available'}")
+        print(f"🛠️  Assistant: {'✅ Connected' if ASSISTANT_ID else '❌ Not configured'}")
+        print(f"🔍 Research: {'✅ Connected' if BRAVE_API_KEY else '❌ Not available'}")
+        print(f"📋 Channels: {', '.join(ALLOWED_CHANNELS)}")
+        
+        if accessible_calendars:
+            print(f"📅 Accessible Calendars: {len(accessible_calendars)}")
+            for name, _ in accessible_calendars:
+                print(f"   • {name}")
+        
+        print(f"🌹 ======================================")
+        print(f"👑 Ready for executive assistance!")
+        print(f"🌹 ======================================\n")
+        
+    except Exception as e:
+        print(f"❌ Startup error: {e}")
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Global error handler"""
+    print(f"❌ Discord error in {event}: {traceback.format_exc()}")
+
+@bot.event
+async def on_message(message):
+    """Enhanced message handling following team patterns"""
+    try:
+        if message.author == bot.user:
+            return
+        
+        await bot.process_commands(message)
+        
+        channel_name = message.channel.name.lower() if hasattr(message.channel, 'name') else 'dm'
+        is_dm = isinstance(message.channel, discord.DMChannel)
+        is_allowed_channel = any(allowed in channel_name for allowed in ALLOWED_CHANNELS)
+        
+        if not (is_dm or is_allowed_channel):
+            return
+
+        if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
+            
+            message_key = f"{message.author.id}_{message.content[:50]}"
+            current_time = time.time()
+            
+            if message_key in processing_messages:
+                return
+            
+            if message.author.id in last_response_time:
+                if current_time - last_response_time[message.author.id] < 5:
+                    return
+            
+            processing_messages.add(message_key)
+            last_response_time[message.author.id] = current_time
+            
+            try:
+                async with message.channel.typing():
+                    response = await get_rose_response(message.content, message.author.id)
+                    await send_long_message(message, response)
+            except Exception as e:
+                print(f"❌ Message error: {e}")
+                print(f"📋 Message traceback: {traceback.format_exc()}")
+                try:
+                    await message.reply("❌ Something went wrong with executive consultation. Please try again!")
+                except:
+                    pass
+            finally:
+                processing_messages.discard(message_key)
+                    
+    except Exception as e:
+        print(f"❌ Message event error: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+
+# ============================================================================
+# DISCORD COMMANDS WITH NEW VISUAL IDENTITY
+# ============================================================================
+
+@bot.command(name='ping')
+async def ping_command(ctx):
+    """Test Rose's connectivity with executive flair"""
+    try:
+        latency = round(bot.latency * 1000)
+        await ctx.send(f"👑 Pong! Latency: {latency}ms - Executive operations running smoothly!")
+    except Exception as e:
+        print(f"❌ Ping command error: {e}")
+        await ctx.send("👑 Executive ping experiencing issues.")
+
+@bot.command(name='status')
+async def status_command(ctx):
+    """Show Rose's comprehensive status with new visual identity"""
+    try:
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
+            color=0xDC2626  # Red color
+        )
+        
+        # Connection statuses
+        embed.add_field(
+            name="🔗 OpenAI Assistant",
+            value="✅ Connected" if ASSISTANT_ID else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📧 Gmail Access",
+            value="✅ Connected" if gmail_service else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Access",
+            value="✅ Connected" if calendar_service else "❌ Not configured",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔍 Research Capability",
+            value="✅ Available" if BRAVE_API_KEY else "❌ Not configured",
+            inline=True
+        )
+        
+        # Specialties
+        specialties_text = "\n".join([f"• {spec}" for spec in ASSISTANT_CONFIG['specialties']])
+        embed.add_field(
+            name="🎯 Executive Specialties",
+            value=specialties_text,
+            inline=False
+        )
+        
+        # Calendar status if available
+        if accessible_calendars:
+            calendar_list = "\n".join([f"• {name}" for name, _ in accessible_calendars])
+            embed.add_field(
+                name="📅 Accessible Calendars",
+                value=calendar_list,
+                inline=False
+            )
+        
+        # Active status
+        embed.add_field(
+            name="📊 Executive Status",
+            value=f"👥 Active Conversations: {len(user_conversations)}\n📋 Monitored Channels: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"❌ Status command error: {e}")
+        await ctx.send("👑 Executive status check experiencing issues.")
+
+@bot.command(name='help', aliases=['commands'])
+async def help_command(ctx):
+    """Show Rose's comprehensive help information with new visual identity"""
+    try:
+        embed = discord.Embed(
+            title="👑 Rose Ashcombe - Executive Assistant",
+            description="Strategic planning specialist with calendar integration, email management, and productivity optimization",
+            color=0xDC2626  # Red color
+        )
+        
+        # How to use
+        embed.add_field(
+            name="💬 How to Work with Rose",
+            value=f"• Mention @{ASSISTANT_CONFIG['name']} for executive assistance and strategic planning\n• Use commands below for specific functions\n• I monitor: {', '.join([f'#{ch}' for ch in ASSISTANT_CONFIG['channels']])}",
+            inline=False
+        )
+        
+        # All commands organized by category
+        embed.add_field(
+            name="📧 Email Commands",
+            value="• `!emails [count]` - Recent emails (default: 10)\n• `!unread [count]` - Unread emails only\n• `!emailstats` - Email dashboard overview\n• `!quickemails [count]` - Concise email view\n• `!emailcount` - Just email counts\n• `!cleansender <email> [count]` - Delete emails from sender",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Commands",
+            value="• `!briefing` / `!daily` / `!morning` - Morning executive briefing\n• `!schedule` / `!today` - Today's executive schedule\n• `!upcoming [days]` - Upcoming events (default: 7 days)",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🔍 Planning & Research Commands",
+            value="• `!plan [query]` / `!research [query]` - Planning research\n• `!ping` - Test connectivity\n• `!status` - System status\n• `!help` - This help message",
+            inline=False
+        )
+        
+        # Example requests
+        examples_text = "\n".join([f"• {ex}" for ex in ASSISTANT_CONFIG['example_requests']])
+        embed.add_field(
+            name="✨ Example Executive Requests",
+            value=examples_text,
+            inline=False
+        )
+        
+        # Core capabilities
+        capabilities_text = "\n".join([f"• {cap}" for cap in ASSISTANT_CONFIG['capabilities']])
+        embed.add_field(
+            name="🎯 Executive Capabilities",
+            value=capabilities_text,
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"❌ Help command error: {e}")
+        await ctx.send("👑 Executive help experiencing issues.")
+
+# Email-specific Discord commands
+@bot.command(name='emails')
+async def emails_command(ctx, count: int = 10):
+    """Recent emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_recent_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Emails command error: {e}")
+        await ctx.send("📧 Recent emails unavailable. Please try again.")
+
+@bot.command(name='unread')
+async def unread_command(ctx, count: int = 10):
+    """Unread emails command"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 20))
+            emails = get_unread_emails(count)
+            await send_long_message(ctx.message, emails)
+    except Exception as e:
+        print(f"❌ Unread command error: {e}")
+        await ctx.send("📧 Unread emails unavailable. Please try again.")
+
+@bot.command(name='emailstats')
+async def emailstats_command(ctx):
+    """Email statistics command"""
+    try:
+        async with ctx.typing():
+            stats = get_email_stats()
+            await ctx.send(stats)
+    except Exception as e:
+        print(f"❌ Email stats command error: {e}")
+        await ctx.send("📧 Email statistics unavailable. Please try again.")
+
+@bot.command(name='quickemails')
+async def quick_emails_command(ctx, count: int = 5):
+    """Quick email overview with minimal formatting"""
+    try:
+        async with ctx.typing():
+            count = max(1, min(count, 10))
+            emails = get_recent_emails(count)
+            await ctx.send(emails)
+    except Exception as e:
+        print(f"❌ Quick emails command error: {e}")
+        await ctx.send("📧 Quick email check unavailable")
+
+@bot.command(name='emailcount')
+async def email_count_command(ctx):
+    """Just show email counts without details"""
+    try:
+        async with ctx.typing():
+            stats = get_email_stats()
+            await ctx.send(stats)
+    except Exception as e:
+        print(f"❌ Email count command error: {e}")
+        await ctx.send("📧 Email count unavailable")
+
+@bot.command(name='cleansender')
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+    """Clean emails from a specific sender"""
+    try:
+        async with ctx.typing():
+            if '@' not in sender_email:
+                await ctx.send("❌ Please provide a valid email address")
+                return
+            
+            count = max(1, min(count, 20))
+            result = delete_emails_from_sender(sender_email, count)
+            await ctx.send(result)
+    except Exception as e:
+        print(f"❌ Clean sender command error: {e}")
+        await ctx.send(f"❌ Error cleaning emails from {sender_email}")
+
+# Briefing-specific Discord commands
+@bot.command(name='briefing', aliases=['daily', 'morning'])
+async def briefing_command(ctx):
+    """Morning executive briefing command"""
+    try:
+        async with ctx.typing():
+            briefing = get_morning_briefing()
+            await send_long_message(ctx.message, briefing)
+    except Exception as e:
+        print(f"❌ Briefing command error: {e}")
+        await ctx.send("🌅 Morning briefing unavailable. Please try again.")
+
+@bot.command(name='plan', aliases=['research'])
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -14468,7 +14480,7 @@ def format_for_discord_rose(response):
 # ENHANCED MESSAGE HANDLING
 # ============================================================================
 
-async async def send_long_message(original_message, response):
+async def send_long_message(original_message, response):
     """Send response with length handling and error recovery"""
     try:
         if len(response) <= 2000:
@@ -14553,6 +14565,7 @@ async def on_message(message):
             return
 
         if bot.user.mentioned_in(message) or is_dm:
+            pass  # auto-fixed to prevent syntax error
             
             message_key = f"{message.author.id}_{message.content[:50]}"
             current_time = time.time()
@@ -14590,7 +14603,7 @@ async def on_message(message):
 # ============================================================================
 
 @bot.command(name='ping')
-async async def ping_command(ctx):
+async def ping_command(ctx):
     """Test Rose's connectivity with executive flair"""
     try:
         latency = round(bot.latency * 1000)
@@ -14759,7 +14772,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -14771,7 +14784,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -14782,7 +14795,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -14799,7 +14812,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -14810,7 +14823,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -15039,7 +15052,7 @@ async def emailstats_command(ctx):
         await ctx.send("📧 Email statistics unavailable. Please try again.")
 
 @bot.command(name='quickemails')
-async async def quick_emails_command(ctx, count: int = 5):
+async def quick_emails_command(ctx, count: int = 5):
     """Quick email overview with minimal formatting"""
     try:
         async with ctx.typing():
@@ -15051,7 +15064,7 @@ async async def quick_emails_command(ctx, count: int = 5):
         await ctx.send("📧 Quick email check unavailable")
 
 @bot.command(name='emailcount')
-async async def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
@@ -15062,7 +15075,7 @@ async async def email_count_command(ctx):
         await ctx.send("📧 Email count unavailable")
 
 @bot.command(name='cleansender')
-async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
@@ -15079,7 +15092,7 @@ async async def clean_sender_command(ctx, sender_email: str, count: int = 5):
 
 # Briefing-specific Discord commands
 @bot.command(name='briefing', aliases=['daily', 'morning'])
-async async def briefing_command(ctx):
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
@@ -15090,7 +15103,7 @@ async async def briefing_command(ctx):
         await ctx.send("🌅 Morning briefing unavailable. Please try again.")
 
 @bot.command(name='plan', aliases=['research'])
-async async def plan_command(ctx, *, query: str = ""):
+async def plan_command(ctx, *, query: str = ""):
     """Planning research command"""
     try:
         if not query:
@@ -15158,5 +15171,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Critical startup error: {e}")
         print(f"📋 Traceback: {traceback.format_exc()}")
-
 
