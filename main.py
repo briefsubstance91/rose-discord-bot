@@ -3085,7 +3085,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def clean_sender_command(ctx, sender_email: str, count: int = 5):
+async def clean_sender_command(ctx, sender_email: str, count: int = 5):
     """Clean emails from a specific sender"""
     try:
         async with ctx.typing():
