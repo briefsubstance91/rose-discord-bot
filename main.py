@@ -770,6 +770,171 @@ async def planning_search_enhanced(query, focus_area="general", num_results=3):
 
 
 
+
+def batch_delete_by_sender(sender_email, count=50):
+    """Enhanced batch delete from sender with better feedback"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails from sender
+        query = f"from:{sender_email}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=min(count, 200)  # Cap at 200 for safety
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found from {sender_email}"
+        
+        # Get a few sample emails for confirmation
+        sample_subjects = []
+        for msg in messages[:3]:
+            try:
+                email_data = get_email_details(msg['id'])
+                if email_data:
+                    sample_subjects.append(email_data['subject'][:60])
+            except:
+                pass
+        
+        deleted_count = 0
+        failed_count = 0
+        
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as delete_error:
+                print(f"❌ Error deleting message {message['id']}: {delete_error}")
+                failed_count += 1
+        
+        result = f"📧 **Batch Cleanup Complete:** Deleted {deleted_count} emails from {sender_email}"
+        if failed_count > 0:
+            result += f" ({failed_count} failed)"
+        
+        if sample_subjects:
+            result += f"\n📝 **Sample subjects:** {', '.join(sample_subjects[:2])}"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Batch delete by sender error: {e}")
+        return f"❌ Failed to delete emails from {sender_email}: {str(e)}"
+
+def smart_email_search(search_terms, count=20):
+    """Smart email search that finds emails by content, subject, or sender"""
+    try:
+        if not gmail_service:
+            return "📧 Gmail integration not available"
+        
+        # Build flexible search query
+        query_parts = []
+        for term in search_terms.split():
+            query_parts.append(f"({term} OR subject:{term} OR from:{term})")
+        
+        query = " ".join(query_parts)
+        
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found matching: {search_terms}"
+        
+        email_list = []
+        senders = {}
+        
+        for msg in messages[:count]:
+            email_data = get_email_details(msg['id'])
+            if email_data:
+                formatted = format_email_concise(email_data)
+                email_list.append(formatted)
+                
+                # Track senders for batch delete suggestions
+                sender = email_data.get('sender', '')
+                if '@' in sender:
+                    sender_email = sender.split('<')[-1].strip('>')
+                    if sender_email.count('@') == 1:  # Valid email
+                        senders[sender_email] = senders.get(sender_email, 0) + 1
+        
+        result = f"📧 **Smart Search Results:** {len(email_list)} emails found\n\n" + "\n\n".join(email_list)
+        
+        # Suggest batch operations if multiple emails from same sender
+        if senders:
+            top_sender = max(senders.items(), key=lambda x: x[1])
+            if top_sender[1] > 2:
+                result += f"\n\n💡 **Suggestion:** Found {top_sender[1]} emails from {top_sender[0]}. Want me to delete them all?"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Smart email search error: {e}")
+        return f"❌ Error searching emails: {str(e)}"
+
+def get_email_details(message_id):
+    """Get detailed email information"""
+    try:
+        message = gmail_service.users().messages().get(
+            userId='me', 
+            id=message_id,
+            format='full'
+        ).execute()
+        
+        headers = message['payload'].get('headers', [])
+        
+        # Extract headers
+        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+        sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+        date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
+        
+        # Get email body snippet
+        snippet = message.get('snippet', '')
+        
+        return {
+            'id': message_id,
+            'subject': subject,
+            'sender': sender,
+            'date': date,
+            'snippet': snippet
+        }
+    except Exception as e:
+        print(f"❌ Error getting email details: {e}")
+        return None
+
+def format_email_concise(email_data):
+    """Format email data concisely"""
+    try:
+        subject = email_data.get('subject', 'No Subject')[:50]
+        sender = email_data.get('sender', 'Unknown Sender')
+        snippet = email_data.get('snippet', '')[:80]
+        
+        # Extract just the name from sender if it's in "Name <email>" format
+        if '<' in sender and '>' in sender:
+            sender = sender.split('<')[0].strip().strip('"')
+        elif '@' in sender:
+            sender = sender.split('@')[0]
+        
+        # Shorten long subjects
+        if len(subject) >= 50:
+            subject = subject[:47] + "..."
+        
+        return f"• **{subject}** - {sender}\n  {snippet}..."
+        
+    except Exception as e:
+        print(f"❌ Error formatting email: {e}")
+        return "• Email formatting error"
+
+
 def search_emails(query, max_results=10, include_body=False):
     """Search Gmail messages with query"""
     if not gmail_service:
