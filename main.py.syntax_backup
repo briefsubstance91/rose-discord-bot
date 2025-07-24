@@ -2090,6 +2090,716 @@ async def clear_user_memory_command(ctx):
 
 
 
+# ============================================================================
+# GMAIL FUNCTIONS (Complete Working Implementation)
+# ============================================================================
+
+def get_email_details(message_id):
+    """Get detailed email information"""
+    try:
+        message = gmail_service.users().messages().get(
+            userId='me', 
+            id=message_id,
+            format='full'
+        ).execute()
+        
+        headers = message['payload'].get('headers', [])
+        
+        # Extract headers
+        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+        sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+        date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
+        
+        # Get email body snippet
+        snippet = message.get('snippet', '')
+        
+        return {
+            'id': message_id,
+            'subject': subject,
+            'sender': sender,
+            'date': date,
+            'snippet': snippet
+        }
+    except Exception as e:
+        print(f"❌ Error getting email details: {e}")
+        return None
+
+def format_email_concise(email_data):
+    """Format email data concisely"""
+    try:
+        subject = email_data.get('subject', 'No Subject')[:50]
+        sender = email_data.get('sender', 'Unknown Sender')
+        snippet = email_data.get('snippet', '')[:80]
+        
+        # Extract just the name from sender if it's in "Name <email>" format
+        if '<' in sender and '>' in sender:
+            sender = sender.split('<')[0].strip().strip('"')
+        elif '@' in sender:
+            sender = sender.split('@')[0]
+        
+        # Shorten long subjects
+        if len(subject) >= 50:
+            subject = subject[:47] + "..."
+        
+        return f"• **{subject}** - {sender}\n  {snippet}..."
+        
+    except Exception as e:
+        print(f"❌ Error formatting email: {e}")
+        return "• Email formatting error"
+
+def get_recent_emails(count=10, query="in:inbox"):
+    """Get recent emails with Gmail query support"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found for query: {query}"
+        
+        email_list = []
+        for msg in messages[:count]:
+            email_data = get_email_details(msg['id'])
+            if email_data:
+                email_list.append(format_email_concise(email_data))
+        
+        if email_list:
+            return f"📧 {len(email_list)} emails found:\n\n" + "\n\n".join(email_list)
+        else:
+            return "📧 No emails retrieved"
+            
+    except Exception as e:
+        print(f"❌ Error getting recent emails: {e}")
+        return f"❌ Error retrieving emails: {str(e)}"
+
+def get_unread_emails(count=10):
+    """Get unread emails only"""
+    return get_recent_emails(count, "is:unread")
+
+def search_emails(query, count=10):
+    """Search emails using Gmail search syntax"""
+    return get_recent_emails(count, query)
+
+def send_email(to_email, subject, body):
+    """Send email through Gmail"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Create message
+        message = MIMEText(body)
+        message['to'] = to_email
+        message['subject'] = subject
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Send message
+        sent_message = gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"📧 Email sent to {to_email}\n📝 Subject: {subject}"
+        
+    except Exception as e:
+        print(f"❌ Send email error: {e}")
+        return f"❌ Failed to send email: {str(e)}"
+
+def get_email_stats():
+    """Get email dashboard statistics"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Get unread count
+        unread_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:unread',
+            maxResults=1
+        ).execute()
+        unread_count = unread_results.get('resultSizeEstimate', 0)
+        
+        # Get today's emails
+        today_results = gmail_service.users().messages().list(
+            userId='me',
+            q='newer_than:1d',
+            maxResults=1
+        ).execute()
+        today_count = today_results.get('resultSizeEstimate', 0)
+        
+        # Get important emails
+        important_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:important is:unread',
+            maxResults=1
+        ).execute()
+        important_count = important_results.get('resultSizeEstimate', 0)
+        
+        return f"📧 **Email Dashboard**\n🔴 Unread: {unread_count}\n📅 Today: {today_count}\n⭐ Important: {important_count}"
+        
+    except Exception as e:
+        print(f"❌ Email stats error: {e}")
+        return f"❌ Error retrieving email statistics: {str(e)}"
+
+def delete_email(email_id):
+    """Move email to trash"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().trash(
+            userId='me',
+            id=email_id
+        ).execute()
+        
+        return f"📧 Email deleted"
+        
+    except Exception as e:
+        print(f"❌ Delete email error: {e}")
+        return f"❌ Failed to delete email: {str(e)}"
+
+def archive_email(email_id):
+    """Archive email (remove from inbox)"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"📧 Email archived"
+        
+    except Exception as e:
+        print(f"❌ Archive email error: {e}")
+        return f"❌ Failed to archive email: {str(e)}"
+
+def delete_emails_from_sender(sender_email, count=10):
+    """Delete multiple emails from a specific sender"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails from sender
+        query = f"from:{sender_email}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=count
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found from {sender_email}"
+        
+        deleted_count = 0
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as delete_error:
+                print(f"❌ Error deleting message {message['id']}: {delete_error}")
+        
+        return f"📧 Deleted {deleted_count} emails from {sender_email}"
+        
+    except Exception as e:
+        print(f"❌ Delete emails from sender error: {e}")
+        return f"❌ Failed to delete emails from {sender_email}: {str(e)}"
+
+def mark_email_as_read(email_id):
+    """Mark email as read"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['UNREAD']}
+        ).execute()
+        
+        return f"📧 Email marked as read"
+        
+    except Exception as e:
+        print(f"❌ Mark email as read error: {e}")
+        return f"❌ Failed to mark email as read: {str(e)}"
+
+def mark_email_as_important(email_id):
+    """Mark email as important"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'addLabelIds': ['IMPORTANT']}
+        ).execute()
+        
+        return f"📧 Email marked as important"
+        
+    except Exception as e:
+        print(f"❌ Mark email as important error: {e}")
+        return f"❌ Failed to mark email as important: {str(e)}"
+
+
+
+# ============================================================================
+# GMAIL FUNCTIONS (Complete Working Implementation)
+# ============================================================================
+
+def get_email_details(message_id):
+    """Get detailed email information"""
+    try:
+        message = gmail_service.users().messages().get(
+            userId='me', 
+            id=message_id,
+            format='full'
+        ).execute()
+        
+        headers = message['payload'].get('headers', [])
+        
+        # Extract headers
+        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+        sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+        date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown Date')
+        
+        # Get email body snippet
+        snippet = message.get('snippet', '')
+        
+        return {
+            'id': message_id,
+            'subject': subject,
+            'sender': sender,
+            'date': date,
+            'snippet': snippet
+        }
+    except Exception as e:
+        print(f"❌ Error getting email details: {e}")
+        return None
+
+def format_email_concise(email_data):
+    """Format email data concisely"""
+    try:
+        subject = email_data.get('subject', 'No Subject')[:50]
+        sender = email_data.get('sender', 'Unknown Sender')
+        snippet = email_data.get('snippet', '')[:80]
+        
+        # Extract just the name from sender if it's in "Name <email>" format
+        if '<' in sender and '>' in sender:
+            sender = sender.split('<')[0].strip().strip('"')
+        elif '@' in sender:
+            sender = sender.split('@')[0]
+        
+        # Shorten long subjects
+        if len(subject) >= 50:
+            subject = subject[:47] + "..."
+        
+        return f"• **{subject}** - {sender}\n  {snippet}..."
+        
+    except Exception as e:
+        print(f"❌ Error formatting email: {e}")
+        return "• Email formatting error"
+
+def get_recent_emails(count=10, query="in:inbox"):
+    """Get recent emails with Gmail query support"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found for query: {query}"
+        
+        email_list = []
+        for msg in messages[:count]:
+            email_data = get_email_details(msg['id'])
+            if email_data:
+                email_list.append(format_email_concise(email_data))
+        
+        if email_list:
+            return f"📧 {len(email_list)} emails found:\n\n" + "\n\n".join(email_list)
+        else:
+            return "📧 No emails retrieved"
+            
+    except Exception as e:
+        print(f"❌ Error getting recent emails: {e}")
+        return f"❌ Error retrieving emails: {str(e)}"
+
+def get_unread_emails(count=10):
+    """Get unread emails only"""
+    return get_recent_emails(count, "is:unread")
+
+def search_emails(query, count=10):
+    """Search emails using Gmail search syntax"""
+    return get_recent_emails(count, query)
+
+def send_email(to_email, subject, body):
+    """Send email through Gmail"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Create message
+        message = MIMEText(body)
+        message['to'] = to_email
+        message['subject'] = subject
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Send message
+        sent_message = gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"📧 Email sent to {to_email}\n📝 Subject: {subject}"
+        
+    except Exception as e:
+        print(f"❌ Send email error: {e}")
+        return f"❌ Failed to send email: {str(e)}"
+
+def get_email_stats():
+    """Get email dashboard statistics"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        # Get unread count
+        unread_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:unread',
+            maxResults=1
+        ).execute()
+        unread_count = unread_results.get('resultSizeEstimate', 0)
+        
+        # Get today's emails
+        today_results = gmail_service.users().messages().list(
+            userId='me',
+            q='newer_than:1d',
+            maxResults=1
+        ).execute()
+        today_count = today_results.get('resultSizeEstimate', 0)
+        
+        # Get important emails
+        important_results = gmail_service.users().messages().list(
+            userId='me',
+            q='is:important is:unread',
+            maxResults=1
+        ).execute()
+        important_count = important_results.get('resultSizeEstimate', 0)
+        
+        return f"📧 **Email Dashboard**\n🔴 Unread: {unread_count}\n📅 Today: {today_count}\n⭐ Important: {important_count}"
+        
+    except Exception as e:
+        print(f"❌ Email stats error: {e}")
+        return f"❌ Error retrieving email statistics: {str(e)}"
+
+def delete_email(email_id):
+    """Move email to trash"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().trash(
+            userId='me',
+            id=email_id
+        ).execute()
+        
+        return f"📧 Email deleted"
+        
+    except Exception as e:
+        print(f"❌ Delete email error: {e}")
+        return f"❌ Failed to delete email: {str(e)}"
+
+def archive_email(email_id):
+    """Archive email (remove from inbox)"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"📧 Email archived"
+        
+    except Exception as e:
+        print(f"❌ Archive email error: {e}")
+        return f"❌ Failed to archive email: {str(e)}"
+
+def delete_emails_from_sender(sender_email, count=10):
+    """Delete multiple emails from a specific sender"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails from sender
+        query = f"from:{sender_email}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=count
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found from {sender_email}"
+        
+        deleted_count = 0
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as delete_error:
+                print(f"❌ Error deleting message {message['id']}: {delete_error}")
+        
+        return f"📧 Deleted {deleted_count} emails from {sender_email}"
+        
+    except Exception as e:
+        print(f"❌ Delete emails from sender error: {e}")
+        return f"❌ Failed to delete emails from {sender_email}: {str(e)}"
+
+def mark_email_as_read(email_id):
+    """Mark email as read"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['UNREAD']}
+        ).execute()
+        
+        return f"📧 Email marked as read"
+        
+    except Exception as e:
+        print(f"❌ Mark email as read error: {e}")
+        return f"❌ Failed to mark email as read: {str(e)}"
+
+def mark_email_as_important(email_id):
+    """Mark email as important"""
+    if not gmail_service:
+        return "📧 Gmail integration not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'addLabelIds': ['IMPORTANT']}
+        ).execute()
+        
+        return f"📧 Email marked as important"
+        
+    except Exception as e:
+        print(f"❌ Mark email as important error: {e}")
+        return f"❌ Failed to mark email as important: {str(e)}"
+
+def batch_delete_by_subject(subject_text, count=25):
+    """Delete multiple emails containing specific text in subject line"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails with subject text
+        query = f"subject:{subject_text}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=min(count, 100)  # Cap at 100 for safety
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 **Batch Cleanup:** No emails found with '{subject_text}' in subject"
+        
+        deleted_count = 0
+        failed_count = 0
+        
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as delete_error:
+                print(f"❌ Error deleting message {message['id']}: {delete_error}")
+                failed_count += 1
+        
+        result = f"📧 **Batch Cleanup Complete:** Deleted {deleted_count} emails"
+        if failed_count > 0:
+            result += f" ({failed_count} failed)"
+        result += f"\nQuery: '{subject_text}'"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Batch delete by subject error: {e}")
+        return f"❌ Failed to batch delete emails: {str(e)}"
+
+def batch_delete_by_sender(sender_email, count=50):
+    """Enhanced batch delete from sender with better feedback"""
+    try:
+        if not gmail_service:
+            return "❌ Gmail service not available"
+        
+        # Search for emails from sender
+        query = f"from:{sender_email}"
+        search_result = gmail_service.users().messages().list(
+            userId='me', 
+            q=query, 
+            maxResults=min(count, 200)  # Cap at 200 for safety
+        ).execute()
+        
+        messages = search_result.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found from {sender_email}"
+        
+        # Get a few sample emails for confirmation
+        sample_subjects = []
+        for msg in messages[:3]:
+            try:
+                email_data = get_email_details(msg['id'])
+                if email_data:
+                    sample_subjects.append(email_data['subject'][:60])
+            except:
+                pass
+        
+        deleted_count = 0
+        failed_count = 0
+        
+        for message in messages:
+            try:
+                gmail_service.users().messages().trash(
+                    userId='me',
+                    id=message['id']
+                ).execute()
+                deleted_count += 1
+            except Exception as delete_error:
+                print(f"❌ Error deleting message {message['id']}: {delete_error}")
+                failed_count += 1
+        
+        result = f"📧 **Batch Cleanup Complete:** Deleted {deleted_count} emails from {sender_email}"
+        if failed_count > 0:
+            result += f" ({failed_count} failed)"
+        
+        if sample_subjects:
+            result += f"\n📝 **Sample subjects:** {', '.join(sample_subjects[:2])}"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Batch delete by sender error: {e}")
+        return f"❌ Failed to delete emails from {sender_email}: {str(e)}"
+
+def smart_email_search(search_terms, count=20):
+    """Smart email search that finds emails by content, subject, or sender"""
+    try:
+        if not gmail_service:
+            return "📧 Gmail integration not available"
+        
+        # Build flexible search query
+        query_parts = []
+        for term in search_terms.split():
+            query_parts.append(f"({term} OR subject:{term} OR from:{term})")
+        
+        query = " ".join(query_parts)
+        
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=count
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found matching: {search_terms}"
+        
+        email_list = []
+        senders = {}
+        
+        for msg in messages[:count]:
+            email_data = get_email_details(msg['id'])
+            if email_data:
+                formatted = format_email_concise(email_data)
+                email_list.append(formatted)
+                
+                # Track senders for batch delete suggestions
+                sender = email_data.get('sender', '')
+                if '@' in sender:
+                    sender_email = sender.split('<')[-1].strip('>')
+                    senders[sender_email] = senders.get(sender_email, 0) + 1
+        
+        result = f"📧 **Smart Search Results:** {len(email_list)} emails found\n\n" + "\n\n".join(email_list)
+        
+        # Suggest batch operations if multiple emails from same sender
+        if senders:
+            top_sender = max(senders.items(), key=lambda x: x[1])
+            if top_sender[1] > 2:
+                result += f"\n\n💡 **Suggestion:** Found {top_sender[1]} emails from {top_sender[0]}. Want me to delete them all?"
+        
+        # Add the working email function handlers to your existing function handling
+        # These should be added to your handle_rose_functions_enhanced() function
+        
+        # In your current main.py function handler, add these cases:
+        """
+        elif function_name == "batch_delete_by_subject":
+            subject_text = arguments.get('subject_text', '')
+            count = arguments.get('count', 25)
+            if subject_text:
+                output = batch_delete_by_subject(subject_text, count)
+            else:
+                output = "❌ Missing required parameter: subject_text"
+
+        elif function_name == "batch_delete_by_sender":
+            sender_email = arguments.get('sender_email', '')
+            count = arguments.get('count', 50)
+            if sender_email:
+                output = batch_delete_by_sender(sender_email, count)
+            else:
+                output = "❌ Missing required parameter: sender_email"
+
+        elif function_name == "smart_email_search":
+            search_terms = arguments.get('search_terms', '')
+            count = arguments.get('count', 20)
+            if search_terms:
+                output = smart_email_search(search_terms, count)
+            else:
+                output = "❌ Missing required parameter: search_terms"
+        """
 
 
 if __name__ == "__main__":
