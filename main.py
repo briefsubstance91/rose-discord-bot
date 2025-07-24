@@ -1360,7 +1360,7 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 
                 
                 if sender_email:
-                    output = delete_emails_from_sender(sender_email, max_delete, confirm)
+                    output = delete_emails_from_sender(sender_email, max_delete)
                 else:
                     output = "📧 No sender email provided"
                     
@@ -1409,6 +1409,22 @@ async def handle_rose_functions_enhanced(run, thread_id):
                 count = arguments.get('count', 50)
                 query = arguments.get('query', 'in:inbox')
                 output = get_recent_emails_large(count, query)
+            elif function_name == "batch_delete_by_sender":
+                sender_email = arguments.get('sender_email', '')
+                count = arguments.get('count', 50)
+                if sender_email:
+                    output = batch_delete_by_sender(sender_email, count)
+                else:
+                    output = "❌ Missing required parameter: sender_email"
+
+            elif function_name == "smart_email_search":
+                search_terms = arguments.get('search_terms', '')
+                count = arguments.get('count', 20)
+                if search_terms:
+                    output = smart_email_search(search_terms, count)
+                else:
+                    output = "❌ Missing required parameter: search_terms"
+
 
             else:
                 output = f"❓ Function {function_name} not fully implemented yet"
