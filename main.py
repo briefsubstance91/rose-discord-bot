@@ -4082,7 +4082,7 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def email_count_command(ctx):
+async def email_count_command(ctx):
     """Just show email counts without details"""
     try:
         async with ctx.typing():
