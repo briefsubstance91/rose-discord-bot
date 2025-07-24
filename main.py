@@ -3003,7 +3003,8 @@ if __name__ == "__main__":
         print(f"📋 Traceback: {traceback.format_exc()}")
 
 
-def briefing_command(ctx):
+@bot.command(name='briefing')
+async def briefing_command(ctx):
     """Morning executive briefing command"""
     try:
         async with ctx.typing():
