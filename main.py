@@ -145,6 +145,362 @@ except Exception as e:
     print(f"❌ CRITICAL: Failed to initialize {ASSISTANT_NAME}: {e}")
     exit(1)
 
+
+# ============================================================================
+# CALENDAR FUNCTIONS IMPLEMENTATION
+# ============================================================================
+
+def create_gcal_event(calendar_id="primary", summary=None, description=None, 
+                     start_time=None, end_time=None, location=None, attendees=None):
+    """Create a new Google Calendar event"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    if not summary or not start_time or not end_time:
+        return "❌ Missing required fields: summary, start_time, end_time"
+    
+    try:
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Parse and format times
+        if isinstance(start_time, str):
+            if 'T' not in start_time:
+                # Add time if only date provided
+                start_time = start_time + 'T09:00:00'
+            start_dt = datetime.fromisoformat(start_time.replace('Z', ''))
+            # Localize to Toronto timezone if no timezone info
+            if start_dt.tzinfo is None:
+                start_dt = toronto_tz.localize(start_dt)
+        
+        if isinstance(end_time, str):
+            if 'T' not in end_time:
+                # Add time if only date provided, assume 1 hour duration
+                end_time = end_time + 'T10:00:00'
+            end_dt = datetime.fromisoformat(end_time.replace('Z', ''))
+            # Localize to Toronto timezone if no timezone info
+            if end_dt.tzinfo is None:
+                end_dt = toronto_tz.localize(end_dt)
+        
+        # Build event object
+        event = {
+            'summary': summary,
+            'start': {
+                'dateTime': start_dt.isoformat(),
+                'timeZone': 'America/Toronto'
+            },
+            'end': {
+                'dateTime': end_dt.isoformat(),
+                'timeZone': 'America/Toronto'
+            }
+        }
+        
+        if description:
+            event['description'] = description
+            
+        if location:
+            event['location'] = location
+            
+        if attendees:
+            event['attendees'] = [{'email': email} for email in attendees]
+        
+        # Create the event
+        created_event = calendar_service.events().insert(
+            calendarId=calendar_id,
+            body=event
+        ).execute()
+        
+        # Format success message
+        event_link = created_event.get('htmlLink', '')
+        event_id = created_event.get('id', '')
+        
+        formatted_time = start_dt.strftime('%a %m/%d at %-I:%M %p')
+        
+        result = f"✅ **Event Created Successfully**\n"
+        result += f"📅 **{summary}**\n"
+        result += f"🕐 {formatted_time}\n"
+        if location:
+            result += f"📍 {location}\n"
+        if event_link:
+            result += f"🔗 [View in Calendar]({event_link})\n"
+        result += f"🆔 Event ID: `{event_id}`"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error creating calendar event: {e}")
+        return f"❌ Error creating calendar event: {str(e)}"
+
+def update_gcal_event(calendar_id, event_id, summary=None, description=None,
+                     start_time=None, end_time=None, location=None, attendees=None):
+    """Update an existing Google Calendar event"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    if not calendar_id or not event_id:
+        return "❌ Missing required fields: calendar_id, event_id"
+    
+    try:
+        # Get existing event
+        existing_event = calendar_service.events().get(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Update only provided fields
+        if summary:
+            existing_event['summary'] = summary
+        if description:
+            existing_event['description'] = description
+        if location:
+            existing_event['location'] = location
+            
+        if start_time:
+            if isinstance(start_time, str):
+                if 'T' not in start_time:
+                    start_time = start_time + 'T09:00:00'
+                start_dt = datetime.fromisoformat(start_time.replace('Z', ''))
+                if start_dt.tzinfo is None:
+                    start_dt = toronto_tz.localize(start_dt)
+                existing_event['start'] = {
+                    'dateTime': start_dt.isoformat(),
+                    'timeZone': 'America/Toronto'
+                }
+        
+        if end_time:
+            if isinstance(end_time, str):
+                if 'T' not in end_time:
+                    end_time = end_time + 'T10:00:00'
+                end_dt = datetime.fromisoformat(end_time.replace('Z', ''))
+                if end_dt.tzinfo is None:
+                    end_dt = toronto_tz.localize(end_dt)
+                existing_event['end'] = {
+                    'dateTime': end_dt.isoformat(),
+                    'timeZone': 'America/Toronto'
+                }
+        
+        if attendees:
+            existing_event['attendees'] = [{'email': email} for email in attendees]
+        
+        # Update the event
+        updated_event = calendar_service.events().update(
+            calendarId=calendar_id,
+            eventId=event_id,
+            body=existing_event
+        ).execute()
+        
+        event_link = updated_event.get('htmlLink', '')
+        title = updated_event.get('summary', 'Event')
+        
+        result = f"✅ **Event Updated Successfully**\n"
+        result += f"📅 **{title}**\n"
+        if event_link:
+            result += f"🔗 [View in Calendar]({event_link})\n"
+        result += f"🆔 Event ID: `{event_id}`"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error updating calendar event: {e}")
+        return f"❌ Error updating calendar event: {str(e)}"
+
+def delete_gcal_event(calendar_id, event_id):
+    """Delete a Google Calendar event"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    if not calendar_id or not event_id:
+        return "❌ Missing required fields: calendar_id, event_id"
+    
+    try:
+        # Get event details before deletion
+        event = calendar_service.events().get(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+        
+        event_title = event.get('summary', 'Untitled Event')
+        
+        # Delete the event
+        calendar_service.events().delete(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+        
+        return f"✅ **Event Deleted Successfully**\n📅 **{event_title}**\n🆔 Event ID: `{event_id}`"
+        
+    except Exception as e:
+        print(f"❌ Error deleting calendar event: {e}")
+        return f"❌ Error deleting calendar event: {str(e)}"
+
+def list_gcal_events(calendar_id="primary", max_results=25, query=None, 
+                    time_min=None, time_max=None):
+    """List Google Calendar events"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    try:
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Set default time range if not provided
+        if not time_min:
+            time_min = datetime.now(toronto_tz)
+        if not time_max:
+            time_max = datetime.now(toronto_tz) + timedelta(days=30)
+        
+        # Build query parameters
+        params = {
+            'calendarId': calendar_id,
+            'timeMin': time_min.isoformat() if hasattr(time_min, 'isoformat') else time_min,
+            'timeMax': time_max.isoformat() if hasattr(time_max, 'isoformat') else time_max,
+            'maxResults': max_results,
+            'singleEvents': True,
+            'orderBy': 'startTime'
+        }
+        
+        if query:
+            params['q'] = query
+        
+        # Get events
+        events_result = calendar_service.events().list(**params).execute()
+        events = events_result.get('items', [])
+        
+        if not events:
+            return f"📅 No events found for the specified criteria"
+        
+        # Format events list
+        result = f"📅 **Calendar Events ({len(events)} found)**\n\n"
+        
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            summary = event.get('summary', 'Untitled')
+            event_id = event.get('id', '')
+            
+            if 'T' in start:
+                event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                if event_time.tzinfo is None:
+                    event_time = toronto_tz.localize(event_time)
+                else:
+                    event_time = event_time.astimezone(toronto_tz)
+                time_str = event_time.strftime('%a %m/%d %I:%M %p')
+            else:
+                date_obj = datetime.fromisoformat(start)
+                time_str = date_obj.strftime('%a %m/%d (All day)')
+            
+            result += f"• **{time_str}** - {summary}\n"
+            result += f"  🆔 `{event_id}`\n\n"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error listing calendar events: {e}")
+        return f"❌ Error listing calendar events: {str(e)}"
+
+def fetch_gcal_event(calendar_id, event_id):
+    """Fetch details of a specific Google Calendar event"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    if not calendar_id or not event_id:
+        return "❌ Missing required fields: calendar_id, event_id"
+    
+    try:
+        event = calendar_service.events().get(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+        
+        toronto_tz = pytz.timezone('America/Toronto')
+        
+        # Extract event details
+        summary = event.get('summary', 'Untitled Event')
+        description = event.get('description', 'No description')
+        location = event.get('location', 'No location specified')
+        
+        # Format start time
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        if 'T' in start:
+            start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            if start_dt.tzinfo is None:
+                start_dt = toronto_tz.localize(start_dt)
+            else:
+                start_dt = start_dt.astimezone(toronto_tz)
+            time_str = start_dt.strftime('%A, %B %d, %Y at %-I:%M %p')
+        else:
+            date_obj = datetime.fromisoformat(start)
+            time_str = date_obj.strftime('%A, %B %d, %Y (All day)')
+        
+        # Format attendees
+        attendees = event.get('attendees', [])
+        attendee_list = [att.get('email', 'Unknown') for att in attendees] if attendees else ['No attendees']
+        
+        # Build detailed response
+        result = f"📅 **Event Details**\n\n"
+        result += f"**Title:** {summary}\n"
+        result += f"**Time:** {time_str}\n"
+        result += f"**Location:** {location}\n"
+        result += f"**Description:** {description}\n"
+        result += f"**Attendees:** {', '.join(attendee_list)}\n"
+        result += f"**Event ID:** `{event_id}`\n"
+        
+        if event.get('htmlLink'):
+            result += f"**Calendar Link:** [View Event]({event['htmlLink']})"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error fetching calendar event: {e}")
+        return f"❌ Error fetching calendar event: {str(e)}"
+
+def find_free_time(calendar_ids, time_min, time_max):
+    """Find free time slots across multiple calendars"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    try:
+        # This is a simplified implementation
+        # For a full implementation, you'd use the Calendar API's freebusy query
+        result = f"🔍 **Free Time Analysis**\n\n"
+        result += f"⏰ **Time Range:** {time_min} to {time_max}\n"
+        result += f"📅 **Calendars Checked:** {len(calendar_ids)}\n\n"
+        result += "💡 *Note: Full free/busy analysis coming soon. Use list_gcal_events to check specific calendars for conflicts.*"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error finding free time: {e}")
+        return f"❌ Error finding free time: {str(e)}"
+
+def list_gcal_calendars():
+    """List all available Google Calendars"""
+    if not calendar_service:
+        return "❌ Calendar service not available"
+    
+    try:
+        calendar_list = calendar_service.calendarList().list().execute()
+        calendars = calendar_list.get('items', [])
+        
+        if not calendars:
+            return "📅 No calendars found"
+        
+        result = f"📅 **Available Calendars ({len(calendars)})**\n\n"
+        
+        for cal in calendars:
+            cal_id = cal.get('id', 'Unknown ID')
+            summary = cal.get('summary', 'Untitled Calendar')
+            primary = " (Primary)" if cal.get('primary') else ""
+            
+            result += f"• **{summary}**{primary}\n"
+            result += f"  🆔 `{cal_id}`\n\n"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error listing calendars: {e}")
+        return f"❌ Error listing calendars: {str(e)}"
+
+
 # ============================================================================
 # WEATHER INTEGRATION FUNCTIONS (NEW)
 # ============================================================================
@@ -2326,3 +2682,85 @@ if __name__ == "__main__":
         exit(1)
 
 # === Restored Email Functions from main-email_2.py ===
+
+
+def handle_rose_functions_enhanced(run, thread_id):
+    """Enhanced function handler for Rose's capabilities including calendar functions"""
+    tool_outputs = []
+    
+    for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+        function_name = tool_call.function.name
+        arguments = json.loads(tool_call.function.arguments)
+        
+        print(f"🔧 Executing function: {function_name}")
+        print(f"📋 Arguments: {arguments}")
+        
+        try:
+            # Calendar functions
+            if function_name == "create_gcal_event":
+                result = create_gcal_event(**arguments)
+            elif function_name == "update_gcal_event":
+                result = update_gcal_event(**arguments)
+            elif function_name == "delete_gcal_event":
+                result = delete_gcal_event(**arguments)
+            elif function_name == "list_gcal_events":
+                result = list_gcal_events(**arguments)
+            elif function_name == "fetch_gcal_event":
+                result = fetch_gcal_event(**arguments)
+            elif function_name == "find_free_time":
+                result = find_free_time(**arguments)
+            elif function_name == "list_gcal_calendars":
+                result = list_gcal_calendars()
+            
+            # Email functions (existing - keep these)
+            elif function_name == "get_recent_emails":
+                count = arguments.get('count', 5)
+                result = get_recent_emails(count)
+            elif function_name == "search_emails":
+                query = arguments.get('query', '')
+                max_results = arguments.get('max_results', 10)
+                result = search_emails(query, max_results)
+            elif function_name == "send_email":
+                to = arguments.get('to')
+                subject = arguments.get('subject')
+                body = arguments.get('body')
+                result = send_email(to, subject, body)
+            elif function_name == "get_email_content":
+                email_id = arguments.get('email_id')
+                result = get_email_content(email_id)
+            
+            # Web search function (existing - keep this)
+            elif function_name == "web_search":
+                query = arguments.get('query', '')
+                result = web_search(query) if BRAVE_API_KEY else "Web search not available - API key missing"
+            
+            # Calendar view functions (existing - keep these)
+            elif function_name == "get_upcoming_events":
+                days = arguments.get('days', 7)
+                result = get_upcoming_events(days)
+            elif function_name == "get_today_schedule":
+                result = get_today_schedule()
+            elif function_name == "get_week_overview":
+                result = get_week_overview()
+            
+            else:
+                result = f"❌ Function '{function_name}' not implemented yet."
+            
+            tool_outputs.append({
+                "tool_call_id": tool_call.id,
+                "output": str(result)
+            })
+            
+            print(f"✅ Function result: {result}")
+            
+        except Exception as e:
+            error_msg = f"❌ Error in {function_name}: {str(e)}"
+            print(f"❌ Function error: {e}")
+            traceback.print_exc()
+            
+            tool_outputs.append({
+                "tool_call_id": tool_call.id,
+                "output": error_msg
+            })
+    
+    return tool_outputs
