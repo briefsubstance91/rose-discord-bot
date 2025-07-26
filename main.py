@@ -189,8 +189,8 @@ def get_weather_emoji(condition_text):
 
 async def get_weather_briefing():
     """
-    Get comprehensive weather briefing for Rose's executive summary
-    Returns formatted weather section for the morning briefing
+    ENHANCED: Get comprehensive weather briefing INCLUDING FORECAST for Rose's executive summary
+    Returns formatted weather section with current conditions + today's forecast + tomorrow preview
     """
     if not WEATHER_API_KEY:
         return "🌤️ **Weather:** Configure WEATHER_API_KEY for weather updates"
@@ -204,15 +204,17 @@ async def get_weather_briefing():
             location = USER_CITY
             location_display = USER_CITY
         
-        # WeatherAPI.com current weather endpoint (includes UV index)
-        url = "http://api.weatherapi.com/v1/current.json"
+        # WeatherAPI.com forecast endpoint (includes current + forecast)
+        url = "http://api.weatherapi.com/v1/forecast.json"
         params = {
             'key': WEATHER_API_KEY,
             'q': location,
-            'aqi': 'no'  # We don't need air quality for basic briefing
+            'days': 2,  # Today + tomorrow forecast
+            'aqi': 'no',
+            'alerts': 'no'
         }
         
-        print(f"🌍 Fetching weather for {location_display}...")
+        print(f"🌍 Fetching enhanced weather for {location_display}...")
         
         # Make API request with timeout
         response = requests.get(url, params=params, timeout=10)
@@ -220,10 +222,12 @@ async def get_weather_briefing():
         if response.status_code == 200:
             data = response.json()
             
-            # Extract weather data
+            # Extract current weather data
             current = data['current']
             location_data = data['location']
+            forecast_data = data['forecast']['forecastday']
             
+            # Current conditions
             temp_c = current['temp_c']
             feels_like_c = current['feelslike_c']
             humidity = current['humidity']
@@ -232,6 +236,16 @@ async def get_weather_briefing():
             wind_kph = current['wind_kph']
             wind_dir = current['wind_dir']
             
+            # Today's forecast
+            today_forecast = forecast_data[0]['day']
+            today_max = today_forecast['maxtemp_c']
+            today_min = today_forecast['mintemp_c']
+            today_condition = today_forecast['condition']['text']
+            rain_chance = today_forecast['daily_chance_of_rain']
+            
+            # Tomorrow's preview
+            tomorrow_forecast = forecast_data[1]['day'] if len(forecast_data) > 1 else None
+            
             # Get weather emoji and UV advice
             weather_emoji = get_weather_emoji(condition)
             uv_advice = get_uv_advice(uv_index)
@@ -239,14 +253,26 @@ async def get_weather_briefing():
             # Format local time
             local_time = location_data['localtime']
             
-            # Create comprehensive weather briefing
+            # Create comprehensive weather briefing with forecast
             weather_briefing = f"""🌤️ **Weather Update** ({local_time})
 📍 **{location_data['name']}, {location_data['country']}:** {temp_c}°C {weather_emoji} {condition}
-🌡️ **Feels like:** {feels_like_c}°C | **Humidity:** {humidity}%
-🌬️ **Wind:** {wind_kph} km/h {wind_dir}
-🔆 **UV Index:** {uv_index} - {uv_advice}"""
+🌡️ **Current:** Feels like {feels_like_c}°C | Humidity: {humidity}% | Wind: {wind_kph} km/h {wind_dir}
+🔆 **UV Index:** {uv_index} - {uv_advice}
+
+📊 **Today's Forecast:** {today_min}°C to {today_max}°C - {today_condition}
+🌧️ **Rain Chance:** {rain_chance}%"""
             
-            print(f"✅ Weather data retrieved successfully: {temp_c}°C, UV: {uv_index}")
+            # Add tomorrow preview if available
+            if tomorrow_forecast:
+                tomorrow_max = tomorrow_forecast['maxtemp_c']
+                tomorrow_min = tomorrow_forecast['mintemp_c']
+                tomorrow_condition = tomorrow_forecast['condition']['text']
+                tomorrow_rain = tomorrow_forecast['daily_chance_of_rain']
+                
+                weather_briefing += f"""
+🔮 **Tomorrow Preview:** {tomorrow_min}°C to {tomorrow_max}°C - {tomorrow_condition} ({tomorrow_rain}% rain)"""
+            
+            print(f"✅ Enhanced weather data retrieved: Current {temp_c}°C, High {today_max}°C")
             return weather_briefing
             
         elif response.status_code == 401:
@@ -264,8 +290,8 @@ async def get_weather_briefing():
         print(f"❌ Weather API response missing key: {e}")
         return f"🌤️ **Weather:** Data format error - missing {e}"
     except Exception as e:
-        print(f"❌ Weather briefing error: {e}")
-        print(f"📋 Weather briefing traceback: {traceback.format_exc()}")
+        print(f"❌ Enhanced weather briefing error: {e}")
+        print(f"📋 Enhanced weather briefing traceback: {traceback.format_exc()}")
         return f"🌤️ **Weather:** Error retrieving conditions - {str(e)[:50]}"
 
 # ============================================================================
