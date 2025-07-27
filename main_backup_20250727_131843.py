@@ -412,7 +412,7 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         print(f"📅 End: {end_dt}")
         print(f"📋 Calendar ID: {calendar_id}")
         
-        # **CRITICAL FIX - ACTUALLY CREATE THE EVENT**
+        # **THIS IS THE MISSING PIECE - ACTUALLY CREATE THE EVENT**
         created_event = calendar_service.events().insert(
             calendarId=calendar_id,
             body=event_body
@@ -422,24 +422,19 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         print(f"   Event ID: {created_event.get('id')}")
         print(f"   HTML Link: {created_event.get('htmlLink')}")
         
-        # Format success message with REAL event data
+        # Format success message
         event_link = created_event.get('htmlLink', '')
         event_id = created_event.get('id', '')
         
         formatted_time = start_dt.strftime('%a %m/%d at %-I:%M %p')
         
-        result = "✅ **Event Created Successfully**
-"
-        result += f"📅 **{summary}**
-"
-        result += f"🕐 {formatted_time}
-"
+        result = "✅ **Event Created Successfully**\n"
+        result += f"📅 **{summary}**\n"
+        result += f"🕐 {formatted_time}\n"
         if location:
-            result += f"📍 {location}
-"
+            result += f"📍 {location}\n"
         if event_link:
-            result += f"🔗 [View in Calendar]({event_link})
-"
+            result += f"🔗 [View in Calendar]({event_link})\n"
         result += f"🆔 Event ID: `{event_id}`"
         
         print(f"📝 Returning result: {result}")
@@ -451,6 +446,7 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         import traceback
         traceback.print_exc()
         return error_msg
+
 def delete_gcal_event(calendar_id, event_id):
     """Delete a Google Calendar event"""
     if not calendar_service:
