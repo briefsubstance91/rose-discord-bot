@@ -394,25 +394,20 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
                     time_str = time_str + 'T09:00:00'
                     print(f"🕐 Added default time: {time_str}")
                 
-                # Parse the datetime
-                try:
-                    dt = datetime.fromisoformat(time_str)
-                    print(f"🕐 Parsed datetime: {dt}")
-                    
-                    # FIX: Check for old years BEFORE parsing
-                    current_year = datetime.now().year
-                    if time_str.startswith('2023') or time_str.startswith('2024'):
-                        print(f"⚠️ OLD YEAR DETECTED: {time_str}")
-                        if 'T' in time_str:
-                            date_part, time_part = time_str.split('T')
-                            old_year, month, day = date_part.split('-')
-                            time_str = f"{current_year}-{month}-{day}T{time_part}"
-                        else:
-                            old_year, month, day = time_str.split('-')
-                            time_str = f"{current_year}-{month}-{day}"
-                        print(f"🔧 FIXED YEAR: {time_str}")
-                
-                # Parse the datetime
+ # Parse the datetime
+                # FIX: Check for old years BEFORE parsing
+                current_year = datetime.now().year
+                if time_str.startswith('2023') or time_str.startswith('2024'):
+                    print(f"⚠️ OLD YEAR DETECTED: {time_str}")
+                    if 'T' in time_str:
+                        date_part, time_part = time_str.split('T')
+                        old_year, month, day = date_part.split('-')
+                        time_str = f"{current_year}-{month}-{day}T{time_part}"
+                    else:
+                        old_year, month, day = time_str.split('-')
+                        time_str = f"{current_year}-{month}-{day}"
+                    print(f"🔧 FIXED YEAR: {time_str}")
+
                 try:
                     dt = datetime.fromisoformat(time_str)
                     print(f"🕐 Parsed datetime: {dt}")
