@@ -358,98 +358,37 @@ def get_uv_description(uv_index):
 
 def create_gcal_event(calendar_id="primary", summary=None, description=None, 
                      start_time=None, end_time=None, location=None, attendees=None):
-    """Create a new Google Calendar event with enhanced error handling and debugging"""
-    print(f"🔧 create_gcal_event called with:")
-    print(f"   summary: {summary}")
-    print(f"   start_time: {start_time}")
-    print(f"   end_time: {end_time}")
-    print(f"   calendar_id: {calendar_id}")
-    
+    """Create a new Google Calendar event - FIXED VERSION"""
     if not calendar_service:
-        error_msg = "❌ Calendar service not available"
-        print(error_msg)
-        return error_msg
+        return "❌ Calendar service not available"
     
-    if not summary or not start_time or not end_time:
-        error_msg = "❌ Missing required fields: summary, start_time, end_time"
-        print(error_msg)
-        return error_msg
+    if not summary or not start_time:
+        return "❌ Missing required fields: summary, start_time"
     
     try:
         toronto_tz = pytz.timezone('America/Toronto')
-        print(f"🌍 Using timezone: {toronto_tz}")
         
-        # ENHANCED DATE PARSING - Handle multiple formats and fix year issues
-        def parse_datetime_with_current_year(time_str):
-            """Parse datetime string and ensure it uses current year if needed"""
-            print(f"🕐 Parsing time string: {time_str}")
-            
-            # Handle string input
-            if isinstance(time_str, str):
-                # Remove Z suffix if present
-                time_str = time_str.replace('Z', '')
-                
-                # Add time if only date provided
-                if 'T' not in time_str:
-                    time_str = time_str + 'T09:00:00'
-                    print(f"🕐 Added default time: {time_str}")
-                
-                # FIX: Check for old years BEFORE parsing
-                current_year = datetime.now().year
-                if time_str.startswith('2023') or time_str.startswith('2024'):
-                    print(f"⚠️ OLD YEAR DETECTED: {time_str}")
-                    if 'T' in time_str:
-                        date_part, time_part = time_str.split('T')
-                        old_year, month, day = date_part.split('-')
-                        time_str = f"{current_year}-{month}-{day}T{time_part}"
-                    else:
-                        old_year, month, day = time_str.split('-')
-                        time_str = f"{current_year}-{month}-{day}"
-                    print(f"🔧 FIXED YEAR: {time_str}")
-                
-                # Parse the datetime
-                try:
-                    dt = datetime.fromisoformat(time_str)
-                    print(f"🕐 Parsed datetime: {dt}")
-                    
-                    # Double-check: If year is still old, force current year
-                    if dt.year < current_year:
-                        dt = dt.replace(year=current_year)
-                        print(f"🕐 Final year fix: {dt}")
-                    
-                    # Localize to Toronto timezone if no timezone info
-                    if dt.tzinfo is None:
-                        dt = toronto_tz.localize(dt)
-                        print(f"🕐 Localized to Toronto: {dt}")
-                    
-                    return dt
-                    
-                except ValueError as e:
-                    print(f"❌ Date parsing error: {e}")
-                    # Fallback: try to parse with current date
-                    now = datetime.now(toronto_tz)
-                    # Extract time if possible
-                    if ':' in time_str:
-                        time_part = time_str.split('T')[-1]
-                        hour, minute = time_part.split(':')[:2]
-                        dt = now.replace(hour=int(hour), minute=int(minute), second=0, microsecond=0)
-                        print(f"🕐 Fallback parsed: {dt}")
-                        return dt
-                    else:
-                        raise e
-            else:
-                return time_str
+        # Parse start time
+        if isinstance(start_time, str):
+            if 'T' not in start_time:
+                start_time = start_time + 'T09:00:00'
+            start_dt = datetime.fromisoformat(start_time.replace('Z', ''))
+            if start_dt.tzinfo is None:
+                start_dt = toronto_tz.localize(start_dt)
         
-        # Parse start and end times with enhanced logic
-        start_dt = parse_datetime_with_current_year(start_time)
-        end_dt = parse_datetime_with_current_year(end_time)
-        
-        print(f"✅ Final parsed times:")
-        print(f"   Start: {start_dt}")
-        print(f"   End: {end_dt}")
+        # Parse end time (default to 1 hour after start if not provided)
+        if end_time:
+            if isinstance(end_time, str):
+                if 'T' not in end_time:
+                    end_time = end_time + 'T10:00:00'
+                end_dt = datetime.fromisoformat(end_time.replace('Z', ''))
+                if end_dt.tzinfo is None:
+                    end_dt = toronto_tz.localize(end_dt)
+        else:
+            end_dt = start_dt + timedelta(hours=1)
         
         # Build event object
-        event = {
+        event_body = {
             'summary': summary,
             'start': {
                 'dateTime': start_dt.isoformat(),
@@ -462,21 +401,21 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         }
         
         if description:
-            event['description'] = description
-            
+            event_body['description'] = description
         if location:
-            event['location'] = location
-            
+            event_body['location'] = location
         if attendees:
-            event['attendees'] = [{'email': email} for email in attendees]
+            event_body['attendees'] = [{'email': email} for email in attendees]
         
-        print(f"📅 Creating event object: {event}")
+        print(f"🔧 Creating calendar event: {summary}")
+        print(f"📅 Start: {start_dt}")
+        print(f"📅 End: {end_dt}")
+        print(f"📋 Calendar ID: {calendar_id}")
         
-        # Create the event
-        print(f"🚀 Calling Google Calendar API...")
+        # **THIS IS THE MISSING PIECE - ACTUALLY CREATE THE EVENT**
         created_event = calendar_service.events().insert(
             calendarId=calendar_id,
-            body=event
+            body=event_body
         ).execute()
         
         print(f"✅ Event created successfully!")
@@ -489,7 +428,6 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         
         formatted_time = start_dt.strftime('%a %m/%d at %-I:%M %p')
         
-        # FIXED: Properly format the result string
         result = "✅ **Event Created Successfully**\n"
         result += f"📅 **{summary}**\n"
         result += f"🕐 {formatted_time}\n"
@@ -508,6 +446,7 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         import traceback
         traceback.print_exc()
         return error_msg
+
 
 def update_gcal_event(calendar_id, event_id, summary=None, description=None,
                      start_time=None, end_time=None, location=None, attendees=None):
