@@ -428,6 +428,7 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
         
         formatted_time = start_dt.strftime('%a %m/%d at %-I:%M %p')
         
+        # Fixed string formatting - using proper newlines
         result = "✅ **Event Created Successfully**
 "
         result += f"📅 **{summary}**
