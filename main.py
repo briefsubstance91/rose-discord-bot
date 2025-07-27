@@ -118,7 +118,8 @@ GMAIL_TOKEN_FILE = os.getenv('GMAIL_TOKEN_FILE', 'gmail_token.json')
 GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/gmail.modify'
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/calendar'
 ]
 
 # Validate critical environment variables
@@ -174,52 +175,39 @@ def initialize_google_services():
     """Initialize Google Calendar and Gmail services"""
     global calendar_service, gmail_service, accessible_calendars
     
-    print("🔧 Initializing Google Calendar integration...")
+    print("🔧 Initializing Google services with OAuth2...")
     
     try:
-        # Calendar Service (Service Account)
-        if GOOGLE_SERVICE_ACCOUNT_JSON:
-            try:
-                service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-                credentials = Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=['https://www.googleapis.com/auth/calendar']
-                )
-                calendar_service = build('calendar', 'v3', credentials=credentials)
-                print("✅ Google services initialized")
-                print(f"📧 Service Account: {service_account_info.get('client_email', 'Unknown')}")
-                
-                # Test calendar access
-                test_calendar_access()
-                
-            except Exception as e:
-                print(f"❌ Service Account Calendar Error: {e}")
-        else:
-            print("⚠️ No Google service account configured")
-        
-        # Gmail Service (OAuth)
-        print("🔧 Initializing Gmail OAuth2 integration...")
-        
+        # Use OAuth for both Gmail and Calendar
         if GMAIL_TOKEN_JSON:
             try:
                 token_info = json.loads(GMAIL_TOKEN_JSON)
-                gmail_credentials = OAuthCredentials.from_authorized_user_info(
+                oauth_credentials = OAuthCredentials.from_authorized_user_info(
                     token_info, GMAIL_SCOPES
                 )
                 
-                if gmail_credentials and gmail_credentials.valid:
-                    gmail_service = build('gmail', 'v1', credentials=gmail_credentials)
-                    print("✅ OAuth Gmail service initialized with modify permissions")
-                elif gmail_credentials and gmail_credentials.expired and gmail_credentials.refresh_token:
-                    gmail_credentials.refresh(Request())
-                    gmail_service = build('gmail', 'v1', credentials=gmail_credentials)
-                    print("✅ OAuth Gmail service refreshed and initialized")
+                if oauth_credentials and oauth_credentials.valid:
+                    # Initialize both services with same OAuth credentials
+                    gmail_service = build('gmail', 'v1', credentials=oauth_credentials)
+                    calendar_service = build('calendar', 'v3', credentials=oauth_credentials)
+                    print("✅ OAuth Gmail and Calendar services initialized")
+                elif oauth_credentials and oauth_credentials.expired and oauth_credentials.refresh_token:
+                    oauth_credentials.refresh(Request())
+                    gmail_service = build('gmail', 'v1', credentials=oauth_credentials)
+                    calendar_service = build('calendar', 'v3', credentials=oauth_credentials)
+                    print("✅ OAuth services refreshed and initialized")
                 else:
-                    print("❌ Gmail OAuth credentials invalid")
+                    print("❌ OAuth credentials invalid")
+                    
+                # Test calendar access if calendar service is available
+                if calendar_service:
+                    test_calendar_access()
+                    
             except Exception as e:
-                print(f"❌ Gmail OAuth Error: {e}")
+                print(f"❌ OAuth Error: {e}")
+                print("⚠️ You may need to re-authorize with Calendar scope")
         else:
-            print("⚠️ No Gmail OAuth token configured")
+            print("⚠️ No OAuth token configured")
         
     except Exception as e:
         print(f"❌ Google services initialization error: {e}")
@@ -356,7 +344,7 @@ def get_uv_description(uv_index):
 # GOOGLE CALENDAR FUNCTIONS - COMPLETE CLEAN VERSION FOR ROSE
 # ============================================================================
 
-def create_gcal_event(calendar_id="primary", summary=None, description=None, 
+def create_gcal_event(calendar_id=None, summary=None, description=None, 
                      start_time=None, end_time=None, location=None, attendees=None):
     """Create a new Google Calendar event"""
     if not calendar_service:
@@ -364,6 +352,10 @@ def create_gcal_event(calendar_id="primary", summary=None, description=None,
     
     if not summary or not start_time:
         return "❌ Missing required fields: summary, start_time"
+    
+    # Use primary calendar if no calendar_id specified (with OAuth, this is your main calendar)
+    if not calendar_id:
+        calendar_id = "primary"
     
     try:
         toronto_tz = pytz.timezone('America/Toronto')
