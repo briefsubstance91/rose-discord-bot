@@ -192,10 +192,23 @@ def initialize_google_services():
                     calendar_service = build('calendar', 'v3', credentials=oauth_credentials)
                     print("✅ OAuth Gmail and Calendar services initialized")
                 elif oauth_credentials and oauth_credentials.expired and oauth_credentials.refresh_token:
-                    oauth_credentials.refresh(Request())
-                    gmail_service = build('gmail', 'v1', credentials=oauth_credentials)
-                    calendar_service = build('calendar', 'v3', credentials=oauth_credentials)
-                    print("✅ OAuth services refreshed and initialized")
+                    try:
+                        oauth_credentials.refresh(Request())
+                        # Update the token info with refreshed credentials
+                        token_info.update({
+                            'token': oauth_credentials.token,
+                            'refresh_token': oauth_credentials.refresh_token,
+                            'token_uri': oauth_credentials.token_uri,
+                            'client_id': oauth_credentials.client_id,
+                            'client_secret': oauth_credentials.client_secret,
+                            'scopes': oauth_credentials.scopes
+                        })
+                        gmail_service = build('gmail', 'v1', credentials=oauth_credentials)
+                        calendar_service = build('calendar', 'v3', credentials=oauth_credentials)
+                        print("✅ OAuth services refreshed and initialized")
+                    except Exception as refresh_error:
+                        print(f"❌ Token refresh failed: {refresh_error}")
+                        print("⚠️ Please re-authorize OAuth2 tokens - refresh token is invalid")
                 else:
                     print("❌ OAuth credentials invalid")
                     
