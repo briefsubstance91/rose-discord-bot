@@ -995,7 +995,7 @@ def delete_emails_from_sender(sender_email, max_delete=50):
         return "❌ Gmail service not available"
     
     try:
-        # Search for emails from sender
+        # First try exact match
         query = f"from:{sender_email}"
         results = gmail_service.users().messages().list(
             userId='me',
@@ -1005,8 +1005,31 @@ def delete_emails_from_sender(sender_email, max_delete=50):
         
         messages = results.get('messages', [])
         
+        # If no exact match, try domain-based search for common patterns
+        if not messages and '@' in sender_email:
+            domain = sender_email.split('@')[1]
+            # Try searching by domain
+            query = f"from:@{domain}"
+            results = gmail_service.users().messages().list(
+                userId='me',
+                q=query,
+                maxResults=max_delete
+            ).execute()
+            messages = results.get('messages', [])
+            
+            # If still no match, try broader search with domain name
+            if not messages:
+                domain_name = domain.split('.')[0]  # e.g., "hm" from "email.hm.com"
+                query = f"from:{domain_name}"
+                results = gmail_service.users().messages().list(
+                    userId='me',
+                    q=query,
+                    maxResults=max_delete
+                ).execute()
+                messages = results.get('messages', [])
+        
         if not messages:
-            return f"📧 No emails found from: {sender_email}"
+            return f"📧 No emails found from: {sender_email} (tried exact match, domain match, and partial match)"
         
         # Delete messages
         deleted_count = 0
@@ -1020,12 +1043,54 @@ def delete_emails_from_sender(sender_email, max_delete=50):
             except:
                 continue
         
-        return f"✅ **Deleted {deleted_count} emails from {sender_email}**"
+        return f"✅ **Deleted {deleted_count} emails from {sender_email}** (used query: {query})"
         
     except HttpError as e:
         return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
     except Exception as e:
         return f"❌ Error deleting emails: {str(e)}"
+
+def debug_email_senders(search_term, max_results=20):
+    """Debug function to show exact sender formats for troubleshooting"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Search for emails containing the search term
+        query = f"from:{search_term}"
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=max_results
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found containing: {search_term}"
+        
+        # Get sender details
+        sender_list = []
+        for msg in messages:
+            msg_detail = gmail_service.users().messages().get(
+                userId='me',
+                id=msg['id'],
+                format='full'
+            ).execute()
+            
+            headers = msg_detail['payload'].get('headers', [])
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            
+            sender_list.append(f"**From:** `{sender}`\n**Subject:** {subject[:50]}{'...' if len(subject) > 50 else ''}")
+        
+        header = f"📧 **Email Senders Found ({len(sender_list)}):**\n\n"
+        return header + "\n\n".join(sender_list)
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error debugging emails: {str(e)}"
 
 # ============================================================================
 # EMAIL COMPOSITION & SENDING FUNCTIONS
@@ -1947,6 +2012,11 @@ def handle_rose_functions_enhanced(run, thread_id):
                 max_results = arguments.get('max_results', 10) or arguments.get('limit', 10)
                 include_body = arguments.get('include_body', False) or arguments.get('include_content', False)
                 result = search_emails(query, max_results, include_body)
+            elif function_name == "debug_email_senders":
+                # Debug function to show exact sender formats
+                search_term = arguments.get('search_term', '') or arguments.get('sender', '')
+                max_results = arguments.get('max_results', 20) or arguments.get('limit', 20)
+                result = debug_email_senders(search_term, max_results)
             elif function_name == "bulk_email_delete":
                 # Another alternative for bulk deletion
                 sender_email = arguments.get('sender_email', '') or arguments.get('from_address', '')
