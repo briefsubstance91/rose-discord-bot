@@ -926,6 +926,69 @@ def get_email_stats(days=7):
     except Exception as e:
         return f"❌ Error getting email stats: {str(e)}"
 
+def delete_email_by_id(email_id):
+    """Delete a specific email by its ID"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().delete(
+            userId='me',
+            id=email_id
+        ).execute()
+        return f"✅ **Email deleted successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error deleting email: {str(e)}"
+
+def delete_specific_email(subject=None, sender=None, date=None):
+    """Delete a specific email by subject, sender, or date"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Build search query
+        query_parts = []
+        if subject:
+            query_parts.append(f'subject:"{subject}"')
+        if sender:
+            query_parts.append(f'from:{sender}')
+        if date:
+            query_parts.append(f'after:{date} before:{date}')
+        
+        if not query_parts:
+            return "❌ Please specify subject, sender, or date to identify the email"
+        
+        query = ' '.join(query_parts)
+        
+        # Search for the email
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=1
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No email found matching the criteria"
+        
+        # Delete the first matching email
+        email_id = messages[0]['id']
+        gmail_service.users().messages().delete(
+            userId='me',
+            id=email_id
+        ).execute()
+        
+        return f"✅ **Email deleted successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error deleting email: {str(e)}"
+
 def delete_emails_from_sender(sender_email, max_delete=50):
     """Delete emails from a specific sender (with confirmation)"""
     if not gmail_service:
@@ -1304,6 +1367,34 @@ def handle_rose_functions_enhanced(run, thread_id):
                 max_results = arguments.get('max_results', 10) or arguments.get('count', 10)
                 include_body = arguments.get('include_body', False)
                 result = search_emails(query, max_results, include_body)
+            elif function_name == "delete_email":
+                # Delete specific email by ID
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = delete_email_by_id(email_id)
+            elif function_name == "delete_email_by_id":
+                # Delete specific email by ID (alternative name)
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = delete_email_by_id(email_id)
+            elif function_name == "delete_specific_email":
+                # Delete email by subject, sender, or date
+                subject = arguments.get('subject', '')
+                sender = arguments.get('sender', '') or arguments.get('from', '')
+                date = arguments.get('date', '')
+                result = delete_specific_email(subject, sender, date)
+            elif function_name == "single_email_delete":
+                # Another alternative for single email deletion
+                subject = arguments.get('subject', '')
+                sender = arguments.get('sender', '') or arguments.get('from', '')
+                date = arguments.get('date', '')
+                if not subject and not sender and not date:
+                    # Try email ID if no other criteria
+                    email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                    if email_id:
+                        result = delete_email_by_id(email_id)
+                    else:
+                        result = "❌ Please specify subject, sender, date, or email ID"
+                else:
+                    result = delete_specific_email(subject, sender, date)
             
             # Calendar view functions
             elif function_name == "get_today_schedule":
