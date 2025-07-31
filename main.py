@@ -1392,22 +1392,75 @@ async def weather_command(ctx):
 
 @bot.command(name='briefing')
 async def briefing_command(ctx):
-    """Complete morning briefing with weather and calendar"""
+    """Complete morning briefing with structured team reports"""
     if ctx.channel.name not in ALLOWED_CHANNELS:
         return
     
-    await ctx.send("🌅 **Rose's Morning Briefing**")
+    await ctx.send("🌅 **Team Morning Briefing**")
+    await asyncio.sleep(1)
     
-    # Weather
+    # Rose's strategic overview (goes first)
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
+    
+    rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n"
+    rose_briefing += "Good morning! Here's your executive summary for today:\n\n"
+    
+    # Get high-level calendar insights
+    if calendar_service:
+        upcoming_events = get_upcoming_events(1)  # Just today
+        event_count = len([line for line in upcoming_events.split('\n') if '•' in line])
+        rose_briefing += f"📊 **Today's Focus:** {event_count} scheduled items requiring your attention\n"
+        rose_briefing += "🎯 **Priority:** Review calendar for strategic time blocks and preparation needs\n"
+    else:
+        rose_briefing += "📊 **Calendar Status:** Disconnected - manual planning required\n"
+    
+    # Email overview
+    if gmail_service:
+        try:
+            stats = get_email_stats(1)
+            unread_count = stats.count('unread') if 'unread' in stats.lower() else 0
+            rose_briefing += f"📧 **Communications:** Inbox requires attention ({unread_count} items pending)\n"
+        except:
+            rose_briefing += "📧 **Communications:** Email status unavailable\n"
+    
+    rose_briefing += "\n*Delegating operational details to Flora and Maeve...*"
+    await ctx.send(rose_briefing)
+    await asyncio.sleep(2)
+    
+    # Flora's environmental briefing (second)
+    flora_briefing = "🌿 **Flora's Environmental Report**\n"
+    flora_briefing += "Environmental conditions and wellness factors:\n\n"
+    
     weather = get_weather_briefing()
-    await ctx.send(weather)
+    flora_briefing += weather
+    flora_briefing += "\n\n🌱 **Wellness Note:** Consider outdoor time and natural light optimization"
+    flora_briefing += "\n*Coordinating with Maeve for schedule alignment...*"
     
-    # Today's schedule
+    await ctx.send(flora_briefing)
+    await asyncio.sleep(2)
+    
+    # Maeve's operational briefing (third)
+    maeve_briefing = "⚡ **Maeve's Operational Report**\n"
+    maeve_briefing += "Detailed schedule and tactical execution:\n\n"
+    
     if calendar_service:
         schedule = get_today_schedule()
-        await ctx.send(schedule)
+        maeve_briefing += schedule
+        maeve_briefing += "\n\n🔧 **Operational Notes:**\n"
+        maeve_briefing += "• Review meeting preparations 15 minutes prior\n"
+        maeve_briefing += "• Optimize transitions between calendar blocks\n"
+        maeve_briefing += "• Maintain energy levels with strategic breaks"
     else:
-        await ctx.send("📅 **Schedule:** Calendar not connected")
+        maeve_briefing += "📅 **Schedule:** Calendar service disconnected\n"
+        maeve_briefing += "🔧 **Recommendation:** Manual time blocking required"
+    
+    maeve_briefing += "\n\n*All systems operational and ready for execution* ⚡"
+    await ctx.send(maeve_briefing)
+    
+    # Closing coordination
+    await asyncio.sleep(1)
+    await ctx.send("🤝 **Team Coordination Complete** - Ready to optimize your day!")
 
 @bot.command(name='schedule')
 async def schedule_command(ctx):
