@@ -1028,6 +1028,605 @@ def delete_emails_from_sender(sender_email, max_delete=50):
         return f"❌ Error deleting emails: {str(e)}"
 
 # ============================================================================
+# EMAIL COMPOSITION & SENDING FUNCTIONS
+# ============================================================================
+
+def send_email(to, subject, body, cc=None, bcc=None):
+    """Send a new email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        message = MIMEText(body)
+        message['to'] = to
+        message['subject'] = subject
+        if cc:
+            message['cc'] = cc
+        if bcc:
+            message['bcc'] = bcc
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        send_message = gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"✅ **Email sent successfully to {to}**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error sending email: {str(e)}"
+
+def reply_to_email(email_id, reply_body):
+    """Reply to a specific email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Get original message
+        original_msg = gmail_service.users().messages().get(
+            userId='me',
+            id=email_id,
+            format='full'
+        ).execute()
+        
+        headers = original_msg['payload'].get('headers', [])
+        original_to = next((h['value'] for h in headers if h['name'] == 'From'), '')
+        original_subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
+        message_id = next((h['value'] for h in headers if h['name'] == 'Message-ID'), '')
+        
+        # Create reply
+        reply_subject = f"Re: {original_subject}" if not original_subject.startswith('Re:') else original_subject
+        
+        message = MIMEText(reply_body)
+        message['to'] = original_to
+        message['subject'] = reply_subject
+        if message_id:
+            message['In-Reply-To'] = message_id
+            message['References'] = message_id
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"✅ **Reply sent successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error replying to email: {str(e)}"
+
+def forward_email(email_id, to, forward_message=""):
+    """Forward a specific email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Get original message
+        original_msg = gmail_service.users().messages().get(
+            userId='me',
+            id=email_id,
+            format='full'
+        ).execute()
+        
+        headers = original_msg['payload'].get('headers', [])
+        original_from = next((h['value'] for h in headers if h['name'] == 'From'), '')
+        original_subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
+        original_date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+        
+        # Get original body
+        original_body = get_email_body(original_msg)
+        
+        # Create forward message
+        forward_subject = f"Fwd: {original_subject}" if not original_subject.startswith('Fwd:') else original_subject
+        
+        forward_body = f"{forward_message}\n\n---------- Forwarded message ----------\n"
+        forward_body += f"From: {original_from}\n"
+        forward_body += f"Date: {original_date}\n"
+        forward_body += f"Subject: {original_subject}\n\n"
+        forward_body += original_body
+        
+        message = MIMEText(forward_body)
+        message['to'] = to
+        message['subject'] = forward_subject
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        gmail_service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return f"✅ **Email forwarded successfully to {to}**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error forwarding email: {str(e)}"
+
+# ============================================================================
+# EMAIL ORGANIZATION FUNCTIONS
+# ============================================================================
+
+def mark_email_as_read(email_id):
+    """Mark an email as read"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['UNREAD']}
+        ).execute()
+        
+        return f"✅ **Email marked as read**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error marking email as read: {str(e)}"
+
+def mark_email_as_unread(email_id):
+    """Mark an email as unread"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'addLabelIds': ['UNREAD']}
+        ).execute()
+        
+        return f"✅ **Email marked as unread**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error marking email as unread: {str(e)}"
+
+def archive_email(email_id):
+    """Archive an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['INBOX']}
+        ).execute()
+        
+        return f"✅ **Email archived successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error archiving email: {str(e)}"
+
+def star_email(email_id):
+    """Star an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'addLabelIds': ['STARRED']}
+        ).execute()
+        
+        return f"✅ **Email starred successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error starring email: {str(e)}"
+
+def unstar_email(email_id):
+    """Remove star from an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': ['STARRED']}
+        ).execute()
+        
+        return f"✅ **Star removed successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error removing star: {str(e)}"
+
+def add_label_to_email(email_id, label_name):
+    """Add a label to an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Get all labels to find the label ID
+        labels_result = gmail_service.users().labels().list(userId='me').execute()
+        labels = labels_result.get('labels', [])
+        
+        label_id = None
+        for label in labels:
+            if label['name'].lower() == label_name.lower():
+                label_id = label['id']
+                break
+        
+        if not label_id:
+            return f"❌ Label '{label_name}' not found"
+        
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'addLabelIds': [label_id]}
+        ).execute()
+        
+        return f"✅ **Label '{label_name}' added successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error adding label: {str(e)}"
+
+def remove_label_from_email(email_id, label_name):
+    """Remove a label from an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Get all labels to find the label ID
+        labels_result = gmail_service.users().labels().list(userId='me').execute()
+        labels = labels_result.get('labels', [])
+        
+        label_id = None
+        for label in labels:
+            if label['name'].lower() == label_name.lower():
+                label_id = label['id']
+                break
+        
+        if not label_id:
+            return f"❌ Label '{label_name}' not found"
+        
+        gmail_service.users().messages().modify(
+            userId='me',
+            id=email_id,
+            body={'removeLabelIds': [label_id]}
+        ).execute()
+        
+        return f"✅ **Label '{label_name}' removed successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error removing label: {str(e)}"
+
+# ============================================================================
+# ADVANCED EMAIL MANAGEMENT FUNCTIONS
+# ============================================================================
+
+def get_email_attachments(email_id):
+    """Get attachments from an email"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        message = gmail_service.users().messages().get(
+            userId='me',
+            id=email_id,
+            format='full'
+        ).execute()
+        
+        attachments = []
+        
+        def extract_attachments(payload):
+            if 'parts' in payload:
+                for part in payload['parts']:
+                    if part.get('filename'):
+                        attachments.append({
+                            'filename': part['filename'],
+                            'mimeType': part['mimeType'],
+                            'size': part['body'].get('size', 0),
+                            'attachmentId': part['body'].get('attachmentId')
+                        })
+                    else:
+                        extract_attachments(part)
+            elif payload.get('filename'):
+                attachments.append({
+                    'filename': payload['filename'],
+                    'mimeType': payload['mimeType'], 
+                    'size': payload['body'].get('size', 0),
+                    'attachmentId': payload['body'].get('attachmentId')
+                })
+        
+        extract_attachments(message['payload'])
+        
+        if not attachments:
+            return "📎 No attachments found in this email"
+        
+        attachment_list = []
+        for att in attachments:
+            size_kb = att['size'] / 1024 if att['size'] else 0
+            attachment_list.append(f"• {att['filename']} ({att['mimeType']}, {size_kb:.1f}KB)")
+        
+        return f"📎 **Attachments found:**\n" + "\n".join(attachment_list)
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error getting attachments: {str(e)}"
+
+def get_email_thread(thread_id):
+    """Get all emails in a conversation thread"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        thread = gmail_service.users().threads().get(
+            userId='me',
+            id=thread_id
+        ).execute()
+        
+        messages = thread.get('messages', [])
+        
+        if not messages:
+            return "📧 No messages found in thread"
+        
+        thread_summary = []
+        for i, msg in enumerate(messages):
+            headers = msg['payload'].get('headers', [])
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            date = next((h['value'] for h in headers if h['name'] == 'Date'), 'No Date')
+            
+            # Parse date
+            try:
+                parsed_date = parsedate_to_datetime(date)
+                date_str = parsed_date.strftime('%m/%d at %-I:%M %p')
+            except:
+                date_str = date
+            
+            thread_summary.append(f"{i+1}. **{subject}**\n   From: {sender}\n   Date: {date_str}")
+        
+        return f"🧵 **Conversation Thread ({len(messages)} messages):**\n\n" + "\n\n".join(thread_summary)
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error getting thread: {str(e)}"
+
+def mark_all_as_read(query="is:unread"):
+    """Mark multiple emails as read based on search query"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=100
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return "📧 No unread emails found"
+        
+        marked_count = 0
+        for msg in messages:
+            try:
+                gmail_service.users().messages().modify(
+                    userId='me',
+                    id=msg['id'],
+                    body={'removeLabelIds': ['UNREAD']}
+                ).execute()
+                marked_count += 1
+            except:
+                continue
+        
+        return f"✅ **Marked {marked_count} emails as read**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error marking emails as read: {str(e)}"
+
+def archive_old_emails(days_old=30, max_archive=50):
+    """Archive emails older than specified days"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        # Calculate date
+        from datetime import datetime, timedelta
+        cutoff_date = (datetime.now() - timedelta(days=days_old)).strftime('%Y/%m/%d')
+        query = f"before:{cutoff_date} in:inbox"
+        
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=max_archive
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails older than {days_old} days found in inbox"
+        
+        archived_count = 0
+        for msg in messages:
+            try:
+                gmail_service.users().messages().modify(
+                    userId='me',
+                    id=msg['id'],
+                    body={'removeLabelIds': ['INBOX']}
+                ).execute()
+                archived_count += 1
+            except:
+                continue
+        
+        return f"✅ **Archived {archived_count} emails older than {days_old} days**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error archiving old emails: {str(e)}"
+
+def delete_by_subject_pattern(pattern, max_delete=25):
+    """Delete emails matching a subject pattern"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        import re
+        query = f'subject:"{pattern}"'
+        
+        results = gmail_service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=max_delete
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            return f"📧 No emails found matching pattern: {pattern}"
+        
+        deleted_count = 0
+        for msg in messages:
+            try:
+                gmail_service.users().messages().delete(
+                    userId='me',
+                    id=msg['id']
+                ).execute()
+                deleted_count += 1
+            except:
+                continue
+        
+        return f"✅ **Deleted {deleted_count} emails matching pattern '{pattern}'**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error deleting emails: {str(e)}"
+
+def list_email_labels():
+    """List all Gmail labels"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        labels_result = gmail_service.users().labels().list(userId='me').execute()
+        labels = labels_result.get('labels', [])
+        
+        if not labels:
+            return "📝 No labels found"
+        
+        # Separate system and user labels
+        system_labels = []
+        user_labels = []
+        
+        for label in labels:
+            label_name = label['name']
+            if label['type'] == 'system':
+                system_labels.append(label_name)
+            else:
+                user_labels.append(label_name)
+        
+        result = "📝 **Gmail Labels:**\n\n"
+        
+        if system_labels:
+            result += "**System Labels:**\n"
+            result += "\n".join([f"• {label}" for label in sorted(system_labels)])
+            result += "\n\n"
+        
+        if user_labels:
+            result += "**Custom Labels:**\n"
+            result += "\n".join([f"• {label}" for label in sorted(user_labels)])
+        
+        return result
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error listing labels: {str(e)}"
+
+def create_email_filter(criteria, actions):
+    """Create a Gmail filter (simplified version)"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        filter_data = {
+            'criteria': criteria,
+            'action': actions
+        }
+        
+        gmail_service.users().settings().filters().create(
+            userId='me',
+            body=filter_data
+        ).execute()
+        
+        return f"✅ **Email filter created successfully**"
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error creating filter: {str(e)}"
+
+def list_email_filters():
+    """List existing Gmail filters"""
+    if not gmail_service:
+        return "❌ Gmail service not available"
+    
+    try:
+        filters_result = gmail_service.users().settings().filters().list(userId='me').execute()
+        filters = filters_result.get('filter', [])
+        
+        if not filters:
+            return "🔍 No email filters found"
+        
+        filter_list = []
+        for i, email_filter in enumerate(filters):
+            criteria = email_filter.get('criteria', {})
+            actions = email_filter.get('action', {})
+            
+            filter_desc = f"{i+1}. "
+            if criteria.get('from'):
+                filter_desc += f"From: {criteria['from']} "
+            if criteria.get('to'):
+                filter_desc += f"To: {criteria['to']} "
+            if criteria.get('subject'):
+                filter_desc += f"Subject: {criteria['subject']} "
+            
+            if actions.get('addLabelIds'):
+                filter_desc += f"→ Add labels"
+            if actions.get('removeLabelIds'):
+                filter_desc += f"→ Remove labels"
+            if actions.get('forward'):
+                filter_desc += f"→ Forward to {actions['forward']}"
+            
+            filter_list.append(filter_desc)
+        
+        return f"🔍 **Email Filters ({len(filters)}):**\n\n" + "\n".join(filter_list)
+        
+    except HttpError as e:
+        return f"❌ Gmail API error: {e.resp.status} - {e._get_reason()}"
+    except Exception as e:
+        return f"❌ Error listing filters: {str(e)}"
+
+# ============================================================================
 # CALENDAR VIEW FUNCTIONS (ALL PRESERVED)
 # ============================================================================
 
@@ -1395,6 +1994,97 @@ def handle_rose_functions_enhanced(run, thread_id):
                         result = "❌ Please specify subject, sender, date, or email ID"
                 else:
                     result = delete_specific_email(subject, sender, date)
+                    
+            # Email composition & sending functions
+            elif function_name == "send_email":
+                to = arguments.get('to', '') or arguments.get('recipient', '')
+                subject = arguments.get('subject', '')
+                body = arguments.get('body', '') or arguments.get('message', '')
+                cc = arguments.get('cc', '')
+                bcc = arguments.get('bcc', '')
+                result = send_email(to, subject, body, cc, bcc)
+            elif function_name == "reply_to_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                reply_body = arguments.get('reply_body', '') or arguments.get('message', '') or arguments.get('body', '')
+                result = reply_to_email(email_id, reply_body)
+            elif function_name == "forward_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                to = arguments.get('to', '') or arguments.get('recipient', '')
+                forward_message = arguments.get('forward_message', '') or arguments.get('message', '')
+                result = forward_email(email_id, to, forward_message)
+                
+            # Email organization functions
+            elif function_name == "mark_as_read" or function_name == "mark_email_as_read":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = mark_email_as_read(email_id)
+            elif function_name == "mark_as_unread" or function_name == "mark_email_as_unread":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = mark_email_as_unread(email_id)
+            elif function_name == "archive_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = archive_email(email_id)
+            elif function_name == "star_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = star_email(email_id)
+            elif function_name == "unstar_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = unstar_email(email_id)
+            elif function_name == "add_label" or function_name == "add_label_to_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                label_name = arguments.get('label_name', '') or arguments.get('label', '')
+                result = add_label_to_email(email_id, label_name)
+            elif function_name == "remove_label" or function_name == "remove_label_from_email":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                label_name = arguments.get('label_name', '') or arguments.get('label', '')
+                result = remove_label_from_email(email_id, label_name)
+                
+            # Advanced email management functions
+            elif function_name == "get_attachments" or function_name == "get_email_attachments":
+                email_id = arguments.get('email_id', '') or arguments.get('id', '')
+                result = get_email_attachments(email_id)
+            elif function_name == "get_thread" or function_name == "get_email_thread":
+                thread_id = arguments.get('thread_id', '') or arguments.get('id', '')
+                result = get_email_thread(thread_id)
+            elif function_name == "mark_all_as_read":
+                query = arguments.get('query', 'is:unread')
+                result = mark_all_as_read(query)
+            elif function_name == "archive_old_emails":
+                days_old = arguments.get('days_old', 30) or arguments.get('days', 30)
+                max_archive = arguments.get('max_archive', 50) or arguments.get('count', 50)
+                result = archive_old_emails(days_old, max_archive)
+            elif function_name == "delete_by_pattern" or function_name == "delete_by_subject_pattern":
+                pattern = arguments.get('pattern', '') or arguments.get('subject_pattern', '')
+                max_delete = arguments.get('max_delete', 25) or arguments.get('count', 25)
+                result = delete_by_subject_pattern(pattern, max_delete)
+            elif function_name == "list_labels" or function_name == "list_email_labels":
+                result = list_email_labels()
+            elif function_name == "create_filter" or function_name == "create_email_filter":
+                criteria = arguments.get('criteria', {})
+                actions = arguments.get('actions', {})
+                result = create_email_filter(criteria, actions)
+            elif function_name == "list_filters" or function_name == "list_email_filters":
+                result = list_email_filters()
+                
+            # Bulk operations
+            elif function_name == "bulk_mark_read":
+                query = arguments.get('query', 'is:unread')
+                result = mark_all_as_read(query)
+            elif function_name == "bulk_archive":
+                days_old = arguments.get('days_old', 30) or arguments.get('days', 30)
+                max_archive = arguments.get('max_archive', 50) or arguments.get('count', 50)
+                result = archive_old_emails(days_old, max_archive)
+            elif function_name == "email_cleanup_advanced":
+                # Advanced cleanup function
+                operation = arguments.get('operation', '')
+                if operation == 'mark_read':
+                    result = mark_all_as_read()
+                elif operation == 'archive_old':
+                    result = archive_old_emails()
+                elif operation == 'delete_pattern':
+                    pattern = arguments.get('pattern', '')
+                    result = delete_by_subject_pattern(pattern)
+                else:
+                    result = "❌ Please specify operation: mark_read, archive_old, or delete_pattern"
             
             # Calendar view functions
             elif function_name == "get_today_schedule":
