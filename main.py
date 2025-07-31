@@ -968,24 +968,90 @@ def delete_emails_from_sender(sender_email, max_delete=50):
 # CALENDAR VIEW FUNCTIONS (ALL PRESERVED)
 # ============================================================================
 
-def get_today_schedule():
-    """Get today's schedule across all calendars"""
+def get_work_schedule(time_filter=None):
+    """Get work calendar schedule - for Vivian's reports"""
+    if not calendar_service or not GMAIL_WORK_CALENDAR_ID:
+        return "❌ Work calendar not available"
+    
+    try:
+        toronto_tz = pytz.timezone('America/Toronto')
+        now = datetime.now(toronto_tz)
+        
+        # Set time range based on filter
+        if time_filter == 'noon':
+            start_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif time_filter == 'afternoon':
+            start_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:  # Full day
+            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        events_result = calendar_service.events().list(
+            calendarId=GMAIL_WORK_CALENDAR_ID,
+            timeMin=start_time.isoformat(),
+            timeMax=end_time.isoformat(),
+            maxResults=25,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        if not events:
+            return "💼 **Work Schedule:** Clear - focus time available"
+        
+        # Format events
+        formatted_events = []
+        for event in events:
+            summary = event.get('summary', 'Untitled Meeting')
+            start = event.get('start', {})
+            if 'dateTime' in start:
+                start_dt = datetime.fromisoformat(start['dateTime'].replace('Z', '+00:00'))
+                time_str = start_dt.astimezone(toronto_tz).strftime('%-I:%M %p')
+            else:
+                time_str = 'All day'
+            
+            formatted_events.append(f"• {time_str} - {summary}")
+        
+        header = f"💼 **Work Schedule ({len(formatted_events)} items):**\n"
+        return header + "\n".join(formatted_events)
+        
+    except Exception as e:
+        return f"❌ Error getting work schedule: {str(e)}"
+
+def get_personal_schedule(time_filter=None):
+    """Get personal/other calendars schedule - for Rose's reports"""
     if not calendar_service:
         return "❌ Calendar service not available"
     
     try:
         toronto_tz = pytz.timezone('America/Toronto')
         now = datetime.now(toronto_tz)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Set time range based on filter
+        if time_filter == 'noon':
+            start_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif time_filter == 'afternoon':
+            start_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:  # Full day
+            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Get personal calendars (exclude work calendar)
+        personal_calendars = [(name, cal_id) for name, cal_id in accessible_calendars 
+                             if cal_id != GMAIL_WORK_CALENDAR_ID]
         
         all_events = []
-        for calendar_name, calendar_id in accessible_calendars:
+        for calendar_name, calendar_id in personal_calendars:
             try:
                 events_result = calendar_service.events().list(
                     calendarId=calendar_id,
-                    timeMin=start_of_day.isoformat(),
-                    timeMax=end_of_day.isoformat(),
+                    timeMin=start_time.isoformat(),
+                    timeMax=end_time.isoformat(),
                     maxResults=25,
                     singleEvents=True,
                     orderBy='startTime'
@@ -999,7 +1065,7 @@ def get_today_schedule():
                 continue
         
         if not all_events:
-            return "📅 **Today's Schedule:** No events scheduled - perfect for deep work!"
+            return "📅 **Personal Schedule:** Clear - great for personal priorities"
         
         # Sort by start time
         all_events.sort(key=lambda x: x.get('start', {}).get('dateTime', x.get('start', {}).get('date', '')))
@@ -1019,11 +1085,20 @@ def get_today_schedule():
             
             formatted_events.append(f"• {time_str} - {summary} ({calendar_name})")
         
-        header = f"📅 **Today's Schedule ({len(formatted_events)} events):**\n"
+        header = f"📅 **Personal Schedule ({len(formatted_events)} items):**\n"
         return header + "\n".join(formatted_events)
         
     except Exception as e:
-        return f"❌ Error getting today's schedule: {str(e)}"
+        return f"❌ Error getting personal schedule: {str(e)}"
+
+def get_today_schedule():
+    """Get today's schedule across all calendars - legacy function for compatibility"""
+    work_schedule = get_work_schedule()
+    personal_schedule = get_personal_schedule()
+    
+    # Combine both schedules
+    combined = f"{work_schedule}\n\n{personal_schedule}"
+    return combined
 
 def get_upcoming_events(days=7):
     """Get upcoming events for the next N days"""
@@ -1349,34 +1424,55 @@ async def send_as_assistant_bot(channel, content, assistant_name):
     # Fallback: Send as Rose with clear attribution
     await channel.send(f"**{assistant_name}:** {content}")
 
-def get_vivian_report():
-    """Generate Vivian's PR/Work/News briefing"""
-    report = "📺 **Vivian's External Intelligence Brief**\n"
-    report += "Good morning! Here's your external landscape update:\n\n"
+def get_vivian_report(time_filter=None, brief=False):
+    """Generate Vivian's Work Calendar & External Intelligence briefing"""
+    if brief:
+        report = "📺 **Vivian's Work Brief**\n"
+        work_schedule = get_work_schedule(time_filter)
+        report += f"{work_schedule}\n"
+        
+        # Quick priority check
+        if gmail_service:
+            try:
+                unread_emails = get_recent_emails(3, unread_only=True, include_body=False)
+                priority_count = len([line for line in unread_emails.split('\n') if 'urgent' in line.lower() or 'important' in line.lower()])
+                if priority_count > 0:
+                    report += f"\n📧 **Priority Alerts:** {priority_count} urgent items\n"
+            except:
+                pass
+        
+        report += "\n💼 **External Focus:** LinkedIn, stakeholder follow-up, industry monitoring"
+        return report
     
-    # Work email priority assessment
+    # Full detailed report
+    report = "📺 **Vivian's Work & External Intelligence Brief**\n"
+    report += "Good morning! Work calendar and external landscape update:\n\n"
+    
+    # Work calendar (Vivian's primary responsibility)
+    work_schedule = get_work_schedule(time_filter)
+    report += f"{work_schedule}\n"
+    
+    # Work email priority assessment (lighter focus now that Rose handles main email)
     if gmail_service:
         try:
-            unread_emails = get_recent_emails(5, unread_only=True, include_body=False)
+            unread_emails = get_recent_emails(3, unread_only=True, include_body=False)
             priority_count = len([line for line in unread_emails.split('\n') if 'urgent' in line.lower() or 'important' in line.lower()])
-            report += f"📧 **Work Communications Priority:** {priority_count} high-priority items detected\n"
-            report += "🎯 **Recommendation:** Review urgent emails before first meeting\n"
+            if priority_count > 0:
+                report += f"\n📧 **Work Priority Alerts:** {priority_count} urgent items flagged\n"
         except:
-            report += "📧 **Work Communications:** Email assessment unavailable\n"
-    else:
-        report += "📧 **Work Communications:** Email service offline\n"
+            pass
     
-    # External communications reminder
-    report += "\n💼 **Today's External Focus:**\n"
-    report += "• LinkedIn engagement check scheduled\n"
-    report += "• Stakeholder follow-up prep needed\n"
-    report += "• Professional communication review pending\n"
+    # External communications focus
+    report += "\n💼 **External Priorities:**\n"
+    report += "• LinkedIn engagement check\n"
+    report += "• Stakeholder follow-up prep\n"
+    report += "• Professional communication review\n"
     
-    # News digest placeholder (could integrate with news API)
+    # Industry monitoring
     report += "\n📰 **Industry Watch:**\n"
-    report += "• Monitor key industry developments throughout the day\n"
-    report += "• Check for mentions and engagement opportunities\n"
-    report += "• Curated news feed review recommended\n"
+    report += "• Key developments monitoring active\n"
+    report += "• Engagement opportunities tracked\n"
+    report += "• News feed curation ready\n"
     
     return report
 
@@ -1645,9 +1741,9 @@ async def send_as_persona(channel, content, persona_name, avatar_url=None):
         print(f"❌ Error sending as {persona_name}: {e}")
         await channel.send(f"**{persona_name}:** {content}")
 
-@bot.command(name='briefing')
-async def briefing_command(ctx):
-    """Complete morning briefing with comprehensive team reports"""
+@bot.command(name='am')
+async def morning_briefing_command(ctx):
+    """Morning comprehensive briefing - all day ahead"""
     if ctx.channel.name not in ALLOWED_CHANNELS:
         return
     
@@ -1658,125 +1754,193 @@ async def briefing_command(ctx):
     toronto_tz = pytz.timezone('America/Toronto')
     current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
     
-    rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n"
-    rose_briefing += "Good morning! Comprehensive executive briefing initiating...\n\n"
+    rose_briefing = f"👑 **Rose's Morning Brief** ({current_time})\n"
     
-    # Get high-level calendar insights
-    if calendar_service:
-        upcoming_events = get_upcoming_events(1)  # Just today
-        event_count = len([line for line in upcoming_events.split('\n') if '•' in line])
-        rose_briefing += f"📊 **Today's Strategic Focus:** {event_count} scheduled commitments\n"
-        rose_briefing += "🎯 **Executive Priority:** Multi-department coordination for optimal productivity\n"
-    else:
-        rose_briefing += "📊 **Calendar Status:** Manual coordination mode - all departments standing by\n"
+    # Personal/Other calendars (Rose's primary responsibility)
+    personal_schedule = get_personal_schedule()
+    rose_briefing += f"{personal_schedule}\n"
     
-    # Email overview
+    # Email overview (Rose's primary responsibility)
     if gmail_service:
         try:
             stats = get_email_stats(1)
             unread_count = stats.count('unread') if 'unread' in stats.lower() else 0
-            rose_briefing += f"📧 **Communications Status:** {unread_count} priority items requiring attention\n"
+            rose_briefing += f"\n📧 **Email Status:** {unread_count} items pending\n"
         except:
-            rose_briefing += "📧 **Communications:** Assessment pending\n"
+            rose_briefing += "\n📧 **Email:** Assessment pending\n"
     
-    rose_briefing += "\n🚀 **Team Status:** All departments online - requesting full briefing reports"
+    rose_briefing += "🚀 **Team reports incoming...**"
     await ctx.send(rose_briefing)
     await asyncio.sleep(2)
     
-    # Vivian's external intelligence report
-    vivian_report = get_vivian_report()
+    # Vivian's work calendar (brief version)
+    vivian_report = get_vivian_report(brief=True)
     await send_as_assistant_bot(ctx.channel, vivian_report, "Vivian Spencer")
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
     
-    # Flora's mystical guidance and weather
-    flora_briefing = "🔮 **Flora's Mystical Guidance & Celestial Weather Reading**\n"
-    flora_briefing += "Good morning, dear souls! The cosmos whispers through today's elements:\n\n"
-    
+    # Flora's weather + energy (concise)
     weather = get_weather_briefing()
-    flora_briefing += weather
-    
-    # Add mystical interpretation
-    flora_briefing += "\n\n🌙 **Celestial Interpretation:**\n"
-    flora_briefing += "• The atmospheric energies align with your daily intentions\n"
-    flora_briefing += "• Weather patterns reflect inner emotional currents - observe and adapt\n"
-    flora_briefing += "• Natural light serves as divine connection - embrace solar/lunar rhythms\n"
-    flora_briefing += "• Elements speak - listen to wind, feel temperature shifts as cosmic guidance\n"
-    
-    flora_briefing += "\n🃏 **Daily Mystical Insight:**\n"
-    flora_briefing += "*\"Today's weather is but the universe's mood - flow with it, don't fight it.\"*\n"
-    flora_briefing += "✨ Trust your intuition as the day's energies shift and dance"
-    
+    flora_briefing = f"🔮 **Flora's Weather & Energy**\n{weather}\n\n✨ **Daily Guidance:** Flow with today's cosmic energies - trust your intuition"
     await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
     
-    # Maeve's style and schedule coordination
-    maeve_briefing = "🎨 **Maeve's Style & Schedule Aesthetic Brief**\n"
-    maeve_briefing += "Perfect cosmic canvas, Flora! Now for today's curated schedule:\n\n"
-    
+    # Maeve's style coordination (essential)
+    maeve_briefing = "🎨 **Maeve's Style Brief**\n"
     if calendar_service:
-        schedule = get_today_schedule()
-        maeve_briefing += schedule
-        maeve_briefing += "\n\n✨ **Style & Efficiency Curation:**\n"
-        maeve_briefing += "• **Meeting Prep Aesthetic:** 15-minute buffer for mental outfit changes\n"
-        maeve_briefing += "• **Transition Styling:** Seamless flow between commitments\n"
-        maeve_briefing += "• **Energy Color Palette:** Schedule rhythm to style vibe alignment\n"
-        maeve_briefing += "• **Weather-to-Wardrobe Sync:** Channeling Flora's cosmic weather guidance\n"
-        
-        maeve_briefing += "\n👗 **Today's Style Strategy:**\n"
-        maeve_briefing += "• Comfort meets confidence - dress for peak performance\n"
-        maeve_briefing += "• Accessories that transition seamlessly\n"
-        maeve_briefing += "• Color psychology alignment with calendar energy\n"
+        event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
+        event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
+        maeve_briefing += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
+        maeve_briefing += "👗 **Strategy:** Dress for peak performance, transitional accessories, weather-aligned colors"
     else:
-        maeve_briefing += "📅 **Schedule Status:** Calendar offline - styling reset mode activated\n"
-        maeve_briefing += "🎯 **Style Recovery:** Perfect time for aesthetic vision curation\n"
-    
-    maeve_briefing += "\n💄 **Aesthetic Systems: Fully Coordinated & Ready!**"
-    
+        maeve_briefing += "📅 **Styling Reset Mode:** Perfect curation opportunity"
     await send_as_assistant_bot(ctx.channel, maeve_briefing, "Maeve Windham")
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
     
-    # Celeste's content and research briefing
-    celeste_report = get_celeste_report()
-    await send_as_assistant_bot(ctx.channel, celeste_report, "Celeste Marchmont")
-    await asyncio.sleep(2)
+    # Celeste's priorities (brief)
+    celeste_brief = "✍️ **Celeste's Content Brief**\n• Newsletter & content pipeline ready\n• Meeting research prepared\n• Knowledge synthesis active\n• Documentation backlog managed"
+    await send_as_assistant_bot(ctx.channel, celeste_brief, "Celeste Marchmont")
+    await asyncio.sleep(1)
     
-    # Charlotte's technical systems report
-    charlotte_report = get_charlotte_report()
-    await send_as_assistant_bot(ctx.channel, charlotte_report, "Charlotte Astor")
-    await asyncio.sleep(2)
+    # Charlotte's systems (essential)
+    charlotte_brief = "⚙️ **Charlotte's Systems Brief**\n"
+    charlotte_brief += f"• Bot: {'✅' if bot.is_ready() else '❌'} | Calendar: {'✅' if calendar_service else '❌'} | Email: {'✅' if gmail_service else '❌'} | Weather: {'✅' if WEATHER_API_KEY else '❌'}\n"
+    charlotte_brief += f"• {len(accessible_calendars)} calendars synced | All systems operational"
+    await send_as_assistant_bot(ctx.channel, charlotte_brief, "Charlotte Astor")
+    await asyncio.sleep(1)
     
-    # Alice's home and wellness check
-    alice_report = get_alice_report()
-    await send_as_assistant_bot(ctx.channel, alice_report, "Alice Fortescue")
-    await asyncio.sleep(2)
+    # Alice's wellness (key points)
+    alice_brief = "🏠 **Alice's Wellness Brief**\n• Morning routine: Hydration & movement\n• Workspace organized for productivity\n• Home systems on track\n• Family coordination complete"
+    await send_as_assistant_bot(ctx.channel, alice_brief, "Alice Fortescue")
+    await asyncio.sleep(1)
     
-    # Pippa's mindset and resilience coaching
-    pippa_report = get_pippa_report()
-    await send_as_assistant_bot(ctx.channel, pippa_report, "Pippa Blackwood")
-    await asyncio.sleep(2)
+    # Pippa's mindset (essential)
+    pippa_brief = "🧠 **Pippa's Mindset Brief**\n• Mental readiness: Check in with authentic self\n• AuDHD support: Sensory optimization ready\n• Energy boundaries: Protect resources wisely\n• Panic protocols: Grounding techniques available"
+    await send_as_assistant_bot(ctx.channel, pippa_brief, "Pippa Blackwood")
+    await asyncio.sleep(1)
     
-    # Cressida's magic and joy elevation
-    cressida_report = get_cressida_report()
-    await send_as_assistant_bot(ctx.channel, cressida_report, "Cressida Frost")
-    await asyncio.sleep(2)
+    # Cressida's magic (brief inspiration)
+    cressida_brief = "✨ **Cressida's Magic Brief**\n• Joy creation: Stay open to wonder\n• Creative flow: High potential today\n• Magical mission: Spread authentic positivity\n• Universal elevation: Your growth lifts all consciousness"
+    await send_as_assistant_bot(ctx.channel, cressida_brief, "Cressida Frost")
+    await asyncio.sleep(1)
     
-    # Rose's comprehensive synthesis and closing
-    rose_closing = "👑 **Rose's Executive Synthesis**\n\n"
-    rose_closing += "**Department Status:** ✅ All teams reporting ready\n"
-    rose_closing += "**Systems Integration:** ✅ Full spectrum support activated\n"
-    rose_closing += "**Strategic Coordination:** ✅ Multi-department alignment achieved\n\n"
-    rose_closing += "**🎯 Today's Executive Summary:**\n"
-    rose_closing += "• External intelligence: Vivian monitoring communications & industry\n"
-    rose_closing += "• Cosmic guidance: Flora providing weather & energy insights\n"
-    rose_closing += "• Aesthetic coordination: Maeve optimizing style & schedule flow\n"
-    rose_closing += "• Content pipeline: Celeste managing research & knowledge synthesis\n"
-    rose_closing += "• Technical systems: Charlotte ensuring full infrastructure support\n"
-    rose_closing += "• Wellness foundation: Alice maintaining home & health priorities\n"
-    rose_closing += "• Mental resilience: Pippa providing mindset & AuDHD support\n"
-    rose_closing += "• Joy elevation: Cressida channeling magic & authentic expression\n\n"
-    rose_closing += "**🚀 Executive Decision:** Team fully coordinated. Let's make today extraordinary! 👑**"
+    # Rose's concise synthesis
+    rose_closing = "👑 **Rose's Synthesis**\n"
+    rose_closing += "✅ **All departments ready** | Full team coordination achieved\n"
+    rose_closing += "🎯 **Strategic focus:** Work calendar (Vivian) + Personal schedule (Rose) + Full support stack\n"
+    rose_closing += "🚀 **Executive status:** Ready for exceptional productivity 👑"
     
     await ctx.send(rose_closing)
+
+@bot.command(name='noon')
+async def midday_briefing_command(ctx):
+    """Midday briefing - remaining day focus (noon onwards)"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
+    
+    await ctx.send(f"☀️ **Midday Check-In** ({current_time})")
+    await asyncio.sleep(1)
+    
+    # Rose's midday coordination
+    rose_midday = "👑 **Rose's Midday Coordination**\n"
+    personal_schedule = get_personal_schedule('noon')
+    rose_midday += f"{personal_schedule}\n"
+    
+    if gmail_service:
+        try:
+            unread_emails = get_recent_emails(3, unread_only=True, include_body=False)
+            if unread_emails and len(unread_emails) > 50:
+                rose_midday += "\n📧 **Email Status:** New items require attention\n"
+        except:
+            pass
+    
+    await ctx.send(rose_midday)
+    await asyncio.sleep(1)
+    
+    # Vivian's work focus
+    vivian_midday = get_vivian_report('noon', brief=True)
+    await send_as_assistant_bot(ctx.channel, vivian_midday, "Vivian Spencer")
+    await asyncio.sleep(1)
+    
+    # Quick weather check from Flora
+    weather = get_weather_briefing()
+    flora_midday = f"🔮 **Flora's Energy Update**\n{weather}\n\n✨ **Midday Guidance:** Maintain cosmic alignment through afternoon transitions"
+    await send_as_assistant_bot(ctx.channel, flora_midday, "Flora Penrose")
+
+@bot.command(name='pm')
+async def afternoon_briefing_command(ctx):
+    """Afternoon briefing - evening prep & priorities (3pm onwards)"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
+    
+    await ctx.send(f"🌇 **Afternoon Focus** ({current_time})")
+    await asyncio.sleep(1)
+    
+    # Rose's afternoon coordination
+    rose_afternoon = "👑 **Rose's Afternoon Priorities**\n"
+    personal_schedule = get_personal_schedule('afternoon')
+    rose_afternoon += f"{personal_schedule}\n"
+    rose_afternoon += "\n🎯 **Evening Prep:** Review day's progress & tomorrow setup"
+    
+    await ctx.send(rose_afternoon)
+    await asyncio.sleep(1)
+    
+    # Vivian's remaining work items
+    vivian_afternoon = get_vivian_report('afternoon', brief=True)
+    await send_as_assistant_bot(ctx.channel, vivian_afternoon, "Vivian Spencer")
+    await asyncio.sleep(1)
+    
+    # Alice's evening prep
+    alice_afternoon = "🏠 **Alice's Evening Transition**\n"
+    alice_afternoon += "• Workspace organization for tomorrow\n"
+    alice_afternoon += "• Evening routine preparation\n"
+    alice_afternoon += "• Home systems check & reset\n"
+    alice_afternoon += "• Family coordination for evening"
+    await send_as_assistant_bot(ctx.channel, alice_afternoon, "Alice Fortescue")
+
+@bot.command(name='briefing')
+async def full_team_briefing_command(ctx):
+    """Full comprehensive team reports - detailed individual briefings"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    await ctx.send("📋 **Full Team Reports** - Comprehensive individual briefings...")
+    await asyncio.sleep(1)
+    
+    # All team members give their full detailed reports
+    team_reports = [
+        (get_vivian_report(), "Vivian Spencer"),
+        ("🔮 **Flora's Complete Mystical & Weather Guidance**\n" + get_weather_briefing() + 
+         "\n\n🌙 **Full Celestial Reading:**\nToday's energies support your highest intentions. Weather patterns mirror inner emotional currents - observe, adapt, flow. Natural light connects you to divine guidance. Elements speak through wind, temperature, atmospheric shifts. Trust your intuition as cosmic energies dance through your day.", "Flora Penrose"),
+        (get_celeste_report(), "Celeste Marchmont"),
+        (get_charlotte_report(), "Charlotte Astor"),
+        (get_alice_report(), "Alice Fortescue"),
+        (get_pippa_report(), "Pippa Blackwood"),
+        (get_cressida_report(), "Cressida Frost")
+    ]
+    
+    for report, assistant_name in team_reports:
+        await send_as_assistant_bot(ctx.channel, report, assistant_name)
+        await asyncio.sleep(2)
+    
+    # Rose's comprehensive synthesis
+    rose_synthesis = "👑 **Rose's Complete Team Synthesis**\n\n"
+    rose_synthesis += "All departments have provided full detailed reports. Complete situational awareness achieved across all domains:\n"
+    rose_synthesis += "• External & work coordination fully briefed\n"
+    rose_synthesis += "• Mystical & environmental guidance complete\n" 
+    rose_synthesis += "• Content & knowledge systems detailed\n"
+    rose_synthesis += "• Technical infrastructure fully reported\n"
+    rose_synthesis += "• Home & wellness priorities comprehensive\n"
+    rose_synthesis += "• Mental resilience & coaching complete\n"
+    rose_synthesis += "• Joy & magic elevation fully engaged\n\n"
+    rose_synthesis += "**🚀 Executive Status: Complete team coordination achieved**"
+    
+    await ctx.send(rose_synthesis)
 
 @bot.command(name='quickbriefing')
 async def quickbriefing_command(ctx):
@@ -1854,8 +2018,9 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         maeve_brief = "🎨 **Maeve's Style & Schedule Brief**\n"
         maeve_brief += "Hello, gorgeous! Your curated day awaits:\n\n"
         if calendar_service:
-            schedule = get_today_schedule()
-            maeve_brief += schedule
+            work_schedule = get_work_schedule()
+            personal_schedule = get_personal_schedule()
+            maeve_brief += f"{work_schedule}\n\n{personal_schedule}"
             maeve_brief += "\n\n✨ **Style Coordination:** All systems aesthetically aligned!"
         else:
             maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!"
@@ -2069,8 +2234,11 @@ async def help_command(ctx):
     
     # Commands - Split into sections for better organization
     briefing_commands = [
-        "!briefing - Complete team morning briefing",
-        "!quickbriefing - Condensed essential briefing",
+        "!am - Morning comprehensive briefing (full day)",
+        "!noon - Midday check-in (noon onwards)",
+        "!pm - Afternoon focus (3pm onwards)", 
+        "!briefing - Full detailed team reports",
+        "!quickbriefing - Essential summary only",
         "!teambriefing [name] - Individual assistant reports",
         "!weather - Current weather & UV"
     ]
