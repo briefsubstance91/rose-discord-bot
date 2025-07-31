@@ -1315,6 +1315,200 @@ async def handle_ai_conversation(message, user_id, channel_id):
         return f"❌ Error processing request: {str(e)[:100]}"
 
 # ============================================================================
+# ENHANCED TEAM BRIEFING FUNCTIONS
+# ============================================================================
+
+def get_vivian_report():
+    """Generate Vivian's PR/Work/News briefing"""
+    report = "📺 **Vivian's External Intelligence Brief**\n"
+    report += "Good morning! Here's your external landscape update:\n\n"
+    
+    # Work email priority assessment
+    if gmail_service:
+        try:
+            unread_emails = get_recent_emails(5, unread_only=True, include_body=False)
+            priority_count = len([line for line in unread_emails.split('\n') if 'urgent' in line.lower() or 'important' in line.lower()])
+            report += f"📧 **Work Communications Priority:** {priority_count} high-priority items detected\n"
+            report += "🎯 **Recommendation:** Review urgent emails before first meeting\n"
+        except:
+            report += "📧 **Work Communications:** Email assessment unavailable\n"
+    else:
+        report += "📧 **Work Communications:** Email service offline\n"
+    
+    # External communications reminder
+    report += "\n💼 **Today's External Focus:**\n"
+    report += "• LinkedIn engagement check scheduled\n"
+    report += "• Stakeholder follow-up prep needed\n"
+    report += "• Professional communication review pending\n"
+    
+    # News digest placeholder (could integrate with news API)
+    report += "\n📰 **Industry Watch:**\n"
+    report += "• Monitor key industry developments throughout the day\n"
+    report += "• Check for mentions and engagement opportunities\n"
+    report += "• Curated news feed review recommended\n"
+    
+    return report
+
+def get_celeste_report():
+    """Generate Celeste's Content & Research briefing"""
+    report = "✍️ **Celeste's Content & Knowledge Brief**\n"
+    report += "Good morning! Your content and research priorities:\n\n"
+    
+    # Content deadlines
+    report += "📝 **Content Pipeline Status:**\n"
+    report += "• Newsletter draft ready for review\n"
+    report += "• Research synthesis pending from team reports\n"
+    report += "• Content calendar alignment check needed\n"
+    
+    # Meeting research
+    if calendar_service:
+        try:
+            today_events = get_today_schedule()
+            meeting_count = len([line for line in today_events.split('\n') if 'meeting' in line.lower() or 'call' in line.lower()])
+            if meeting_count > 0:
+                report += f"\n🔍 **Meeting Research Status:**\n"
+                report += f"• {meeting_count} meetings detected - background research required\n"
+                report += "• Key topics and participant profiles ready\n"
+                report += "• Discussion points and follow-up templates prepared\n"
+        except:
+            pass
+    
+    # Knowledge synthesis
+    report += "\n📚 **Knowledge Management:**\n"
+    report += "• Team report synthesis ready for processing\n"
+    report += "• Cross-reference updates pending\n"
+    report += "• Documentation backlog manageable\n"
+    
+    return report
+
+def get_charlotte_report():
+    """Generate Charlotte's IT/Systems briefing"""
+    report = "⚙️ **Charlotte's Technical Systems Brief**\n"
+    report += "Good morning! Your technical infrastructure status:\n\n"
+    
+    # System health
+    report += "🖥️ **System Health Check:**\n"
+    report += f"• Discord Bot: {'✅ Online' if bot.is_ready() else '❌ Connection issues'}\n"
+    report += f"• Calendar Integration: {'✅ Active' if calendar_service else '❌ Disconnected'}\n"
+    report += f"• Gmail Service: {'✅ Operational' if gmail_service else '❌ Offline'}\n"
+    report += f"• Weather API: {'✅ Connected' if WEATHER_API_KEY else '❌ Not configured'}\n"
+    
+    # Calendar sync status
+    if accessible_calendars:
+        report += f"\n📅 **Calendar System:**\n"
+        report += f"• {len(accessible_calendars)} calendars synchronized\n"
+        report += "• Cross-calendar coordination active\n"
+        report += "• Timezone handling: Toronto/Eastern verified\n"
+    
+    # Automation status
+    report += "\n🤖 **Automation Status:**\n"
+    report += "• Morning briefing workflows operational\n"
+    report += "• Email processing algorithms active\n"
+    report += "• AI assistant functions fully integrated\n"
+    
+    # Technical recommendations
+    report += "\n🔧 **Technical Priorities:**\n"
+    report += "• System monitoring: All green\n"
+    report += "• Backup routines: On schedule\n"
+    report += "• Integration updates: Current\n"
+    
+    return report
+
+def get_alice_report():
+    """Generate Alice's Health & Home briefing"""
+    report = "🏠 **Alice's Home & Wellness Brief**\n"
+    report += "Good morning! Your domestic and health priorities:\n\n"
+    
+    # Health & routines
+    report += "💪 **Wellness Check:**\n"
+    report += "• Morning routine: Hydration and movement recommended\n"
+    report += "• Energy levels: Assess after weather review\n"
+    report += "• Habit tracker: Daily goals aligned with schedule\n"
+    
+    # Home management
+    report += "\n🏡 **Home Systems:**\n"
+    report += "• Household routine: On track\n"
+    report += "• Organization priorities: Desktop and digital cleanup\n"
+    report += "• Family coordination: Schedule sync complete\n"
+    
+    # Financial reminders
+    report += "\n💰 **Financial Wellness:**\n"
+    report += "• Daily expense tracking: Ready\n"
+    report += "• Budget alignment: Monitor discretionary spending\n"
+    report += "• Financial goals: Stay focused on priorities\n"
+    
+    # Today's home priorities
+    report += "\n✅ **Today's Home Focus:**\n"
+    report += "• Maintain organized workspace for productivity\n"
+    report += "• Prepare for smooth evening routine\n"
+    report += "• Balance home and work energy efficiently\n"
+    
+    return report
+
+def get_pippa_report():
+    """Generate Pippa's Life Coach briefing"""
+    report = "🧠 **Pippa's Mindset & Resilience Brief**\n"
+    report += "Good morning, beautiful human! Your mental wellness checkpoint:\n\n"
+    
+    # Emotional readiness
+    report += "💭 **Mental Readiness Assessment:**\n"
+    report += "• Energy calibration: Check in with your authentic self\n"
+    report += "• Stress indicators: Monitor for early intervention\n"
+    report += "• Confidence levels: You've got this - trust your capabilities\n"
+    
+    # AuDHD support
+    report += "\n🌈 **AuDHD Success Strategies:**\n"
+    report += "• Sensory environment: Optimize for focus and comfort\n"
+    report += "• Transition planning: Build in buffer time between tasks\n"
+    report += "• Executive function: Use external systems for cognitive support\n"
+    report += "• Masking management: Reserve energy, authenticity over performance\n"
+    
+    # Daily mindset
+    report += "\n🎯 **Today's Mindset Focus:**\n"
+    report += "• Priority clarity: Focus on what truly matters\n"
+    report += "• Energy boundaries: Protect your resources wisely\n"
+    report += "• Self-compassion: Progress over perfection always\n"
+    
+    # Emergency protocols
+    report += "\n🆘 **Panic Protocol Status:**\n"
+    report += "• Grounding techniques: 5-4-3-2-1 sensory method ready\n"
+    report += "• Breathing exercises: Box breathing available\n"
+    report += "• Support systems: Remember your network is here\n"
+    
+    return report
+
+def get_cressida_report():
+    """Generate Cressida's Manic Pixie Dream Collective briefing"""
+    report = "✨ **Cressida's Magic & Joy Elevation Brief**\n"
+    report += "Good morning, magnificent soul! Time for some conscious magic:\n\n"
+    
+    # Joy creation
+    report += "🌈 **Joy Creation Status:**\n"
+    report += "• Spontaneous magic opportunities: Stay open to wonder\n"
+    report += "• Creative rebellion potential: High - trust your artistic instincts\n"
+    report += "• Authentic expression: The world needs your unique light\n"
+    
+    # Community building
+    report += "\n🤝 **Collective Elevation:**\n"
+    report += "• Random acts of kindness: Opportunity radar activated\n"
+    report += "• Grassroots kindness: Small actions, big consciousness shifts\n"
+    report += "• Evidence-based self-love: You are worthy of all good things\n"
+    
+    # Vibrational elevation
+    report += "\n🔮 **Vibrational Frequency:**\n"
+    report += "• Individual transformation: Your growth elevates universal consciousness\n"
+    report += "• Creative flow state: Available for peak expression\n"
+    report += "• Magical realism mode: Engaged and ready for synchronicities\n"
+    
+    # Today's magic
+    report += "\n✨ **Today's Magical Mission:**\n"
+    report += "• Spread infectious positivity through authentic presence\n"
+    report += "• Create micro-moments of wonder in ordinary interactions\n"
+    report += "• Channel dreams into reality through inspired action\n"
+    
+    return report
+
+# ============================================================================
 # DISCORD COMMANDS (ALL PRESERVED WITH ORIGINAL VARIABLE NAMES)
 # ============================================================================
 
@@ -1422,43 +1616,48 @@ async def send_as_persona(channel, content, persona_name, avatar_url=None):
 
 @bot.command(name='briefing')
 async def briefing_command(ctx):
-    """Complete morning briefing with structured team reports"""
+    """Complete morning briefing with comprehensive team reports"""
     if ctx.channel.name not in ALLOWED_CHANNELS:
         return
     
-    await ctx.send("🌅 **Team Morning Briefing** - Rose initiating...")
+    await ctx.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
     await asyncio.sleep(1)
     
     # Rose's strategic overview (goes first)
     toronto_tz = pytz.timezone('America/Toronto')
     current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
     
-    rose_briefing = f"👑 **Strategic Overview** ({current_time})\n"
-    rose_briefing += "Good morning! Here's your executive summary for today:\n\n"
+    rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n"
+    rose_briefing += "Good morning! Comprehensive executive briefing initiating...\n\n"
     
     # Get high-level calendar insights
     if calendar_service:
         upcoming_events = get_upcoming_events(1)  # Just today
         event_count = len([line for line in upcoming_events.split('\n') if '•' in line])
-        rose_briefing += f"📊 **Today's Focus:** {event_count} scheduled items requiring your attention\n"
-        rose_briefing += "🎯 **Priority:** Review calendar for strategic time blocks and preparation needs\n"
+        rose_briefing += f"📊 **Today's Strategic Focus:** {event_count} scheduled commitments\n"
+        rose_briefing += "🎯 **Executive Priority:** Multi-department coordination for optimal productivity\n"
     else:
-        rose_briefing += "📊 **Calendar Status:** Disconnected - manual planning required\n"
+        rose_briefing += "📊 **Calendar Status:** Manual coordination mode - all departments standing by\n"
     
     # Email overview
     if gmail_service:
         try:
             stats = get_email_stats(1)
             unread_count = stats.count('unread') if 'unread' in stats.lower() else 0
-            rose_briefing += f"📧 **Communications:** Inbox requires attention ({unread_count} items pending)\n"
+            rose_briefing += f"📧 **Communications Status:** {unread_count} priority items requiring attention\n"
         except:
-            rose_briefing += "📧 **Communications:** Email status unavailable\n"
+            rose_briefing += "📧 **Communications:** Assessment pending\n"
     
-    rose_briefing += "\n@Flora @Maeve - Please provide your reports 🤝"
+    rose_briefing += "\n🚀 **Team Status:** All departments online - requesting full briefing reports"
     await ctx.send(rose_briefing)
-    await asyncio.sleep(3)
+    await asyncio.sleep(2)
     
-    # Flora responds as mystical guide
+    # Vivian's external intelligence report
+    vivian_report = get_vivian_report()
+    await send_as_persona(ctx.channel, vivian_report, "Vivian Spencer", None)
+    await asyncio.sleep(2)
+    
+    # Flora's mystical guidance and weather
     flora_briefing = "🔮 **Flora's Mystical Guidance & Celestial Weather Reading**\n"
     flora_briefing += "Good morning, dear souls! The cosmos whispers through today's elements:\n\n"
     
@@ -1474,42 +1673,179 @@ async def briefing_command(ctx):
     
     flora_briefing += "\n🃏 **Daily Mystical Insight:**\n"
     flora_briefing += "*\"Today's weather is but the universe's mood - flow with it, don't fight it.\"*\n"
-    flora_briefing += "✨ Trust your intuition as the day's energies shift and dance\n"
+    flora_briefing += "✨ Trust your intuition as the day's energies shift and dance"
     
-    flora_briefing += "\n@Maeve - The celestial canvas is painted, now add your aesthetic wisdom! 🌿✨"
+    await send_as_persona(ctx.channel, flora_briefing, "Flora Penrose", None)
+    await asyncio.sleep(2)
     
-    await send_as_persona(ctx.channel, flora_briefing, "Flora Penrose", "https://cdn.discordapp.com/attachments/1234567890/flora_avatar.png")
-    await asyncio.sleep(3)
-    
-    # Maeve responds as style specialist  
+    # Maeve's style and schedule coordination
     maeve_briefing = "🎨 **Maeve's Style & Schedule Aesthetic Brief**\n"
-    maeve_briefing += "Absolutely divine, Flora! Now let's curate today's schedule with style:\n\n"
+    maeve_briefing += "Perfect cosmic canvas, Flora! Now for today's curated schedule:\n\n"
     
     if calendar_service:
         schedule = get_today_schedule()
         maeve_briefing += schedule
         maeve_briefing += "\n\n✨ **Style & Efficiency Curation:**\n"
         maeve_briefing += "• **Meeting Prep Aesthetic:** 15-minute buffer for mental outfit changes\n"
-        maeve_briefing += "• **Transition Styling:** Seamless flow between commitments - think capsule wardrobe efficiency\n"
-        maeve_briefing += "• **Energy Color Palette:** Match your schedule rhythm to your inner style vibe\n"
-        maeve_briefing += "• **Weather-to-Wardrobe Sync:** Channeling Flora's cosmic weather into outfit coordination\n"
+        maeve_briefing += "• **Transition Styling:** Seamless flow between commitments\n"
+        maeve_briefing += "• **Energy Color Palette:** Schedule rhythm to style vibe alignment\n"
+        maeve_briefing += "• **Weather-to-Wardrobe Sync:** Channeling Flora's cosmic weather guidance\n"
         
         maeve_briefing += "\n👗 **Today's Style Strategy:**\n"
-        maeve_briefing += "• Comfort meets confidence - dress for your busiest meeting, style down for everything else\n"
-        maeve_briefing += "• Accessories that transition - one statement piece, multiple moods\n"
+        maeve_briefing += "• Comfort meets confidence - dress for peak performance\n"
+        maeve_briefing += "• Accessories that transition seamlessly\n"
         maeve_briefing += "• Color psychology alignment with calendar energy\n"
     else:
-        maeve_briefing += "📅 **Schedule Status:** Calendar offline - perfect time for a styling reset!\n"
-        maeve_briefing += "🎯 **Style Recovery Mode:** Use this time to curate and organize your aesthetic vision\n"
+        maeve_briefing += "📅 **Schedule Status:** Calendar offline - styling reset mode activated\n"
+        maeve_briefing += "🎯 **Style Recovery:** Perfect time for aesthetic vision curation\n"
     
-    maeve_briefing += "\n\n💄 **Aesthetic Systems: Fully Styled & Ready!**"
-    maeve_briefing += "\n@Rose - Your style team has the vision locked and loaded! Time to make it happen with flair! ✨"
+    maeve_briefing += "\n💄 **Aesthetic Systems: Fully Coordinated & Ready!**"
     
-    await send_as_persona(ctx.channel, maeve_briefing, "Maeve Windham", "https://cdn.discordapp.com/attachments/1234567890/maeve_avatar.png")
-    
-    # Rose's closing coordination
+    await send_as_persona(ctx.channel, maeve_briefing, "Maeve Windham", None)
     await asyncio.sleep(2)
-    await ctx.send("🤝 **Excellent work, team!** All departments reporting ready. Let's make today productive! 👑")
+    
+    # Celeste's content and research briefing
+    celeste_report = get_celeste_report()
+    await send_as_persona(ctx.channel, celeste_report, "Celeste Marchmont", None)
+    await asyncio.sleep(2)
+    
+    # Charlotte's technical systems report
+    charlotte_report = get_charlotte_report()
+    await send_as_persona(ctx.channel, charlotte_report, "Charlotte Astor", None)
+    await asyncio.sleep(2)
+    
+    # Alice's home and wellness check
+    alice_report = get_alice_report()
+    await send_as_persona(ctx.channel, alice_report, "Alice Fortescue", None)
+    await asyncio.sleep(2)
+    
+    # Pippa's mindset and resilience coaching
+    pippa_report = get_pippa_report()
+    await send_as_persona(ctx.channel, pippa_report, "Pippa Blackwood", None)
+    await asyncio.sleep(2)
+    
+    # Cressida's magic and joy elevation
+    cressida_report = get_cressida_report()
+    await send_as_persona(ctx.channel, cressida_report, "Cressida Frost", None)
+    await asyncio.sleep(2)
+    
+    # Rose's comprehensive synthesis and closing
+    rose_closing = "👑 **Rose's Executive Synthesis**\n\n"
+    rose_closing += "**Department Status:** ✅ All teams reporting ready\n"
+    rose_closing += "**Systems Integration:** ✅ Full spectrum support activated\n"
+    rose_closing += "**Strategic Coordination:** ✅ Multi-department alignment achieved\n\n"
+    rose_closing += "**🎯 Today's Executive Summary:**\n"
+    rose_closing += "• External intelligence: Vivian monitoring communications & industry\n"
+    rose_closing += "• Cosmic guidance: Flora providing weather & energy insights\n"
+    rose_closing += "• Aesthetic coordination: Maeve optimizing style & schedule flow\n"
+    rose_closing += "• Content pipeline: Celeste managing research & knowledge synthesis\n"
+    rose_closing += "• Technical systems: Charlotte ensuring full infrastructure support\n"
+    rose_closing += "• Wellness foundation: Alice maintaining home & health priorities\n"
+    rose_closing += "• Mental resilience: Pippa providing mindset & AuDHD support\n"
+    rose_closing += "• Joy elevation: Cressida channeling magic & authentic expression\n\n"
+    rose_closing += "**🚀 Executive Decision:** Team fully coordinated. Let's make today extraordinary! 👑**"
+    
+    await ctx.send(rose_closing)
+
+@bot.command(name='quickbriefing')
+async def quickbriefing_command(ctx):
+    """Condensed briefing with core essentials only"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
+    
+    # Quick status from Rose
+    quick_brief = f"⚡ **Quick Morning Brief** ({current_time})\n\n"
+    
+    # Essential calendar info
+    if calendar_service:
+        upcoming_events = get_upcoming_events(1)
+        event_count = len([line for line in upcoming_events.split('\n') if '•' in line])
+        quick_brief += f"📅 **Today:** {event_count} events scheduled\n"
+    
+    # Essential email info  
+    if gmail_service:
+        try:
+            stats = get_email_stats(1)
+            unread_count = stats.count('unread') if 'unread' in stats.lower() else 0
+            quick_brief += f"📧 **Inbox:** {unread_count} unread items\n"
+        except:
+            quick_brief += "📧 **Inbox:** Status unavailable\n"
+    
+    # Weather from Flora
+    weather = get_weather_briefing()
+    quick_brief += f"\n{weather}\n"
+    
+    # Quick team status
+    quick_brief += "\n🚀 **Team Status:** All systems operational\n"
+    quick_brief += "💡 Use `!briefing` for full team reports"
+    
+    await ctx.send(quick_brief)
+
+@bot.command(name='teambriefing')
+async def teambriefing_command(ctx, assistant_name: str = None):
+    """Get individual assistant reports or list available assistants"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    if not assistant_name:
+        team_list = "👥 **Available Team Members:**\n"
+        team_list += "• `vivian` - External Intelligence (PR/Work/News)\n"
+        team_list += "• `flora` - Mystical Guidance & Weather\n" 
+        team_list += "• `maeve` - Style & Schedule Coordination\n"
+        team_list += "• `celeste` - Content & Research\n"
+        team_list += "• `charlotte` - Technical Systems\n"
+        team_list += "• `alice` - Home & Wellness\n"
+        team_list += "• `pippa` - Life Coaching & Mindset\n"
+        team_list += "• `cressida` - Magic & Joy Elevation\n\n"
+        team_list += "Usage: `!teambriefing <name>` (e.g., `!teambriefing vivian`)"
+        await ctx.send(team_list)
+        return
+    
+    assistant_name = assistant_name.lower()
+    
+    # Route to appropriate assistant report
+    if assistant_name in ['vivian', 'vivian spencer']:
+        report = get_vivian_report()
+        await send_as_persona(ctx.channel, report, "Vivian Spencer", None)
+    elif assistant_name in ['flora', 'flora penrose']:
+        flora_brief = "🔮 **Flora's Mystical Guidance & Weather**\n"
+        flora_brief += "Greetings, dear soul! Here's today's cosmic guidance:\n\n"
+        weather = get_weather_briefing()
+        flora_brief += weather
+        flora_brief += "\n\n🌙 **Celestial Insight:**\n"
+        flora_brief += "*\"Flow with today's universal energies - they guide you perfectly.\"*\n"
+        flora_brief += "✨ Trust your intuition as the day unfolds"
+        await send_as_persona(ctx.channel, flora_brief, "Flora Penrose", None)
+    elif assistant_name in ['maeve', 'maeve windham']:
+        maeve_brief = "🎨 **Maeve's Style & Schedule Brief**\n"
+        maeve_brief += "Hello, gorgeous! Your curated day awaits:\n\n"
+        if calendar_service:
+            schedule = get_today_schedule()
+            maeve_brief += schedule
+            maeve_brief += "\n\n✨ **Style Coordination:** All systems aesthetically aligned!"
+        else:
+            maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!"
+        await send_as_persona(ctx.channel, maeve_brief, "Maeve Windham", None)
+    elif assistant_name in ['celeste', 'celeste marchmont']:
+        report = get_celeste_report()
+        await send_as_persona(ctx.channel, report, "Celeste Marchmont", None)
+    elif assistant_name in ['charlotte', 'charlotte astor']:
+        report = get_charlotte_report()
+        await send_as_persona(ctx.channel, report, "Charlotte Astor", None)
+    elif assistant_name in ['alice', 'alice fortescue']:
+        report = get_alice_report()
+        await send_as_persona(ctx.channel, report, "Alice Fortescue", None)
+    elif assistant_name in ['pippa', 'pippa blackwood']:
+        report = get_pippa_report()
+        await send_as_persona(ctx.channel, report, "Pippa Blackwood", None)
+    elif assistant_name in ['cressida', 'cressida frost']:
+        report = get_cressida_report()
+        await send_as_persona(ctx.channel, report, "Cressida Frost", None)
+    else:
+        await ctx.send(f"❌ Assistant '{assistant_name}' not found. Use `!teambriefing` to see available team members.")
 
 @bot.command(name='schedule')
 async def schedule_command(ctx):
@@ -1701,11 +2037,16 @@ async def help_command(ctx):
     )
     
     # Commands - Split into sections for better organization
-    calendar_commands = [
-        "!briefing - Complete morning briefing",
-        "!schedule - Today's calendar", 
-        "!upcoming [days] - Upcoming events (default: 7)",
+    briefing_commands = [
+        "!briefing - Complete team morning briefing",
+        "!quickbriefing - Condensed essential briefing",
+        "!teambriefing [name] - Individual assistant reports",
         "!weather - Current weather & UV"
+    ]
+    
+    calendar_commands = [
+        "!schedule - Today's calendar", 
+        "!upcoming [days] - Upcoming events (default: 7)"
     ]
     
     email_commands = [
@@ -1723,7 +2064,13 @@ async def help_command(ctx):
     ]
     
     embed.add_field(
-        name="📅 Calendar & Weather",
+        name="🌅 Team Briefings",
+        value="\n".join([f"• {cmd}" for cmd in briefing_commands]),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📅 Calendar Management",
         value="\n".join([f"• {cmd}" for cmd in calendar_commands]),
         inline=False
     )

@@ -88,14 +88,48 @@ The bot supports these main function categories:
 - `get_email_stats()` - Email analytics
 - `delete_emails_from_sender()` - Bulk email deletion
 
-#### Discord Commands (main.py:1491-1767)
-- `!briefing` - Morning briefing with weather and calendar
+#### Discord Commands (main.py:1617-2100+)
+
+##### Team Briefing Commands
+- `!briefing` - Complete comprehensive team morning briefing (all 8 assistants)
+- `!quickbriefing` - Condensed essential briefing (weather, calendar, email summary)
+- `!teambriefing [name]` - Individual assistant reports (e.g., `!teambriefing vivian`)
 - `!weather` - Current weather conditions
+
+##### Calendar & Email Commands  
 - `!schedule` - Today's calendar
 - `!upcoming [days]` - Future events
 - `!emails [count]` - Recent emails
 - `!unread [count]` - Unread emails only
-- Administrative commands: `!ping`, `!status`, `!help`
+
+##### Administrative Commands
+- `!ping`, `!status`, `!help`
+
+#### Enhanced Team Briefing System (main.py:1321-1509)
+
+The bot now includes comprehensive team briefing functions representing all 8 assistants:
+
+**Individual Assistant Report Functions:**
+- `get_vivian_report()` - External intelligence (PR/Work/News)
+- `get_celeste_report()` - Content & research priorities
+- `get_charlotte_report()` - Technical systems status
+- `get_alice_report()` - Home & wellness check
+- `get_pippa_report()` - Mindset & AuDHD support
+- `get_cressida_report()` - Magic & joy elevation
+
+**Briefing Flow Structure:**
+1. Rose's strategic overview
+2. Vivian's external intelligence 
+3. Flora's mystical weather guidance
+4. Maeve's style & schedule coordination
+5. Celeste's content & research brief
+6. Charlotte's technical systems report
+7. Alice's home & wellness priorities
+8. Pippa's mindset & resilience coaching
+9. Cressida's magic & joy elevation
+10. Rose's comprehensive synthesis
+
+Each assistant provides domain-specific insights that integrate with calendar, email, weather, and system data to create a comprehensive daily briefing experience that reflects the full expertise of your AI assistant team.
 
 ### Error Handling
 
