@@ -1274,6 +1274,36 @@ def handle_rose_functions_enhanced(run, thread_id):
                 sender_email = arguments.get('sender_email', '')
                 max_delete = arguments.get('max_delete', 50)
                 result = delete_emails_from_sender(sender_email, max_delete)
+            elif function_name == "batch_delete_by_sender":
+                # Alternative name for delete_emails_from_sender
+                sender_email = arguments.get('sender_email', '') or arguments.get('sender', '')
+                max_delete = arguments.get('max_delete', 50) or arguments.get('count', 50)
+                result = delete_emails_from_sender(sender_email, max_delete)
+            elif function_name == "smart_email_search":
+                # Enhanced email search function
+                query = arguments.get('query', '') or arguments.get('search_term', '')
+                max_results = arguments.get('max_results', 10) or arguments.get('limit', 10)
+                include_body = arguments.get('include_body', False) or arguments.get('include_content', False)
+                result = search_emails(query, max_results, include_body)
+            elif function_name == "bulk_email_delete":
+                # Another alternative for bulk deletion
+                sender_email = arguments.get('sender_email', '') or arguments.get('from_address', '')
+                max_delete = arguments.get('max_delete', 50) or arguments.get('count', 50)
+                result = delete_emails_from_sender(sender_email, max_delete)
+            elif function_name == "email_cleanup":
+                # General email cleanup function
+                sender_email = arguments.get('sender_email', '') or arguments.get('sender', '')
+                max_delete = arguments.get('max_delete', 50) or arguments.get('count', 50)
+                if sender_email:
+                    result = delete_emails_from_sender(sender_email, max_delete)
+                else:
+                    result = "❌ Please specify sender email for cleanup"
+            elif function_name == "advanced_email_search":
+                # Advanced search with flexible parameters
+                query = arguments.get('query', '') or arguments.get('search_query', '') or arguments.get('term', '')
+                max_results = arguments.get('max_results', 10) or arguments.get('count', 10)
+                include_body = arguments.get('include_body', False)
+                result = search_emails(query, max_results, include_body)
             
             # Calendar view functions
             elif function_name == "get_today_schedule":
