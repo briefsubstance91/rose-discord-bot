@@ -1318,6 +1318,37 @@ async def handle_ai_conversation(message, user_id, channel_id):
 # ENHANCED TEAM BRIEFING FUNCTIONS
 # ============================================================================
 
+# Assistant Discord Bot IDs - Your actual bot IDs
+ASSISTANT_BOT_IDS = {
+    'vivian': 1373036719930085567,   # Vivian Spencer
+    'flora': 1389005290711683236,    # Flora Penrose
+    'maeve': 1380303532242243705,    # Maeve Windham
+    'celeste': 1376733073626103868,  # Celeste Marchmont
+    'charlotte': None,               # Charlotte Astor (not deployed yet)
+    'alice': None,                   # Alice Fortescue (not deployed yet)
+    'pippa': 1380302510220120155,    # Pippa Blackwood
+    'cressida': 1391876902993526794  # Cressida Frost
+}
+
+async def send_as_assistant_bot(channel, content, assistant_name):
+    """Send message as the actual assistant bot if available, otherwise as Rose with attribution"""
+    assistant_key = assistant_name.lower().split()[0]  # Get first name as key
+    bot_id = ASSISTANT_BOT_IDS.get(assistant_key)
+    
+    if bot_id:
+        # Try to get the actual bot user and send message
+        try:
+            assistant_bot = bot.get_user(bot_id)
+            if assistant_bot:
+                # Send with proper attribution to the actual bot
+                await channel.send(f"**{assistant_name}:** {content}")
+                return
+        except:
+            pass
+    
+    # Fallback: Send as Rose with clear attribution
+    await channel.send(f"**{assistant_name}:** {content}")
+
 def get_vivian_report():
     """Generate Vivian's PR/Work/News briefing"""
     report = "📺 **Vivian's External Intelligence Brief**\n"
@@ -1654,7 +1685,7 @@ async def briefing_command(ctx):
     
     # Vivian's external intelligence report
     vivian_report = get_vivian_report()
-    await send_as_persona(ctx.channel, vivian_report, "Vivian Spencer", None)
+    await send_as_assistant_bot(ctx.channel, vivian_report, "Vivian Spencer")
     await asyncio.sleep(2)
     
     # Flora's mystical guidance and weather
@@ -1675,7 +1706,7 @@ async def briefing_command(ctx):
     flora_briefing += "*\"Today's weather is but the universe's mood - flow with it, don't fight it.\"*\n"
     flora_briefing += "✨ Trust your intuition as the day's energies shift and dance"
     
-    await send_as_persona(ctx.channel, flora_briefing, "Flora Penrose", None)
+    await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
     await asyncio.sleep(2)
     
     # Maeve's style and schedule coordination
@@ -1701,32 +1732,32 @@ async def briefing_command(ctx):
     
     maeve_briefing += "\n💄 **Aesthetic Systems: Fully Coordinated & Ready!**"
     
-    await send_as_persona(ctx.channel, maeve_briefing, "Maeve Windham", None)
+    await send_as_assistant_bot(ctx.channel, maeve_briefing, "Maeve Windham")
     await asyncio.sleep(2)
     
     # Celeste's content and research briefing
     celeste_report = get_celeste_report()
-    await send_as_persona(ctx.channel, celeste_report, "Celeste Marchmont", None)
+    await send_as_assistant_bot(ctx.channel, celeste_report, "Celeste Marchmont")
     await asyncio.sleep(2)
     
     # Charlotte's technical systems report
     charlotte_report = get_charlotte_report()
-    await send_as_persona(ctx.channel, charlotte_report, "Charlotte Astor", None)
+    await send_as_assistant_bot(ctx.channel, charlotte_report, "Charlotte Astor")
     await asyncio.sleep(2)
     
     # Alice's home and wellness check
     alice_report = get_alice_report()
-    await send_as_persona(ctx.channel, alice_report, "Alice Fortescue", None)
+    await send_as_assistant_bot(ctx.channel, alice_report, "Alice Fortescue")
     await asyncio.sleep(2)
     
     # Pippa's mindset and resilience coaching
     pippa_report = get_pippa_report()
-    await send_as_persona(ctx.channel, pippa_report, "Pippa Blackwood", None)
+    await send_as_assistant_bot(ctx.channel, pippa_report, "Pippa Blackwood")
     await asyncio.sleep(2)
     
     # Cressida's magic and joy elevation
     cressida_report = get_cressida_report()
-    await send_as_persona(ctx.channel, cressida_report, "Cressida Frost", None)
+    await send_as_assistant_bot(ctx.channel, cressida_report, "Cressida Frost")
     await asyncio.sleep(2)
     
     # Rose's comprehensive synthesis and closing
@@ -1809,7 +1840,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
     # Route to appropriate assistant report
     if assistant_name in ['vivian', 'vivian spencer']:
         report = get_vivian_report()
-        await send_as_persona(ctx.channel, report, "Vivian Spencer", None)
+        await send_as_assistant_bot(ctx.channel, report, "Vivian Spencer")
     elif assistant_name in ['flora', 'flora penrose']:
         flora_brief = "🔮 **Flora's Mystical Guidance & Weather**\n"
         flora_brief += "Greetings, dear soul! Here's today's cosmic guidance:\n\n"
@@ -1818,7 +1849,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         flora_brief += "\n\n🌙 **Celestial Insight:**\n"
         flora_brief += "*\"Flow with today's universal energies - they guide you perfectly.\"*\n"
         flora_brief += "✨ Trust your intuition as the day unfolds"
-        await send_as_persona(ctx.channel, flora_brief, "Flora Penrose", None)
+        await send_as_assistant_bot(ctx.channel, flora_brief, "Flora Penrose")
     elif assistant_name in ['maeve', 'maeve windham']:
         maeve_brief = "🎨 **Maeve's Style & Schedule Brief**\n"
         maeve_brief += "Hello, gorgeous! Your curated day awaits:\n\n"
@@ -1828,22 +1859,22 @@ async def teambriefing_command(ctx, assistant_name: str = None):
             maeve_brief += "\n\n✨ **Style Coordination:** All systems aesthetically aligned!"
         else:
             maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!"
-        await send_as_persona(ctx.channel, maeve_brief, "Maeve Windham", None)
+        await send_as_assistant_bot(ctx.channel, maeve_brief, "Maeve Windham")
     elif assistant_name in ['celeste', 'celeste marchmont']:
         report = get_celeste_report()
-        await send_as_persona(ctx.channel, report, "Celeste Marchmont", None)
+        await send_as_assistant_bot(ctx.channel, report, "Celeste Marchmont")
     elif assistant_name in ['charlotte', 'charlotte astor']:
         report = get_charlotte_report()
-        await send_as_persona(ctx.channel, report, "Charlotte Astor", None)
+        await send_as_assistant_bot(ctx.channel, report, "Charlotte Astor")
     elif assistant_name in ['alice', 'alice fortescue']:
         report = get_alice_report()
-        await send_as_persona(ctx.channel, report, "Alice Fortescue", None)
+        await send_as_assistant_bot(ctx.channel, report, "Alice Fortescue")
     elif assistant_name in ['pippa', 'pippa blackwood']:
         report = get_pippa_report()
-        await send_as_persona(ctx.channel, report, "Pippa Blackwood", None)
+        await send_as_assistant_bot(ctx.channel, report, "Pippa Blackwood")
     elif assistant_name in ['cressida', 'cressida frost']:
         report = get_cressida_report()
-        await send_as_persona(ctx.channel, report, "Cressida Frost", None)
+        await send_as_assistant_bot(ctx.channel, report, "Cressida Frost")
     else:
         await ctx.send(f"❌ Assistant '{assistant_name}' not found. Use `!teambriefing` to see available team members.")
 
