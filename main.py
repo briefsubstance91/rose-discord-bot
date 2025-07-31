@@ -1390,20 +1390,50 @@ async def weather_command(ctx):
     weather = get_weather_briefing()
     await ctx.send(weather)
 
+async def send_as_persona(channel, content, persona_name, avatar_url=None):
+    """Send a message as a different persona using webhooks"""
+    try:
+        # Try to find existing webhook for this persona
+        webhooks = await channel.webhooks()
+        webhook = None
+        
+        for wh in webhooks:
+            if wh.name == f"{persona_name}_webhook":
+                webhook = wh
+                break
+        
+        # Create webhook if it doesn't exist
+        if not webhook:
+            webhook = await channel.create_webhook(name=f"{persona_name}_webhook")
+        
+        # Send message as persona
+        await webhook.send(
+            content=content,
+            username=persona_name,
+            avatar_url=avatar_url
+        )
+        
+    except discord.Forbidden:
+        # Fallback to regular message if webhooks aren't available
+        await channel.send(f"**{persona_name}:** {content}")
+    except Exception as e:
+        print(f"❌ Error sending as {persona_name}: {e}")
+        await channel.send(f"**{persona_name}:** {content}")
+
 @bot.command(name='briefing')
 async def briefing_command(ctx):
     """Complete morning briefing with structured team reports"""
     if ctx.channel.name not in ALLOWED_CHANNELS:
         return
     
-    await ctx.send("🌅 **Team Morning Briefing**")
+    await ctx.send("🌅 **Team Morning Briefing** - Rose initiating...")
     await asyncio.sleep(1)
     
     # Rose's strategic overview (goes first)
     toronto_tz = pytz.timezone('America/Toronto')
     current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
     
-    rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n"
+    rose_briefing = f"👑 **Strategic Overview** ({current_time})\n"
     rose_briefing += "Good morning! Here's your executive summary for today:\n\n"
     
     # Get high-level calendar insights
@@ -1424,43 +1454,62 @@ async def briefing_command(ctx):
         except:
             rose_briefing += "📧 **Communications:** Email status unavailable\n"
     
-    rose_briefing += "\n*Delegating operational details to Flora and Maeve...*"
+    rose_briefing += "\n@Flora @Maeve - Please provide your reports 🤝"
     await ctx.send(rose_briefing)
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
     
-    # Flora's environmental briefing (second)
-    flora_briefing = "🌿 **Flora's Environmental Report**\n"
-    flora_briefing += "Environmental conditions and wellness factors:\n\n"
+    # Flora responds as mystical guide
+    flora_briefing = "🔮 **Flora's Mystical Guidance & Celestial Weather Reading**\n"
+    flora_briefing += "Good morning, dear souls! The cosmos whispers through today's elements:\n\n"
     
     weather = get_weather_briefing()
     flora_briefing += weather
-    flora_briefing += "\n\n🌱 **Wellness Note:** Consider outdoor time and natural light optimization"
-    flora_briefing += "\n*Coordinating with Maeve for schedule alignment...*"
     
-    await ctx.send(flora_briefing)
-    await asyncio.sleep(2)
+    # Add mystical interpretation
+    flora_briefing += "\n\n🌙 **Celestial Interpretation:**\n"
+    flora_briefing += "• The atmospheric energies align with your daily intentions\n"
+    flora_briefing += "• Weather patterns reflect inner emotional currents - observe and adapt\n"
+    flora_briefing += "• Natural light serves as divine connection - embrace solar/lunar rhythms\n"
+    flora_briefing += "• Elements speak - listen to wind, feel temperature shifts as cosmic guidance\n"
     
-    # Maeve's operational briefing (third)
-    maeve_briefing = "⚡ **Maeve's Operational Report**\n"
-    maeve_briefing += "Detailed schedule and tactical execution:\n\n"
+    flora_briefing += "\n🃏 **Daily Mystical Insight:**\n"
+    flora_briefing += "*\"Today's weather is but the universe's mood - flow with it, don't fight it.\"*\n"
+    flora_briefing += "✨ Trust your intuition as the day's energies shift and dance\n"
+    
+    flora_briefing += "\n@Maeve - The celestial canvas is painted, now add your aesthetic wisdom! 🌿✨"
+    
+    await send_as_persona(ctx.channel, flora_briefing, "Flora Penrose", "https://cdn.discordapp.com/attachments/1234567890/flora_avatar.png")
+    await asyncio.sleep(3)
+    
+    # Maeve responds as style specialist  
+    maeve_briefing = "🎨 **Maeve's Style & Schedule Aesthetic Brief**\n"
+    maeve_briefing += "Absolutely divine, Flora! Now let's curate today's schedule with style:\n\n"
     
     if calendar_service:
         schedule = get_today_schedule()
         maeve_briefing += schedule
-        maeve_briefing += "\n\n🔧 **Operational Notes:**\n"
-        maeve_briefing += "• Review meeting preparations 15 minutes prior\n"
-        maeve_briefing += "• Optimize transitions between calendar blocks\n"
-        maeve_briefing += "• Maintain energy levels with strategic breaks"
+        maeve_briefing += "\n\n✨ **Style & Efficiency Curation:**\n"
+        maeve_briefing += "• **Meeting Prep Aesthetic:** 15-minute buffer for mental outfit changes\n"
+        maeve_briefing += "• **Transition Styling:** Seamless flow between commitments - think capsule wardrobe efficiency\n"
+        maeve_briefing += "• **Energy Color Palette:** Match your schedule rhythm to your inner style vibe\n"
+        maeve_briefing += "• **Weather-to-Wardrobe Sync:** Channeling Flora's cosmic weather into outfit coordination\n"
+        
+        maeve_briefing += "\n👗 **Today's Style Strategy:**\n"
+        maeve_briefing += "• Comfort meets confidence - dress for your busiest meeting, style down for everything else\n"
+        maeve_briefing += "• Accessories that transition - one statement piece, multiple moods\n"
+        maeve_briefing += "• Color psychology alignment with calendar energy\n"
     else:
-        maeve_briefing += "📅 **Schedule:** Calendar service disconnected\n"
-        maeve_briefing += "🔧 **Recommendation:** Manual time blocking required"
+        maeve_briefing += "📅 **Schedule Status:** Calendar offline - perfect time for a styling reset!\n"
+        maeve_briefing += "🎯 **Style Recovery Mode:** Use this time to curate and organize your aesthetic vision\n"
     
-    maeve_briefing += "\n\n*All systems operational and ready for execution* ⚡"
-    await ctx.send(maeve_briefing)
+    maeve_briefing += "\n\n💄 **Aesthetic Systems: Fully Styled & Ready!**"
+    maeve_briefing += "\n@Rose - Your style team has the vision locked and loaded! Time to make it happen with flair! ✨"
     
-    # Closing coordination
-    await asyncio.sleep(1)
-    await ctx.send("🤝 **Team Coordination Complete** - Ready to optimize your day!")
+    await send_as_persona(ctx.channel, maeve_briefing, "Maeve Windham", "https://cdn.discordapp.com/attachments/1234567890/maeve_avatar.png")
+    
+    # Rose's closing coordination
+    await asyncio.sleep(2)
+    await ctx.send("🤝 **Excellent work, team!** All departments reporting ready. Let's make today productive! 👑")
 
 @bot.command(name='schedule')
 async def schedule_command(ctx):
