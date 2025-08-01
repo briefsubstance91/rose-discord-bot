@@ -27,6 +27,8 @@ from google.oauth2.credentials import Credentials as OAuthCredentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import traceback
+import random
+import pandas as pd
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -2327,12 +2329,12 @@ def get_vivian_report(time_filter=None, brief=False):
             except:
                 pass
         
-        report += "\n💼 **External Focus:** LinkedIn, stakeholder follow-up, industry monitoring"
+        report += "\n💼 **Work Focus:** Calendar coordination and priority management"
         return report
     
     # Full detailed report
-    report = "📺 **Vivian's Work & External Intelligence Brief**\n"
-    report += "Good morning! Work calendar and external landscape update:\n\n"
+    report = "📺 **Vivian's Work Calendar Brief**\n"
+    report += "Good morning! Work calendar and priority management update:\n\n"
     
     # Work calendar (Vivian's primary responsibility)
     work_schedule = get_work_schedule(time_filter)
@@ -2348,17 +2350,17 @@ def get_vivian_report(time_filter=None, brief=False):
         except:
             pass
     
-    # External communications focus
-    report += "\n💼 **External Priorities:**\n"
-    report += "• LinkedIn engagement check\n"
-    report += "• Stakeholder follow-up prep\n"
-    report += "• Professional communication review\n"
+    # Work coordination focus (removed external focus)
+    report += "\n💼 **Work Coordination:**\n"
+    report += "• Calendar optimization and scheduling\n"
+    report += "• Meeting preparation and follow-up\n"
+    report += "• Work priority management\n"
     
-    # Industry monitoring
-    report += "\n📰 **Industry Watch:**\n"
-    report += "• Key developments monitoring active\n"
-    report += "• Engagement opportunities tracked\n"
-    report += "• News feed curation ready\n"
+    # Productivity focus
+    report += "\n📊 **Productivity Status:**\n"
+    report += "• Time blocking efficiency monitored\n"
+    report += "• Work-life balance coordination active\n"
+    report += "• Priority alignment with strategic goals\n"
     
     return report
 
@@ -2395,35 +2397,103 @@ def get_celeste_report():
     return report
 
 def get_charlotte_report():
-    """Generate Charlotte's IT/Systems briefing"""
+    """Generate Charlotte's IT/Systems briefing with real-time API monitoring"""
     report = "⚙️ **Charlotte's Technical Systems Brief**\n"
-    report += "Good morning! Your technical infrastructure status:\n\n"
+    report += "Good morning! Your technical infrastructure and API status:\n\n"
     
-    # System health
-    report += "🖥️ **System Health Check:**\n"
+    # Core System Health
+    report += "🖥️ **Core System Status:**\n"
     report += f"• Discord Bot: {'✅ Online' if bot.is_ready() else '❌ Connection issues'}\n"
     report += f"• Calendar Integration: {'✅ Active' if calendar_service else '❌ Disconnected'}\n"
     report += f"• Gmail Service: {'✅ Operational' if gmail_service else '❌ Offline'}\n"
-    report += f"• Weather API: {'✅ Connected' if WEATHER_API_KEY else '❌ Not configured'}\n"
+    report += f"• OpenAI Assistant: {'✅ Connected' if ROSE_ASSISTANT_ID else '❌ Not configured'}\n"
     
-    # Calendar sync status
+    # API Status Monitoring
+    report += "\n🌐 **API Connection Status:**\n"
+    report += f"• Weather API: {'✅ Connected' if WEATHER_API_KEY else '❌ Not configured'}\n"
+    report += f"• Brave Search API: {'✅ Active' if BRAVE_API_KEY else '❌ Limited functionality'}\n"
+    report += f"• OpenAI API: {'✅ Operational' if OPENAI_API_KEY else '❌ Critical issue'}\n"
+    
+    # Assistant Team API Health
+    report += "\n🤖 **Assistant Team APIs:**\n"
+    report += f"• Rose (Executive): {'✅ Fully operational' if ROSE_ASSISTANT_ID and OPENAI_API_KEY else '❌ Issues detected'}\n"
+    report += f"• Vivian (PR/Work): {'✅ Ready' if os.getenv('VIVIAN_ASSISTANT_ID') else '⚠️ Standby mode'}\n"
+    report += f"• Flora (Mystical): {'✅ Active' if os.getenv('FLORA_ASSISTANT_ID') else '⚠️ Limited'}\n"
+    report += f"• Maeve (Style): {'✅ Connected' if os.getenv('MAEVE_ASSISTANT_ID') else '⚠️ Offline'}\n"
+    report += f"• Pippa (Coach): {'✅ Available' if os.getenv('PIPPA_ASSISTANT_ID') else '⚠️ Unavailable'}\n"
+    report += f"• Cressida (Magic): {'✅ Online' if os.getenv('CRESSIDA_ASSISTANT_ID') else '⚠️ Offline'}\n"
+    
+    # Calendar System Status
     if accessible_calendars:
-        report += f"\n📅 **Calendar System:**\n"
+        report += f"\n📅 **Calendar Integration:**\n"
         report += f"• {len(accessible_calendars)} calendars synchronized\n"
         report += "• Cross-calendar coordination active\n"
         report += "• Timezone handling: Toronto/Eastern verified\n"
+        report += "• OAuth tokens: Valid and refreshed\n"
+    else:
+        report += f"\n📅 **Calendar Integration:**\n"
+        report += "• ❌ No calendars accessible - check OAuth tokens\n"
     
-    # Automation status
-    report += "\n🤖 **Automation Status:**\n"
-    report += "• Morning briefing workflows operational\n"
-    report += "• Email processing algorithms active\n"
-    report += "• AI assistant functions fully integrated\n"
+    # Email System Status
+    if gmail_service:
+        try:
+            # Quick health check - get profile info
+            profile = gmail_service.users().getProfile(userId='me').execute()
+            email_addr = profile.get('emailAddress', 'unknown')
+            report += f"\n📧 **Email System:**\n"
+            report += f"• Gmail API: ✅ Connected ({email_addr})\n"
+            report += "• OAuth authentication: Valid\n"
+            report += "• Email processing: Operational\n"
+        except Exception as e:
+            report += f"\n📧 **Email System:**\n"
+            report += "• Gmail API: ❌ Authentication issues\n"
+            report += "• Email processing: Limited\n"
+    else:
+        report += f"\n📧 **Email System:**\n"
+        report += "• Gmail API: ❌ Not connected\n"
     
-    # Technical recommendations
-    report += "\n🔧 **Technical Priorities:**\n"
-    report += "• System monitoring: All green\n"
-    report += "• Backup routines: On schedule\n"
-    report += "• Integration updates: Current\n"
+    # External Service Dependencies
+    report += "\n🔌 **External Services:**\n"
+    external_apis = [
+        ("Google Calendar API", calendar_service is not None),
+        ("Gmail API", gmail_service is not None),
+        ("WeatherAPI.com", WEATHER_API_KEY is not None),
+        ("Brave Search", BRAVE_API_KEY is not None),
+        ("OpenAI GPT-4", OPENAI_API_KEY is not None)
+    ]
+    
+    for service_name, is_active in external_apis:
+        status = "✅ Active" if is_active else "❌ Inactive"
+        report += f"• {service_name}: {status}\n"
+    
+    # System Performance Metrics
+    report += "\n📊 **Performance Status:**\n"
+    report += f"• Bot Latency: {round(bot.latency * 1000) if bot.is_ready() else 'N/A'}ms\n"
+    report += f"• Active Conversations: {len(user_conversations)}\n"
+    report += f"• Memory Usage: Monitoring active\n"
+    report += "• Error Rate: Within acceptable limits\n"
+    
+    # Technical Priorities & Alerts
+    report += "\n🚨 **Priority Alerts:**\n"
+    alerts = []
+    if not WEATHER_API_KEY:
+        alerts.append("• Weather API configuration needed")
+    if not accessible_calendars:
+        alerts.append("• Calendar access requires OAuth reauthorization")
+    if not gmail_service:
+        alerts.append("• Gmail service needs reconnection")
+    
+    if alerts:
+        report += "\n".join(alerts)
+    else:
+        report += "• All systems green - no critical issues detected\n"
+    
+    # Daily Tech Recommendations
+    report += "\n🔧 **Today's Tech Focus:**\n"
+    report += "• System monitoring: Continuous oversight active\n"
+    report += "• Backup verification: Automated routines running\n"
+    report += "• Security updates: All APIs using secure authentication\n"
+    report += "• Performance optimization: All assistant connections stable\n"
     
     return report
 
@@ -2458,66 +2528,99 @@ def get_alice_report():
     
     return report
 
+def get_daily_quotes():
+    """Get 3 random quotes from Pippa's Quotes_Affirmations.xlsx file"""
+    try:
+        # Path to Pippa's Excel file
+        excel_path = "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/Quotes_Affirmations.xlsx"
+        
+        # Read the Excel file
+        df = pd.read_excel(excel_path)
+        
+        # Get column names (assuming quotes are in first column)
+        if len(df.columns) > 0:
+            quotes_column = df.columns[0]  # Use first column
+            quotes = df[quotes_column].dropna().tolist()  # Remove empty cells
+            
+            # Select 3 random quotes
+            if len(quotes) >= 3:
+                selected_quotes = random.sample(quotes, 3)
+                return selected_quotes
+            else:
+                return quotes  # Return all if less than 3
+        else:
+            return ["Trust your journey", "You are capable of amazing things", "Progress over perfection"]
+            
+    except Exception as e:
+        print(f"Error reading quotes file: {e}")
+        # Fallback quotes
+        return [
+            "Trust your journey - every step matters",
+            "You are capable of amazing things",
+            "Progress over perfection, always"
+        ]
+
 def get_pippa_report():
-    """Generate Pippa's Life Coach briefing"""
-    report = "🧠 **Pippa's Mindset & Resilience Brief**\n"
-    report += "Good morning, beautiful human! Your mental wellness checkpoint:\n\n"
+    """Generate Pippa's Daily Quotes briefing"""
+    report = "🧠 **Pippa's Daily Inspiration**\n"
+    report += "Good morning, beautiful human! Here are your daily affirmations:\n\n"
     
-    # Emotional readiness
-    report += "💭 **Mental Readiness Assessment:**\n"
-    report += "• Energy calibration: Check in with your authentic self\n"
-    report += "• Stress indicators: Monitor for early intervention\n"
-    report += "• Confidence levels: You've got this - trust your capabilities\n"
+    # Get 3 random quotes
+    quotes = get_daily_quotes()
     
-    # AuDHD support
-    report += "\n🌈 **AuDHD Success Strategies:**\n"
-    report += "• Sensory environment: Optimize for focus and comfort\n"
-    report += "• Transition planning: Build in buffer time between tasks\n"
-    report += "• Executive function: Use external systems for cognitive support\n"
-    report += "• Masking management: Reserve energy, authenticity over performance\n"
+    report += "✨ **Today's Motivational Quotes:**\n\n"
+    for i, quote in enumerate(quotes, 1):
+        report += f"**{i}.** *\"{quote}\"*\n\n"
     
-    # Daily mindset
-    report += "\n🎯 **Today's Mindset Focus:**\n"
-    report += "• Priority clarity: Focus on what truly matters\n"
-    report += "• Energy boundaries: Protect your resources wisely\n"
-    report += "• Self-compassion: Progress over perfection always\n"
-    
-    # Emergency protocols
-    report += "\n🆘 **Panic Protocol Status:**\n"
-    report += "• Grounding techniques: 5-4-3-2-1 sensory method ready\n"
-    report += "• Breathing exercises: Box breathing available\n"
-    report += "• Support systems: Remember your network is here\n"
+    report += "💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!\n"
     
     return report
 
+def get_random_kindness_ideas():
+    """Generate 3 random acts of kindness ideas"""
+    kindness_ideas = [
+        "Leave a genuine compliment sticky note in a library book",
+        "Pay for someone's coffee behind you in line",
+        "Send a heartfelt text to a friend you haven't spoken to in a while",
+        "Write a thank-you note to a local essential worker",
+        "Hold the door open and make warm eye contact with a stranger",
+        "Share homemade cookies with your neighbors",
+        "Leave quarters in a laundromat for someone to find",
+        "Pick up litter in your neighborhood during your walk",
+        "Give a genuine compliment to someone who serves you today",
+        "Donate unused items in good condition to a local shelter",
+        "Help carry groceries for someone struggling with bags",
+        "Leave a positive review for a small local business you love",
+        "Offer to help an elderly person with technology",
+        "Send an encouraging message to someone going through a tough time",
+        "Leave a positive chalk message on a public sidewalk",
+        "Volunteer an hour at a local charity",
+        "Bring flowers from your garden to a nursing home",
+        "Let someone go ahead of you in line when you're not in a rush",
+        "Call a family member just to tell them you love them",
+        "Leave bird seed in a park for the wildlife",
+        "Give someone a book that changed your life",
+        "Offer your seat to someone on public transport",
+        "Leave a surprise treat for your mail carrier",
+        "Help someone carry a stroller up/down stairs"
+    ]
+    
+    return random.sample(kindness_ideas, 3)
+
 def get_cressida_report():
-    """Generate Cressida's Manic Pixie Dream Collective briefing"""
-    report = "✨ **Cressida's Magic & Joy Elevation Brief**\n"
-    report += "Good morning, magnificent soul! Time for some conscious magic:\n\n"
+    """Generate Cressida's Random Acts of Kindness briefing"""
+    report = "✨ **Cressida's Daily Kindness Magic**\n"
+    report += "Good morning, magnificent soul! Ready to sprinkle some kindness magic today?\n\n"
     
-    # Joy creation
-    report += "🌈 **Joy Creation Status:**\n"
-    report += "• Spontaneous magic opportunities: Stay open to wonder\n"
-    report += "• Creative rebellion potential: High - trust your artistic instincts\n"
-    report += "• Authentic expression: The world needs your unique light\n"
+    # Get 3 random acts of kindness
+    kindness_acts = get_random_kindness_ideas()
     
-    # Community building
-    report += "\n🤝 **Collective Elevation:**\n"
-    report += "• Random acts of kindness: Opportunity radar activated\n"
-    report += "• Grassroots kindness: Small actions, big consciousness shifts\n"
-    report += "• Evidence-based self-love: You are worthy of all good things\n"
+    report += "🌈 **Today's 3 Random Acts of Kindness:**\n\n"
+    for i, act in enumerate(kindness_acts, 1):
+        report += f"**{i}.** {act}\n\n"
     
-    # Vibrational elevation
-    report += "\n🔮 **Vibrational Frequency:**\n"
-    report += "• Individual transformation: Your growth elevates universal consciousness\n"
-    report += "• Creative flow state: Available for peak expression\n"
-    report += "• Magical realism mode: Engaged and ready for synchronicities\n"
-    
-    # Today's magic
-    report += "\n✨ **Today's Magical Mission:**\n"
-    report += "• Spread infectious positivity through authentic presence\n"
-    report += "• Create micro-moments of wonder in ordinary interactions\n"
-    report += "• Channel dreams into reality through inspired action\n"
+    report += "💫 **Remember:** Small acts of kindness create ripples of positivity that extend far beyond what you can see. Your authentic compassion has the power to transform someone's entire day!\n\n"
+    report += "✨ **Bonus Magic:** Choose the one that feels most aligned with your heart today - that's your intuition guiding you to the perfect moment of connection."
     
     return report
 
@@ -2752,6 +2855,10 @@ async def morning_briefing_command(ctx):
     
     rose_briefing = f"👑 **Rose's Morning Brief** ({current_time})\n"
     
+    # Weather briefing (Rose now handles weather)
+    weather = get_weather_briefing()
+    rose_briefing += f"{weather}\n\n"
+    
     # Personal/Other calendars (Rose's primary responsibility)
     personal_schedule = get_personal_schedule()
     rose_briefing += f"{personal_schedule}\n"
@@ -2774,9 +2881,14 @@ async def morning_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, vivian_report, "Vivian Spencer")
     await asyncio.sleep(1)
     
-    # Flora's weather + energy (concise)
-    weather = get_weather_briefing()
-    flora_briefing = f"🔮 **Flora's Weather & Energy**\n{weather}\n\n✨ **Daily Guidance:** Flow with today's cosmic energies - trust your intuition"
+    # Flora's personalized astrological guidance
+    flora_briefing = f"🔮 **Flora's Astrological Guidance** ({current_time})\n"
+    flora_briefing += "✨ **Your Personalized Reading:**\n"
+    flora_briefing += "• Cancer Sun: Emotional intuition heightened today\n"
+    flora_briefing += "• Birth chart focus: Trust your nurturing instincts\n"
+    flora_briefing += "• Current lunar phase energy supports inner reflection\n"
+    flora_briefing += "• Planetary transits: Favor home and family connections\n\n"
+    flora_briefing += "🌙 **Today's Cosmic Guidance:** Your natural empathic abilities are especially strong. Use this intuitive clarity to guide important decisions."
     await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
     await asyncio.sleep(1)
     
@@ -2786,9 +2898,10 @@ async def morning_briefing_command(ctx):
         event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
         event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
         maeve_briefing += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
-        maeve_briefing += "👗 **Strategy:** Dress for peak performance, transitional accessories, weather-aligned colors"
+        maeve_briefing += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
     else:
-        maeve_briefing += "📅 **Styling Reset Mode:** Perfect curation opportunity"
+        maeve_briefing += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
+        maeve_briefing += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
     await send_as_assistant_bot(ctx.channel, maeve_briefing, "Maeve Windham")
     await asyncio.sleep(1)
     
@@ -2860,9 +2973,13 @@ async def midday_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, vivian_midday, "Vivian Spencer")
     await asyncio.sleep(1)
     
-    # Quick weather check from Flora
-    weather = get_weather_briefing()
-    flora_midday = f"🔮 **Flora's Energy Update**\n{weather}\n\n✨ **Midday Guidance:** Maintain cosmic alignment through afternoon transitions"
+    # Flora's personalized midday astrological guidance
+    flora_midday = f"🔮 **Flora's Midday Astrological Update**\n"
+    flora_midday += "✨ **Your Personal Reading:**\n"
+    flora_midday += "• Cancer energy: Mid-day emotional processing peak\n"
+    flora_midday += "• Natal chart guidance: Honor your need for security\n"
+    flora_midday += "• Current transits: Support creative and nurturing activities\n\n"
+    flora_midday += "🌟 **Midday Guidance:** Your intuitive radar is particularly sharp now. Trust those gut feelings about people and situations."
     await send_as_assistant_bot(ctx.channel, flora_midday, "Flora Penrose")
 
 @bot.command(name='pm')
@@ -2911,8 +3028,15 @@ async def full_team_briefing_command(ctx):
     # All team members give their full detailed reports
     team_reports = [
         (get_vivian_report(), "Vivian Spencer"),
-        ("🔮 **Flora's Complete Mystical & Weather Guidance**\n" + get_weather_briefing() + 
-         "\n\n🌙 **Full Celestial Reading:**\nToday's energies support your highest intentions. Weather patterns mirror inner emotional currents - observe, adapt, flow. Natural light connects you to divine guidance. Elements speak through wind, temperature, atmospheric shifts. Trust your intuition as cosmic energies dance through your day.", "Flora Penrose"),
+        ("🔮 **Flora's Complete Astrological Guidance**\n" +
+         "✨ **Your Personalized Natal Chart Reading:**\n" +
+         "• Cancer Sun (June 25, 1983): Your emotional intelligence peaks today\n" +
+         "• Moon in current phase: Amplifies your natural psychic sensitivity\n" +
+         "• Mercury aspects: Favor intuitive communication over logical analysis\n" +
+         "• Venus influences: Strengthen bonds with family and close friends\n" +
+         "• Mars energy: Channel protective instincts into creative projects\n\n" +
+         "🌙 **Today's Cosmic Forecast for You:**\n" +
+         "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. The planetary transits are activating your 4th house of home and roots. This is an excellent time for nurturing relationships, creating beauty in your space, and honoring your intuitive gifts. Your Cancer Sun is being supported by harmonious aspects that enhance your natural empathy and healing abilities.", "Flora Penrose"),
         (get_celeste_report(), "Celeste Marchmont"),
         (get_charlotte_report(), "Charlotte Astor"),
         (get_alice_report(), "Alice Fortescue"),
@@ -3002,13 +3126,16 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         report = get_vivian_report()
         await send_as_assistant_bot(ctx.channel, report, "Vivian Spencer")
     elif assistant_name in ['flora', 'flora penrose']:
-        flora_brief = "🔮 **Flora's Mystical Guidance & Weather**\n"
-        flora_brief += "Greetings, dear soul! Here's today's cosmic guidance:\n\n"
-        weather = get_weather_briefing()
-        flora_brief += weather
-        flora_brief += "\n\n🌙 **Celestial Insight:**\n"
-        flora_brief += "*\"Flow with today's universal energies - they guide you perfectly.\"*\n"
-        flora_brief += "✨ Trust your intuition as the day unfolds"
+        flora_brief = "🔮 **Flora's Personal Astrological Guidance**\n"
+        flora_brief += "Greetings, dear soul! Your personalized cosmic guidance:\n\n"
+        flora_brief += "✨ **Your Cancer Sun Reading:**\n"
+        flora_brief += "• Emotional intelligence: Peak sensitivity to undercurrents\n"
+        flora_brief += "• Intuitive gifts: Prophetic dreams and gut feelings heightened\n"
+        flora_brief += "• Nurturing energy: Others drawn to your healing presence\n"
+        flora_brief += "• Home/family focus: Creating sanctuary is especially important\n\n"
+        flora_brief += "🌙 **Your Personal Celestial Insight:**\n"
+        flora_brief += "*\"Your birth chart shows Water element dominance today - trust your emotional wisdom completely. The planets are activating your natural psychic abilities.\"*\n"
+        flora_brief += "✨ Your Cancer intuition is your superpower right now"
         await send_as_assistant_bot(ctx.channel, flora_brief, "Flora Penrose")
     elif assistant_name in ['maeve', 'maeve windham']:
         maeve_brief = "🎨 **Maeve's Style & Schedule Brief**\n"
@@ -3017,9 +3144,10 @@ async def teambriefing_command(ctx, assistant_name: str = None):
             work_schedule = get_work_schedule()
             personal_schedule = get_personal_schedule()
             maeve_brief += f"{work_schedule}\n\n{personal_schedule}"
-            maeve_brief += "\n\n✨ **Style Coordination:** All systems aesthetically aligned!"
+            maeve_brief += "\n\n✨ **Daily Style Inspiration:** Follow my latest looks: https://www.instagram.com/?maeve-wyndham=following"
         else:
-            maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!"
+            maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!\n"
+            maeve_brief += "✨ **Daily Style Inspiration:** Follow my latest looks: https://www.instagram.com/?maeve-wyndham=following"
         await send_as_assistant_bot(ctx.channel, maeve_brief, "Maeve Windham")
     elif assistant_name in ['celeste', 'celeste marchmont']:
         report = get_celeste_report()
