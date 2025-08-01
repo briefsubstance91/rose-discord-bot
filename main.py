@@ -2406,7 +2406,7 @@ def get_charlotte_report():
     report += f"• Discord Bot: {'✅ Online' if bot.is_ready() else '❌ Connection issues'}\n"
     report += f"• Calendar Integration: {'✅ Active' if calendar_service else '❌ Disconnected'}\n"
     report += f"• Gmail Service: {'✅ Operational' if gmail_service else '❌ Offline'}\n"
-    report += f"• OpenAI Assistant: {'✅ Connected' if ROSE_ASSISTANT_ID else '❌ Not configured'}\n"
+    report += f"• OpenAI Assistant: {'✅ Connected' if ASSISTANT_ID else '❌ Not configured'}\n"
     
     # API Status Monitoring
     report += "\n🌐 **API Connection Status:**\n"
@@ -2416,7 +2416,7 @@ def get_charlotte_report():
     
     # Assistant Team API Health
     report += "\n🤖 **Assistant Team APIs:**\n"
-    report += f"• Rose (Executive): {'✅ Fully operational' if ROSE_ASSISTANT_ID and OPENAI_API_KEY else '❌ Issues detected'}\n"
+    report += f"• Rose (Executive): {'✅ Fully operational' if ASSISTANT_ID and OPENAI_API_KEY else '❌ Issues detected'}\n"
     report += f"• Vivian (PR/Work): {'✅ Ready' if os.getenv('VIVIAN_ASSISTANT_ID') else '⚠️ Standby mode'}\n"
     report += f"• Flora (Mystical): {'✅ Active' if os.getenv('FLORA_ASSISTANT_ID') else '⚠️ Limited'}\n"
     report += f"• Maeve (Style): {'✅ Connected' if os.getenv('MAEVE_ASSISTANT_ID') else '⚠️ Offline'}\n"
