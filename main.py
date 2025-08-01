@@ -2922,13 +2922,13 @@ async def morning_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, alice_brief, "Alice Fortescue")
     await asyncio.sleep(1)
     
-    # Pippa's mindset (essential)
-    pippa_brief = "🧠 **Pippa's Mindset Brief**\n• Mental readiness: Check in with authentic self\n• AuDHD support: Sensory optimization ready\n• Energy boundaries: Protect resources wisely\n• Panic protocols: Grounding techniques available"
+    # Pippa's daily quotes (from Excel file)
+    pippa_brief = get_pippa_report()
     await send_as_assistant_bot(ctx.channel, pippa_brief, "Pippa Blackwood")
     await asyncio.sleep(1)
     
-    # Cressida's magic (brief inspiration)
-    cressida_brief = "✨ **Cressida's Magic Brief**\n• Joy creation: Stay open to wonder\n• Creative flow: High potential today\n• Magical mission: Spread authentic positivity\n• Universal elevation: Your growth lifts all consciousness"
+    # Cressida's random acts of kindness
+    cressida_brief = get_cressida_report()
     await send_as_assistant_bot(ctx.channel, cressida_brief, "Cressida Frost")
     await asyncio.sleep(1)
     
