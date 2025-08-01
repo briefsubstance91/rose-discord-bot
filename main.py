@@ -2573,7 +2573,7 @@ async def send_automated_noon():
     """Automatically send midday check-in to specific channel"""
     try:
         # Target specific channel by ID
-        target_channel_id = 1400672908610769027
+        target_channel_id = 1400674820429053992
         target_channel = bot.get_channel(target_channel_id)
         
         if target_channel:
@@ -2604,7 +2604,7 @@ async def send_automated_pm():
     """Automatically send afternoon focus to specific channel"""
     try:
         # Target specific channel by ID
-        target_channel_id = 1400672908610769027
+        target_channel_id = 1400674903547576363
         target_channel = bot.get_channel(target_channel_id)
         
         if target_channel:
