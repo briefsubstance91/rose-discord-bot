@@ -29,6 +29,8 @@ from googleapiclient.errors import HttpError
 import traceback
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Load environment variables
 load_dotenv()
@@ -147,6 +149,9 @@ try:
     intents = discord.Intents.default()
     intents.message_content = True
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+    
+    # Scheduler for automated tasks
+    scheduler = AsyncIOScheduler(timezone=pytz.timezone('America/Toronto'))
     
     # OpenAI client
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -2517,6 +2522,54 @@ def get_cressida_report():
     return report
 
 # ============================================================================
+# AUTOMATED SCHEDULING FUNCTIONS
+# ============================================================================
+
+async def send_automated_am():
+    """Automatically send morning briefing to specific channel"""
+    try:
+        # Target specific channel by ID
+        target_channel_id = 1400667245947912314
+        target_channel = bot.get_channel(target_channel_id)
+        
+        if target_channel:
+            print(f"🕖 Automated morning briefing - sending to #{target_channel.name}")
+            
+            # Execute the same logic as the !am command
+            await target_channel.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
+            await asyncio.sleep(1)
+            
+            # Rose's strategic overview (goes first)
+            toronto_tz = pytz.timezone('America/Toronto')
+            current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
+            
+            rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n\n"
+            
+            # Today's calendar
+            if calendar_service:
+                schedule = get_today_schedule()
+                rose_briefing += f"📅 **Today's Calendar:**\n{schedule}\n\n"
+            
+            # Quick email status
+            if gmail_service:
+                try:
+                    stats = get_email_stats()
+                    lines = stats.split('\n')
+                    email_summary = '\n'.join([line for line in lines if 'Total:' in line or 'Unread:' in line][:2])
+                    rose_briefing += f"📧 **Email Status:**\n{email_summary}\n\n"
+                except:
+                    rose_briefing += "📧 **Email Status:** Service unavailable\n\n"
+            
+            rose_briefing += "🎯 **Executive Focus:** Ready to optimize your productivity and strategic priorities today."
+            await target_channel.send(rose_briefing)
+            
+        else:
+            print(f"⚠️ Target channel {target_channel_id} not found for automated morning briefing")
+            
+    except Exception as e:
+        print(f"❌ Error in automated morning briefing: {e}")
+
+# ============================================================================
 # DISCORD COMMANDS (ALL PRESERVED WITH ORIGINAL VARIABLE NAMES)
 # ============================================================================
 
@@ -3092,6 +3145,15 @@ async def cleansender_command(ctx, sender_email: str, count: int = 50):
         print(f"❌ Clean sender command error: {e}")
         await ctx.send("🗑️ Error with email deletion. Please try again.")
 
+@bot.command(name='testam')
+async def test_am_command(ctx):
+    """Test the automated morning briefing function"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    await ctx.send("🧪 Testing automated morning briefing function...")
+    await send_automated_am()
+
 @bot.command(name='help')
 async def help_command(ctx):
     """Show comprehensive help message"""
@@ -3215,6 +3277,20 @@ async def on_ready():
     
     # Initialize Google services
     initialize_google_services()
+    
+    # Initialize scheduler for automated tasks
+    try:
+        # Schedule daily morning briefing at 7:15 AM Toronto time
+        scheduler.add_job(
+            send_automated_am,
+            CronTrigger(hour=7, minute=15, timezone=pytz.timezone('America/Toronto')),
+            id='daily_morning_briefing',
+            replace_existing=True
+        )
+        scheduler.start()
+        print("⏰ Automated morning briefing scheduled for 7:15 AM Toronto time")
+    except Exception as e:
+        print(f"⚠️ Failed to start scheduler: {e}")
     
     # Final status
     print(f"📅 Calendar Service: {'✅ Ready' if calendar_service else '❌ Not available'}")

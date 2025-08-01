@@ -19,3 +19,6 @@ gunicorn==21.2.0
 
 # Additional dependencies for email handling
 email-validator>=2.0.0
+
+# Task scheduling
+APScheduler>=3.10.0
