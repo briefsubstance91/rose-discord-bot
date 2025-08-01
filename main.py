@@ -2569,6 +2569,68 @@ async def send_automated_am():
     except Exception as e:
         print(f"❌ Error in automated morning briefing: {e}")
 
+async def send_automated_noon():
+    """Automatically send midday check-in to specific channel"""
+    try:
+        # Target specific channel by ID
+        target_channel_id = 1400672908610769027
+        target_channel = bot.get_channel(target_channel_id)
+        
+        if target_channel:
+            print(f"☀️ Automated midday briefing - sending to #{target_channel.name}")
+            
+            # Execute the same logic as the !noon command
+            toronto_tz = pytz.timezone('America/Toronto')
+            current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
+            
+            await target_channel.send(f"☀️ **Midday Check-In** ({current_time})")
+            await asyncio.sleep(1)
+            
+            # Rose's midday coordination
+            rose_midday = "👑 **Rose's Midday Coordination**\n"
+            personal_schedule = get_personal_schedule('noon')
+            rose_midday += f"{personal_schedule}\n"
+            rose_midday += "\n🌟 **Afternoon Focus:** Optimizing productivity for remaining day priorities"
+            
+            await target_channel.send(rose_midday)
+            
+        else:
+            print(f"⚠️ Target channel {target_channel_id} not found for automated midday briefing")
+            
+    except Exception as e:
+        print(f"❌ Error in automated midday briefing: {e}")
+
+async def send_automated_pm():
+    """Automatically send afternoon focus to specific channel"""
+    try:
+        # Target specific channel by ID
+        target_channel_id = 1400672908610769027
+        target_channel = bot.get_channel(target_channel_id)
+        
+        if target_channel:
+            print(f"🌇 Automated afternoon briefing - sending to #{target_channel.name}")
+            
+            # Execute the same logic as the !pm command
+            toronto_tz = pytz.timezone('America/Toronto')
+            current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
+            
+            await target_channel.send(f"🌇 **Afternoon Focus** ({current_time})")
+            await asyncio.sleep(1)
+            
+            # Rose's afternoon coordination
+            rose_afternoon = "👑 **Rose's Afternoon Priorities**\n"
+            personal_schedule = get_personal_schedule('afternoon')
+            rose_afternoon += f"{personal_schedule}\n"
+            rose_afternoon += "\n🎯 **Evening Prep:** Review day's progress & tomorrow setup"
+            
+            await target_channel.send(rose_afternoon)
+            
+        else:
+            print(f"⚠️ Target channel {target_channel_id} not found for automated afternoon briefing")
+            
+    except Exception as e:
+        print(f"❌ Error in automated afternoon briefing: {e}")
+
 # ============================================================================
 # DISCORD COMMANDS (ALL PRESERVED WITH ORIGINAL VARIABLE NAMES)
 # ============================================================================
@@ -3154,6 +3216,24 @@ async def test_am_command(ctx):
     await ctx.send("🧪 Testing automated morning briefing function...")
     await send_automated_am()
 
+@bot.command(name='testnoon')
+async def test_noon_command(ctx):
+    """Test the automated midday briefing function"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    await ctx.send("🧪 Testing automated midday briefing function...")
+    await send_automated_noon()
+
+@bot.command(name='testpm')
+async def test_pm_command(ctx):
+    """Test the automated afternoon briefing function"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    await ctx.send("🧪 Testing automated afternoon briefing function...")
+    await send_automated_pm()
+
 @bot.command(name='help')
 async def help_command(ctx):
     """Show comprehensive help message"""
@@ -3202,6 +3282,9 @@ async def help_command(ctx):
     system_commands = [
         "!status - System status",
         "!ping - Test response time",
+        "!testam - Test morning briefing",
+        "!testnoon - Test midday briefing", 
+        "!testpm - Test afternoon briefing",
         "!help - This message"
     ]
     
@@ -3287,8 +3370,28 @@ async def on_ready():
             id='daily_morning_briefing',
             replace_existing=True
         )
+        
+        # Schedule daily midday check-in at 12:00 PM Toronto time
+        scheduler.add_job(
+            send_automated_noon,
+            CronTrigger(hour=12, minute=0, timezone=pytz.timezone('America/Toronto')),
+            id='daily_midday_briefing',
+            replace_existing=True
+        )
+        
+        # Schedule daily afternoon focus at 3:00 PM Toronto time
+        scheduler.add_job(
+            send_automated_pm,
+            CronTrigger(hour=15, minute=0, timezone=pytz.timezone('America/Toronto')),
+            id='daily_afternoon_briefing',
+            replace_existing=True
+        )
+        
         scheduler.start()
-        print("⏰ Automated morning briefing scheduled for 7:15 AM Toronto time")
+        print("⏰ Automated briefings scheduled:")
+        print("  • Morning: 7:15 AM Toronto time")
+        print("  • Midday: 12:00 PM Toronto time")
+        print("  • Afternoon: 3:00 PM Toronto time")
     except Exception as e:
         print(f"⚠️ Failed to start scheduler: {e}")
     
