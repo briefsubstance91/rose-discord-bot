@@ -28,7 +28,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import traceback
 import random
-import pandas as pd
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -2529,68 +2528,43 @@ def get_alice_report():
     return report
 
 def get_daily_quotes():
-    """Get 3 random quotes from Pippa's collection"""
-    # Comprehensive quote collection (fallback + curated quotes)
-    inspirational_quotes = [
+    """Get 3 random quotes from Pippa's collection - reads simple text file"""
+    # Fallback quotes if file reading fails
+    fallback_quotes = [
         "Trust your journey - every step matters",
         "You are capable of amazing things", 
-        "Progress over perfection, always",
-        "Your current situation is not your final destination",
-        "Small steps daily lead to big changes yearly",
-        "You've survived 100% of your worst days - you're doing great",
-        "Believe in yourself when no one else will, that's when it matters most",
-        "The only way to do great work is to love what you do",
-        "Success is not final, failure is not fatal - it's the courage to continue that counts",
-        "You don't have to be perfect, you just have to be yourself",
-        "Every accomplishment starts with the decision to try",
-        "Your only limit is your mind",
-        "Difficult roads often lead to beautiful destinations",
-        "You are stronger than you think and braver than you feel",
-        "Focus on progress, not perfection",
-        "Your potential is endless",
-        "Be yourself - everyone else is taken",
-        "The best time to plant a tree was 20 years ago. The second best time is now",
-        "You can't go back and change the beginning, but you can start where you are",
-        "Embrace the glorious mess that you are",
-        "You were born to stand out, not fit in",
-        "Your story isn't over yet",
-        "Growth begins at the end of your comfort zone",
-        "You are exactly where you need to be"
+        "Progress over perfection, always"
     ]
     
     try:
-        # Try to read from Excel file first
         import os
         
-        # Multiple possible paths for the Excel file
+        # Try multiple paths for the simple text file (much easier than Excel)
         possible_paths = [
-            "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/Quotes_Affirmations.xlsx",
-            "./pippa-discord-bot/Quotes_Affirmations.xlsx",
-            "../pippa-discord-bot/Quotes_Affirmations.xlsx",
-            "Quotes_Affirmations.xlsx"
+            "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/quotes.txt",
+            "./pippa-discord-bot/quotes.txt", 
+            "../pippa-discord-bot/quotes.txt",
+            "quotes.txt"
         ]
         
-        for excel_path in possible_paths:
-            if os.path.exists(excel_path):
-                print(f"Found Excel file at: {excel_path}")
-                df = pd.read_excel(excel_path)
+        for file_path in possible_paths:
+            if os.path.exists(file_path):
+                print(f"Reading quotes from: {file_path}")
                 
-                # Get quotes from first column
-                if len(df.columns) > 0:
-                    quotes_column = df.columns[0]
-                    excel_quotes = df[quotes_column].dropna().tolist()
-                    
-                    if len(excel_quotes) >= 3:
-                        # Combine Excel quotes with fallback quotes
-                        all_quotes = excel_quotes + inspirational_quotes
-                        return random.sample(all_quotes, 3)
+                # Read the simple text file (one quote per line)
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    quotes = [line.strip() for line in file.readlines() if line.strip()]
+                
+                if len(quotes) >= 3:
+                    print(f"Found {len(quotes)} quotes in file")
+                    return random.sample(quotes, 3)
                 break
                 
     except Exception as e:
-        print(f"Excel reading failed, using curated quotes: {e}")
+        print(f"Quote file reading failed, using fallback: {e}")
     
-    # Fallback to curated quotes
-    return random.sample(inspirational_quotes, 3)
+    # Fallback to hardcoded quotes
+    return fallback_quotes
 
 def get_pippa_report():
     """Generate Pippa's Daily Quotes briefing"""
