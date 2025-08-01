@@ -2910,10 +2910,8 @@ async def morning_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, celeste_brief, "Celeste Marchmont")
     await asyncio.sleep(1)
     
-    # Charlotte's systems (essential)
-    charlotte_brief = "⚙️ **Charlotte's Systems Brief**\n"
-    charlotte_brief += f"• Bot: {'✅' if bot.is_ready() else '❌'} | Calendar: {'✅' if calendar_service else '❌'} | Email: {'✅' if gmail_service else '❌'} | Weather: {'✅' if WEATHER_API_KEY else '❌'}\n"
-    charlotte_brief += f"• {len(accessible_calendars)} calendars synced | All systems operational"
+    # Charlotte's comprehensive API monitoring (Rose standing in)
+    charlotte_brief = get_charlotte_report()
     await send_as_assistant_bot(ctx.channel, charlotte_brief, "Charlotte Astor")
     await asyncio.sleep(1)
     
