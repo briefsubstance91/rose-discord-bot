@@ -2529,52 +2529,101 @@ def get_alice_report():
     return report
 
 def get_daily_quotes():
-    """Get 3 random quotes from Pippa's Quotes_Affirmations.xlsx file"""
+    """Get 3 random quotes from Pippa's collection"""
+    # Comprehensive quote collection (fallback + curated quotes)
+    inspirational_quotes = [
+        "Trust your journey - every step matters",
+        "You are capable of amazing things", 
+        "Progress over perfection, always",
+        "Your current situation is not your final destination",
+        "Small steps daily lead to big changes yearly",
+        "You've survived 100% of your worst days - you're doing great",
+        "Believe in yourself when no one else will, that's when it matters most",
+        "The only way to do great work is to love what you do",
+        "Success is not final, failure is not fatal - it's the courage to continue that counts",
+        "You don't have to be perfect, you just have to be yourself",
+        "Every accomplishment starts with the decision to try",
+        "Your only limit is your mind",
+        "Difficult roads often lead to beautiful destinations",
+        "You are stronger than you think and braver than you feel",
+        "Focus on progress, not perfection",
+        "Your potential is endless",
+        "Be yourself - everyone else is taken",
+        "The best time to plant a tree was 20 years ago. The second best time is now",
+        "You can't go back and change the beginning, but you can start where you are",
+        "Embrace the glorious mess that you are",
+        "You were born to stand out, not fit in",
+        "Your story isn't over yet",
+        "Growth begins at the end of your comfort zone",
+        "You are exactly where you need to be"
+    ]
+    
     try:
-        # Path to Pippa's Excel file
-        excel_path = "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/Quotes_Affirmations.xlsx"
+        # Try to read from Excel file first
+        import os
         
-        # Read the Excel file
-        df = pd.read_excel(excel_path)
-        
-        # Get column names (assuming quotes are in first column)
-        if len(df.columns) > 0:
-            quotes_column = df.columns[0]  # Use first column
-            quotes = df[quotes_column].dropna().tolist()  # Remove empty cells
-            
-            # Select 3 random quotes
-            if len(quotes) >= 3:
-                selected_quotes = random.sample(quotes, 3)
-                return selected_quotes
-            else:
-                return quotes  # Return all if less than 3
-        else:
-            return ["Trust your journey", "You are capable of amazing things", "Progress over perfection"]
-            
-    except Exception as e:
-        print(f"Error reading quotes file: {e}")
-        # Fallback quotes
-        return [
-            "Trust your journey - every step matters",
-            "You are capable of amazing things",
-            "Progress over perfection, always"
+        # Multiple possible paths for the Excel file
+        possible_paths = [
+            "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/Quotes_Affirmations.xlsx",
+            "./pippa-discord-bot/Quotes_Affirmations.xlsx",
+            "../pippa-discord-bot/Quotes_Affirmations.xlsx",
+            "Quotes_Affirmations.xlsx"
         ]
+        
+        for excel_path in possible_paths:
+            if os.path.exists(excel_path):
+                print(f"Found Excel file at: {excel_path}")
+                df = pd.read_excel(excel_path)
+                
+                # Get quotes from first column
+                if len(df.columns) > 0:
+                    quotes_column = df.columns[0]
+                    excel_quotes = df[quotes_column].dropna().tolist()
+                    
+                    if len(excel_quotes) >= 3:
+                        # Combine Excel quotes with fallback quotes
+                        all_quotes = excel_quotes + inspirational_quotes
+                        return random.sample(all_quotes, 3)
+                break
+                
+    except Exception as e:
+        print(f"Excel reading failed, using curated quotes: {e}")
+    
+    # Fallback to curated quotes
+    return random.sample(inspirational_quotes, 3)
 
 def get_pippa_report():
     """Generate Pippa's Daily Quotes briefing"""
-    report = "🧠 **Pippa's Daily Inspiration**\n"
-    report += "Good morning, beautiful human! Here are your daily affirmations:\n\n"
-    
-    # Get 3 random quotes
-    quotes = get_daily_quotes()
-    
-    report += "✨ **Today's Motivational Quotes:**\n\n"
-    for i, quote in enumerate(quotes, 1):
-        report += f"**{i}.** *\"{quote}\"*\n\n"
-    
-    report += "💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!\n"
-    
-    return report
+    try:
+        report = "🧠 **Pippa's Daily Inspiration**\n"
+        report += "Good morning, beautiful human! Here are your daily affirmations:\n\n"
+        
+        # Get 3 random quotes
+        quotes = get_daily_quotes()
+        
+        report += "✨ **Today's Motivational Quotes:**\n\n"
+        for i, quote in enumerate(quotes, 1):
+            report += f"**{i}.** *\"{quote}\"*\n\n"
+        
+        report += "💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!"
+        
+        return report
+        
+    except Exception as e:
+        print(f"Error in get_pippa_report: {e}")
+        # Emergency fallback
+        return """🧠 **Pippa's Daily Inspiration**
+Good morning, beautiful human! 
+
+✨ **Today's Motivational Quotes:**
+
+**1.** *"Trust your journey - every step matters"*
+
+**2.** *"You are capable of amazing things"*
+
+**3.** *"Progress over perfection, always"*
+
+💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!"""
 
 def get_random_kindness_ideas():
     """Generate 3 random acts of kindness ideas"""
