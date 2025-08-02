@@ -2572,28 +2572,42 @@ def get_daily_quotes():
         import os
         
         # Try multiple paths for the simple text file (much easier than Excel)
+        import os
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
         possible_paths = [
             "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/quotes.txt",
+            os.path.join(script_dir, "..", "pippa-discord-bot", "quotes.txt"),
+            os.path.join(script_dir, "pippa-discord-bot", "quotes.txt"),
             "./pippa-discord-bot/quotes.txt", 
             "../pippa-discord-bot/quotes.txt",
             "quotes.txt"
         ]
         
+        print(f"🔍 Pippa looking for quotes file. Current working directory: {os.getcwd()}")
+        
         for file_path in possible_paths:
+            print(f"🔍 Checking path: {file_path}")
             if os.path.exists(file_path):
-                print(f"Reading quotes from: {file_path}")
+                print(f"✅ Reading quotes from: {file_path}")
                 
                 # Read the simple text file (one quote per line)
                 with open(file_path, 'r', encoding='utf-8') as file:
                     quotes = [line.strip() for line in file.readlines() if line.strip()]
                 
                 if len(quotes) >= 3:
-                    print(f"Found {len(quotes)} quotes in file")
+                    print(f"✅ Found {len(quotes)} quotes in file, selecting 3 random quotes")
                     return random.sample(quotes, 3)
+                else:
+                    print(f"⚠️ Only found {len(quotes)} quotes, need at least 3")
                 break
+            else:
+                print(f"❌ File not found: {file_path}")
                 
     except Exception as e:
-        print(f"Quote file reading failed, using fallback: {e}")
+        print(f"❌ Quote file reading failed, using fallback: {e}")
+        import traceback
+        print(f"📋 Traceback: {traceback.format_exc()}")
     
     # Fallback to hardcoded quotes
     return fallback_quotes
