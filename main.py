@@ -2968,6 +2968,24 @@ async def status_command(ctx):
         inline=False
     )
     
+    # Team Status
+    team_status = [
+        "📺 **Vivian** - External Intelligence & Work Coordination",
+        "🔮 **Flora** - Mystical Guidance & Astrological Readings", 
+        "🎨 **Maeve** - Style Coordination & Aesthetic Planning",
+        "✍️ **Celeste** - Content Management & Research",
+        "⚙️ **Charlotte** - Technical Systems & Infrastructure",
+        "🏠 **Alice** - Home & Wellness Coordination",
+        "🧠 **Pippa** - Daily Motivation & Mindset Support",
+        "✨ **Cressida** - Joy Elevation & Kindness Magic"
+    ]
+    
+    embed.add_field(
+        name="👥 Executive Team Status (All Active)",
+        value="\n".join([f"✅ {member}" for member in team_status]),
+        inline=False
+    )
+    
     # Usage
     embed.add_field(
         name="💡 Usage",
@@ -3260,16 +3278,17 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         return
     
     if not assistant_name:
-        team_list = "👥 **Available Team Members:**\n"
-        team_list += "• `vivian` - External Intelligence (PR/Work/News)\n"
-        team_list += "• `flora` - Mystical Guidance & Weather\n" 
-        team_list += "• `maeve` - Style & Schedule Coordination\n"
-        team_list += "• `celeste` - Content & Research\n"
-        team_list += "• `charlotte` - Technical Systems\n"
-        team_list += "• `alice` - Home & Wellness\n"
-        team_list += "• `pippa` - Life Coaching & Mindset\n"
-        team_list += "• `cressida` - Magic & Joy Elevation\n\n"
-        team_list += "Usage: `!teambriefing <name>` (e.g., `!teambriefing vivian`)"
+        team_list = "👥 **Available Executive Team Members:**\n"
+        team_list += "• `vivian` - **Vivian Spencer** - External Intelligence & Work Calendar\n"
+        team_list += "• `flora` - **Flora Penrose** - Mystical Guidance & Personalized Astrology\n" 
+        team_list += "• `maeve` - **Maeve Windham** - Style Coordination & Aesthetic Planning\n"
+        team_list += "• `celeste` - **Celeste Marchmont** - Content & Research Management\n"
+        team_list += "• `charlotte` - **Charlotte Astor** - Technical Systems & Infrastructure\n"
+        team_list += "• `alice` - **Alice Fortescue** - Home & Wellness Coordination\n"
+        team_list += "• `pippa` - **Pippa Blackwood** - Daily Motivation & Mindset Support\n"
+        team_list += "• `cressida` - **Cressida Frost** - Joy Elevation & Random Acts of Kindness\n\n"
+        team_list += "**Usage:** `!teambriefing <name>` (e.g., `!teambriefing vivian`)\n"
+        team_list += "**Alternative:** Use `!briefing` for all team reports at once"
         await ctx.send(team_list)
         return
     
@@ -3573,6 +3592,24 @@ async def help_command(ctx):
     embed.add_field(
         name="⚙️ System",
         value="\n".join([f"• {cmd}" for cmd in system_commands]),
+        inline=False
+    )
+    
+    # Team Members
+    team_members = [
+        "**Vivian Spencer** - External Intelligence & Work Calendar",
+        "**Flora Penrose** - Mystical Guidance & Personalized Astrology", 
+        "**Maeve Windham** - Style Coordination & Aesthetic Planning",
+        "**Celeste Marchmont** - Content & Research Management",
+        "**Charlotte Astor** - Technical Systems & Infrastructure",
+        "**Alice Fortescue** - Home & Wellness Coordination",
+        "**Pippa Blackwood** - Daily Motivation & Mindset Support",
+        "**Cressida Frost** - Joy Elevation & Random Acts of Kindness"
+    ]
+    
+    embed.add_field(
+        name="👥 Executive Team Members",
+        value="\n".join([f"• {member}" for member in team_members]),
         inline=False
     )
     
