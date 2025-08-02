@@ -2576,9 +2576,11 @@ def get_daily_quotes():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         
         possible_paths = [
+            os.path.join(script_dir, "quotes.txt"),  # Same directory as main.py
             "/Users/bgelineau/Downloads/assistants/pippa-discord-bot/quotes.txt",
             os.path.join(script_dir, "..", "pippa-discord-bot", "quotes.txt"),
             os.path.join(script_dir, "pippa-discord-bot", "quotes.txt"),
+            "./quotes.txt",
             "./pippa-discord-bot/quotes.txt", 
             "../pippa-discord-bot/quotes.txt",
             "quotes.txt"
@@ -3083,7 +3085,13 @@ async def send_as_persona(channel, content, persona_name, avatar_url=None):
 @bot.command(name='am')
 async def morning_briefing_command(ctx):
     """Morning comprehensive briefing - all day ahead"""
+    print(f"🔍 !am command called in channel: '{ctx.channel.name}' (type: {type(ctx.channel).__name__})")
+    print(f"🔍 Allowed channels: {ALLOWED_CHANNELS}")
+    print(f"🔍 Channel check result: {ctx.channel.name in ALLOWED_CHANNELS}")
+    
     if ctx.channel.name not in ALLOWED_CHANNELS:
+        print(f"❌ Channel '{ctx.channel.name}' not in allowed channels, command ignored")
+        await ctx.send(f"❌ Command only available in: {', '.join([f'#{ch}' for ch in ALLOWED_CHANNELS])}")
         return
     
     await ctx.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
