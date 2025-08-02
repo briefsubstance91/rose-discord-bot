@@ -2313,6 +2313,38 @@ async def send_as_assistant_bot(channel, content, assistant_name):
 
 def get_vivian_report(time_filter=None, brief=False):
     """Generate Vivian's Work Calendar & External Intelligence briefing"""
+    # Check if it's weekend (Saturday=5, Sunday=6)
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_day = datetime.now(toronto_tz).weekday()
+    is_weekend = current_day >= 5  # Saturday or Sunday
+    
+    if is_weekend:
+        # Weekend version - focus on personal coordination instead of work
+        if brief:
+            report = "📺 **Vivian's Weekend Brief**\n"
+            report += "✨ **Weekend Mode:** Work coordination paused for personal time\n"
+            report += "🌿 **Focus:** Rest, recharge, and personal activities\n"
+            report += "📅 **Personal Calendar:** Available for weekend events and leisure planning"
+            return report
+        else:
+            # Full weekend report
+            report = "📺 **Vivian's Weekend Coordination**\n"
+            report += "Good morning! Weekend personal coordination and leisure planning:\n\n"
+            
+            # Personal calendar only on weekends
+            personal_schedule = get_personal_schedule(time_filter)
+            report += f"🌿 **Weekend Activities:**\n{personal_schedule}\n"
+            
+            report += "✨ **Weekend Priorities:**\n"
+            report += "• Personal time and restoration\n"
+            report += "• Family and social connections\n"
+            report += "• Leisure activities and hobbies\n"
+            report += "• Home projects and personal interests\n\n"
+            
+            report += "💡 **Weekend Wisdom:** This is your time for rest, creativity, and personal fulfillment. Work coordination resumes Monday!"
+            return report
+    
+    # Weekday version - regular work focus
     if brief:
         report = "📺 **Vivian's Work Brief**\n"
         work_schedule = get_work_schedule(time_filter)
@@ -2970,7 +3002,7 @@ async def status_command(ctx):
     
     # Team Status
     team_status = [
-        "📺 **Vivian** - External Intelligence & Work Coordination",
+        "📺 **Vivian** - Work Calendar (weekdays) / Personal Time (weekends)",
         "🔮 **Flora** - Mystical Guidance & Astrological Readings", 
         "🎨 **Maeve** - Style Coordination & Aesthetic Planning",
         "✍️ **Celeste** - Content Management & Research",
@@ -3279,7 +3311,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
     
     if not assistant_name:
         team_list = "👥 **Available Executive Team Members:**\n"
-        team_list += "• `vivian` - **Vivian Spencer** - External Intelligence & Work Calendar\n"
+        team_list += "• `vivian` - **Vivian Spencer** - Work Calendar (weekdays) / Personal Coordination (weekends)\n"
         team_list += "• `flora` - **Flora Penrose** - Mystical Guidance & Personalized Astrology\n" 
         team_list += "• `maeve` - **Maeve Windham** - Style Coordination & Aesthetic Planning\n"
         team_list += "• `celeste` - **Celeste Marchmont** - Content & Research Management\n"
@@ -3597,7 +3629,7 @@ async def help_command(ctx):
     
     # Team Members
     team_members = [
-        "**Vivian Spencer** - External Intelligence & Work Calendar",
+        "**Vivian Spencer** - Work Calendar (weekdays) & Personal Coordination (weekends)",
         "**Flora Penrose** - Mystical Guidance & Personalized Astrology", 
         "**Maeve Windham** - Style Coordination & Aesthetic Planning",
         "**Celeste Marchmont** - Content & Research Management",
