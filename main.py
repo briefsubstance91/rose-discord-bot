@@ -2647,6 +2647,159 @@ def get_cressida_report():
     
     return report
 
+def get_flora_report(brief=False):
+    """Generate Flora's Personalized Astrological Guidance briefing"""
+    if brief:
+        # Brief version for !am command
+        current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
+        report = f"🔮 **Flora's Astrological Guidance** ({current_time})\n"
+        report += "✨ **Your Personalized Reading:**\n"
+        report += "• Cancer Sun: Emotional intuition heightened today\n"
+        report += "• Birth chart focus: Trust your nurturing instincts\n"
+        report += "• Current lunar phase energy supports inner reflection\n"
+        report += "• Planetary transits: Favor home and family connections\n\n"
+        report += "🌙 **Today's Cosmic Guidance:** Your natural empathic abilities are especially strong. Use this intuitive clarity to guide important decisions."
+        return report
+    
+    # Full detailed version for !briefing command
+    report = "🔮 **Flora's Complete Astrological Guidance**\n"
+    report += "Greetings, beautiful soul! Your personalized cosmic guidance:\n\n"
+    
+    # User's natal chart analysis (Cancer Sun, June 25, 1983)
+    report += "✨ **Your Personalized Natal Chart Reading:**\n"
+    report += "• Cancer Sun (June 25, 1983): Your emotional intelligence peaks today\n"
+    report += "• Moon in current phase: Amplifies your natural psychic sensitivity\n"
+    report += "• Mercury aspects: Favor intuitive communication over logical analysis\n"
+    report += "• Venus influences: Strengthen bonds with family and close friends\n"
+    report += "• Mars energy: Channel protective instincts into creative projects\n\n"
+    
+    # Daily cosmic forecast
+    report += "🌙 **Today's Cosmic Forecast for You:**\n"
+    report += "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. "
+    report += "The planetary transits are activating your 4th house of home and roots. This is an excellent time for nurturing relationships, "
+    report += "creating beauty in your space, and honoring your intuitive gifts. Your Cancer Sun is being supported by harmonious aspects "
+    report += "that enhance your natural empathy and healing abilities.\n\n"
+    
+    # Mystical practices for today
+    report += "🔮 **Recommended Mystical Practices:**\n"
+    report += "• Tarot: Pull a card for family/home guidance\n"
+    report += "• Crystal work: Moonstone or Rose Quartz for emotional clarity\n"
+    report += "• Meditation: Focus on heart chakra healing\n"
+    report += "• Journal: Record intuitive insights and dreams\n\n"
+    
+    report += "✨ Remember: Your Cancer intuition is your superpower right now - trust what your heart tells you."
+    
+    return report
+
+def get_maeve_report(brief=False):
+    """Generate Maeve's Style & Schedule Coordination briefing"""
+    if brief:
+        # Brief version for !am command
+        report = "🎨 **Maeve's Style Brief**\n"
+        if calendar_service:
+            try:
+                event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
+                event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
+                report += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
+                report += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
+            except:
+                report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
+                report += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
+        else:
+            report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
+            report += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
+        return report
+    
+    # Full detailed version for !briefing command
+    report = "🎨 **Maeve's Style & Schedule Coordination**\n"
+    report += "Hello, gorgeous! Your curated daily aesthetic and schedule brief:\n\n"
+    
+    # Schedule-based styling
+    if calendar_service:
+        try:
+            work_schedule = get_work_schedule()
+            personal_schedule = get_personal_schedule()
+            
+            # Count events for styling guidance
+            work_events = len([line for line in work_schedule.split('\n') if '•' in line])
+            personal_events = len([line for line in personal_schedule.split('\n') if '•' in line])
+            
+            report += "📊 **Style Coordination Analysis:**\n"
+            report += f"• Work events: {work_events} (professional aesthetic required)\n"
+            report += f"• Personal activities: {personal_events} (lifestyle curation opportunities)\n\n"
+            
+            if work_events > 0:
+                report += "💼 **Professional Style Focus:**\n"
+                report += "• Elevated basics with signature accessories\n"
+                report += "• Confidence-boosting color palette\n"
+                report += "• Comfortable yet polished silhouettes\n\n"
+            
+            if personal_events > 0:
+                report += "✨ **Lifestyle Aesthetic:**\n"
+                report += "• Authentic personal expression\n"
+                report += "• Mood-enhancing color choices\n"
+                report += "• Comfortable luxury approach\n\n"
+                
+        except Exception as e:
+            print(f"Error getting schedule for Maeve: {e}")
+            report += "📅 **Styling Reset Mode:**\n"
+            report += "• Perfect opportunity for aesthetic curation\n"
+            report += "• Focus on personal style development\n"
+            report += "• Wardrobe organization and inspiration\n\n"
+    else:
+        report += "📅 **Styling Reset Mode:**\n"
+        report += "• Perfect opportunity for aesthetic curation\n"
+        report += "• Focus on personal style development\n"
+        report += "• Wardrobe organization and inspiration\n\n"
+    
+    # Daily style inspiration
+    report += "🌟 **Daily Style Inspiration:**\n"
+    report += "Check my latest aesthetic updates and trend insights:\n"
+    report += "📱 Instagram: https://www.instagram.com/?maeve-wyndham=following\n\n"
+    
+    # Weather-based styling (if available)
+    if WEATHER_API_KEY:
+        try:
+            weather_data = get_weather_data()
+            if weather_data:
+                temp = weather_data.get('current', {}).get('temp_c', 20)
+                condition = weather_data.get('current', {}).get('condition', {}).get('text', 'Clear')
+                
+                report += "🌤️ **Weather-Based Style Guidance:**\n"
+                report += f"• Temperature: {temp}°C - {get_style_temp_advice(temp)}\n"
+                report += f"• Conditions: {condition} - {get_style_weather_advice(condition)}\n\n"
+        except:
+            pass
+    
+    report += "💫 **Today's Aesthetic Mantra:** Authentic style is confidence made visible - wear what makes your soul sparkle!"
+    
+    return report
+
+def get_style_temp_advice(temp):
+    """Get styling advice based on temperature"""
+    if temp < 5:
+        return "Luxe layering with statement outerwear"
+    elif temp < 15:
+        return "Chic transitional pieces and textures"
+    elif temp < 25:
+        return "Perfect for sophisticated separates"
+    else:
+        return "Breathable fabrics in elevated silhouettes"
+
+def get_style_weather_advice(condition):
+    """Get styling advice based on weather conditions"""
+    condition_lower = condition.lower()
+    if 'rain' in condition_lower:
+        return "Water-resistant pieces with protective glamour"
+    elif 'snow' in condition_lower:
+        return "Cozy luxury with winter white accents"
+    elif 'sun' in condition_lower or 'clear' in condition_lower:
+        return "Light fabrics with UV-protective accessories"
+    elif 'cloud' in condition_lower:
+        return "Versatile layers for changing conditions"
+    else:
+        return "Adaptable pieces for weather transitions"
+
 # ============================================================================
 # AUTOMATED SCHEDULING FUNCTIONS
 # ============================================================================
@@ -2905,26 +3058,12 @@ async def morning_briefing_command(ctx):
     await asyncio.sleep(1)
     
     # Flora's personalized astrological guidance
-    flora_briefing = f"🔮 **Flora's Astrological Guidance** ({current_time})\n"
-    flora_briefing += "✨ **Your Personalized Reading:**\n"
-    flora_briefing += "• Cancer Sun: Emotional intuition heightened today\n"
-    flora_briefing += "• Birth chart focus: Trust your nurturing instincts\n"
-    flora_briefing += "• Current lunar phase energy supports inner reflection\n"
-    flora_briefing += "• Planetary transits: Favor home and family connections\n\n"
-    flora_briefing += "🌙 **Today's Cosmic Guidance:** Your natural empathic abilities are especially strong. Use this intuitive clarity to guide important decisions."
+    flora_briefing = get_flora_report(brief=True)
     await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
     await asyncio.sleep(1)
     
     # Maeve's style coordination (essential)
-    maeve_briefing = "🎨 **Maeve's Style Brief**\n"
-    if calendar_service:
-        event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
-        event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
-        maeve_briefing += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
-        maeve_briefing += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
-    else:
-        maeve_briefing += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
-        maeve_briefing += "✨ **Daily Inspiration:** Check my latest style updates: https://www.instagram.com/?maeve-wyndham=following"
+    maeve_briefing = get_maeve_report(brief=True)
     await send_as_assistant_bot(ctx.channel, maeve_briefing, "Maeve Windham")
     await asyncio.sleep(1)
     
@@ -3049,15 +3188,8 @@ async def full_team_briefing_command(ctx):
     # All team members give their full detailed reports
     team_reports = [
         (get_vivian_report(), "Vivian Spencer"),
-        ("🔮 **Flora's Complete Astrological Guidance**\n" +
-         "✨ **Your Personalized Natal Chart Reading:**\n" +
-         "• Cancer Sun (June 25, 1983): Your emotional intelligence peaks today\n" +
-         "• Moon in current phase: Amplifies your natural psychic sensitivity\n" +
-         "• Mercury aspects: Favor intuitive communication over logical analysis\n" +
-         "• Venus influences: Strengthen bonds with family and close friends\n" +
-         "• Mars energy: Channel protective instincts into creative projects\n\n" +
-         "🌙 **Today's Cosmic Forecast for You:**\n" +
-         "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. The planetary transits are activating your 4th house of home and roots. This is an excellent time for nurturing relationships, creating beauty in your space, and honoring your intuitive gifts. Your Cancer Sun is being supported by harmonious aspects that enhance your natural empathy and healing abilities.", "Flora Penrose"),
+        (get_flora_report(), "Flora Penrose"),
+        (get_maeve_report(), "Maeve Windham"),
         (get_celeste_report(), "Celeste Marchmont"),
         (get_charlotte_report(), "Charlotte Astor"),
         (get_alice_report(), "Alice Fortescue"),
@@ -3072,14 +3204,15 @@ async def full_team_briefing_command(ctx):
     # Rose's comprehensive synthesis
     rose_synthesis = "👑 **Rose's Complete Team Synthesis**\n\n"
     rose_synthesis += "All departments have provided full detailed reports. Complete situational awareness achieved across all domains:\n"
-    rose_synthesis += "• External & work coordination fully briefed\n"
-    rose_synthesis += "• Mystical & environmental guidance complete\n" 
-    rose_synthesis += "• Content & knowledge systems detailed\n"
-    rose_synthesis += "• Technical infrastructure fully reported\n"
-    rose_synthesis += "• Home & wellness priorities comprehensive\n"
-    rose_synthesis += "• Mental resilience & coaching complete\n"
-    rose_synthesis += "• Joy & magic elevation fully engaged\n\n"
-    rose_synthesis += "**🚀 Executive Status: Complete team coordination achieved**"
+    rose_synthesis += "• External & work coordination fully briefed (Vivian)\n"
+    rose_synthesis += "• Mystical & astrological guidance complete (Flora)\n"
+    rose_synthesis += "• Style & aesthetic coordination detailed (Maeve)\n"
+    rose_synthesis += "• Content & knowledge systems reported (Celeste)\n"
+    rose_synthesis += "• Technical infrastructure fully analyzed (Charlotte)\n"
+    rose_synthesis += "• Home & wellness priorities comprehensive (Alice)\n"
+    rose_synthesis += "• Mental resilience & coaching complete (Pippa)\n"
+    rose_synthesis += "• Joy & magic elevation fully engaged (Cressida)\n\n"
+    rose_synthesis += "**🚀 Executive Status: Complete team coordination achieved across all 8 departments**"
     
     await ctx.send(rose_synthesis)
 
@@ -3147,28 +3280,10 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         report = get_vivian_report()
         await send_as_assistant_bot(ctx.channel, report, "Vivian Spencer")
     elif assistant_name in ['flora', 'flora penrose']:
-        flora_brief = "🔮 **Flora's Personal Astrological Guidance**\n"
-        flora_brief += "Greetings, dear soul! Your personalized cosmic guidance:\n\n"
-        flora_brief += "✨ **Your Cancer Sun Reading:**\n"
-        flora_brief += "• Emotional intelligence: Peak sensitivity to undercurrents\n"
-        flora_brief += "• Intuitive gifts: Prophetic dreams and gut feelings heightened\n"
-        flora_brief += "• Nurturing energy: Others drawn to your healing presence\n"
-        flora_brief += "• Home/family focus: Creating sanctuary is especially important\n\n"
-        flora_brief += "🌙 **Your Personal Celestial Insight:**\n"
-        flora_brief += "*\"Your birth chart shows Water element dominance today - trust your emotional wisdom completely. The planets are activating your natural psychic abilities.\"*\n"
-        flora_brief += "✨ Your Cancer intuition is your superpower right now"
+        flora_brief = get_flora_report()
         await send_as_assistant_bot(ctx.channel, flora_brief, "Flora Penrose")
     elif assistant_name in ['maeve', 'maeve windham']:
-        maeve_brief = "🎨 **Maeve's Style & Schedule Brief**\n"
-        maeve_brief += "Hello, gorgeous! Your curated day awaits:\n\n"
-        if calendar_service:
-            work_schedule = get_work_schedule()
-            personal_schedule = get_personal_schedule()
-            maeve_brief += f"{work_schedule}\n\n{personal_schedule}"
-            maeve_brief += "\n\n✨ **Daily Style Inspiration:** Follow my latest looks: https://www.instagram.com/?maeve-wyndham=following"
-        else:
-            maeve_brief += "📅 Perfect styling reset opportunity - calendar offline for curation mode!\n"
-            maeve_brief += "✨ **Daily Style Inspiration:** Follow my latest looks: https://www.instagram.com/?maeve-wyndham=following"
+        maeve_brief = get_maeve_report()
         await send_as_assistant_bot(ctx.channel, maeve_brief, "Maeve Windham")
     elif assistant_name in ['celeste', 'celeste marchmont']:
         report = get_celeste_report()
