@@ -2305,16 +2305,16 @@ ASSISTANT_EMOJIS = {
     'cressida frost': '✨'
 }
 
-# Assistant colors for embed personalization
+# Assistant colors for embed personalization (matching their individual bot colors)
 ASSISTANT_COLORS = {
-    'vivian spencer': 0x3498DB,    # Professional blue
-    'flora penrose': 0x9B59B6,     # Mystical purple
-    'maeve windham': 0xE67E22,     # Stylish orange
-    'celeste marchmont': 0x1ABC9C, # Teal for content/research
-    'charlotte astor': 0x95A5A6,   # Gray for technical systems
-    'alice fortescue': 0x27AE60,   # Green for home/wellness
-    'pippa blackwood': 0xF39C12,   # Warm yellow for motivation
-    'cressida frost': 0xE91E63     # Pink for joy/magic (matches Rose)
+    'vivian spencer': 0x0F4C75,    # Sapphire blue (from Vivian's bot)
+    'flora penrose': 0x50C878,     # Green (from Flora's bot)
+    'maeve windham': 0xf06292,     # Pink/rose (from Maeve's bot)
+    'celeste marchmont': 0x9c27b0, # Purple (from Celeste's bot)
+    'charlotte astor': 0x95A5A6,   # Gray for technical systems (placeholder)
+    'alice fortescue': 0x27AE60,   # Green for home/wellness (placeholder)
+    'pippa blackwood': 0x0099FF,   # Blue (from Pippa's bot)
+    'cressida frost': 0xFF6B9D     # Pink (from Cressida's bot)
 }
 
 async def send_as_assistant_bot(channel, content, assistant_name):
