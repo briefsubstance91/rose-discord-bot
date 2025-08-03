@@ -2292,24 +2292,34 @@ ASSISTANT_BOT_IDS = {
     'cressida': 1391876902993526794  # Cressida Frost
 }
 
+# Assistant emojis for enhanced identity display
+ASSISTANT_EMOJIS = {
+    'vivian spencer': '📺',
+    'flora penrose': '🔮', 
+    'maeve windham': '🎨',
+    'celeste marchmont': '✍️',
+    'charlotte astor': '⚙️',
+    'alice fortescue': '🏠',
+    'pippa blackwood': '🧠',
+    'cressida frost': '✨'
+}
+
 async def send_as_assistant_bot(channel, content, assistant_name):
-    """Send message as the actual assistant bot if available, otherwise as Rose with attribution"""
-    assistant_key = assistant_name.lower().split()[0]  # Get first name as key
-    bot_id = ASSISTANT_BOT_IDS.get(assistant_key)
-    
-    if bot_id:
-        # Try to get the actual bot user and send message
-        try:
-            assistant_bot = bot.get_user(bot_id)
-            if assistant_bot:
-                # Send with proper attribution to the actual bot
-                await channel.send(f"**{assistant_name}:** {content}")
-                return
-        except:
-            pass
-    
-    # Fallback: Send as Rose with clear attribution
-    await channel.send(f"**{assistant_name}:** {content}")
+    """Send message as assistant using webhooks for better identity, with fallback"""
+    try:
+        # Get emoji for this assistant
+        emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
+        
+        # Try to use webhook system for better visual identity
+        await send_as_persona(channel, content, f"{emoji} {assistant_name}")
+        return
+        
+    except Exception as e:
+        print(f"❌ Error sending as {assistant_name} via webhook: {e}")
+        
+        # Fallback: Send as Rose with clear attribution and emoji
+        emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
+        await channel.send(f"**{emoji} {assistant_name}:** {content}")
 
 def get_vivian_report(time_filter=None, brief=False):
     """Generate Vivian's Work Calendar & External Intelligence briefing"""
@@ -2617,7 +2627,7 @@ def get_daily_quotes():
 def get_pippa_report():
     """Generate Pippa's Daily Quotes briefing"""
     try:
-        report = "🧠 **Pippa's Daily Inspiration**\n"
+        report = "**Daily Inspiration**\n"
         report += "Good morning, beautiful human! Here are your daily affirmations:\n\n"
         
         # Get 3 random quotes
@@ -2634,7 +2644,7 @@ def get_pippa_report():
     except Exception as e:
         print(f"Error in get_pippa_report: {e}")
         # Emergency fallback
-        return """🧠 **Pippa's Daily Inspiration**
+        return """**Daily Inspiration**
 Good morning, beautiful human! Here are your daily affirmations:
 
 ✨ **Today's Motivational Quotes:**
@@ -2677,7 +2687,7 @@ def get_random_kindness_ideas():
 
 def get_cressida_report():
     """Generate Cressida's Random Acts of Kindness briefing"""
-    report = "✨ **Cressida's Daily Kindness Magic**\n"
+    report = "**Daily Kindness Magic**\n"
     report += "Good morning, magnificent soul! Ready to sprinkle some kindness magic today?\n\n"
     
     # Get 3 random acts of kindness
@@ -2697,7 +2707,7 @@ def get_flora_report(brief=False):
     if brief:
         # Brief version for !am command
         current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
-        report = f"🔮 **Flora's Astrological Guidance** ({current_time})\n"
+        report = f"**Astrological Guidance** ({current_time})\n"
         report += "✨ **Your Personalized Reading:**\n"
         report += "• Cancer Sun: Emotional intuition heightened today\n"
         report += "• Birth chart focus: Trust your nurturing instincts\n"
@@ -2707,7 +2717,7 @@ def get_flora_report(brief=False):
         return report
     
     # Full detailed version for !briefing command
-    report = "🔮 **Flora's Complete Astrological Guidance**\n"
+    report = "**Complete Astrological Guidance**\n"
     report += "Greetings, beautiful soul! Your personalized cosmic guidance:\n\n"
     
     # User's natal chart analysis (Cancer Sun, June 25, 1983)
@@ -2742,7 +2752,7 @@ def get_maeve_report(brief=False):
     """Generate Maeve's Style & Schedule Coordination briefing"""
     if brief:
         # Brief version for !am command
-        report = "🎨 **Maeve's Style Brief**\n"
+        report = "**Style Brief**\n"
         if calendar_service:
             try:
                 event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
@@ -2758,7 +2768,7 @@ def get_maeve_report(brief=False):
         return report
     
     # Full detailed version for !briefing command
-    report = "🎨 **Maeve's Style & Schedule Coordination**\n"
+    report = "**Style & Schedule Coordination**\n"
     report += "Hello, gorgeous! Your curated daily aesthetic and schedule brief:\n\n"
     
     # Schedule-based styling
