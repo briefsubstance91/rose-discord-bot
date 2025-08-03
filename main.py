@@ -2282,14 +2282,15 @@ async def handle_ai_conversation(message, user_id, channel_id):
 
 # Assistant Discord Bot IDs - Your actual bot IDs
 ASSISTANT_BOT_IDS = {
+    'rose': 1368273827573923941,     # Rose Ashcombe
     'vivian': 1373036719930085567,   # Vivian Spencer
     'flora': 1389005290711683236,    # Flora Penrose
     'maeve': 1380303532242243705,    # Maeve Windham
     'celeste': 1376733073626103868,  # Celeste Marchmont
-    'charlotte': None,               # Charlotte Astor (not deployed yet)
-    'alice': None,                   # Alice Fortescue (not deployed yet)
     'pippa': 1380302510220120155,    # Pippa Blackwood
-    'cressida': 1391876902993526794  # Cressida Frost
+    'cressida': 1391876902993526794, # Cressida Frost
+    'charlotte': None,               # Charlotte Astor (not deployed yet)
+    'alice': None                    # Alice Fortescue (not deployed yet)
 }
 
 # Assistant emojis for enhanced identity display
@@ -2305,21 +2306,49 @@ ASSISTANT_EMOJIS = {
 }
 
 async def send_as_assistant_bot(channel, content, assistant_name):
-    """Send message as assistant using webhooks for better identity, with fallback"""
-    try:
-        # Get emoji for this assistant
-        emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
-        
-        # Try to use webhook system for better visual identity
-        await send_as_persona(channel, content, f"{emoji} {assistant_name}")
-        return
-        
-    except Exception as e:
-        print(f"❌ Error sending as {assistant_name} via webhook: {e}")
-        
-        # Fallback: Send as Rose with clear attribution and emoji
-        emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
-        await channel.send(f"**{emoji} {assistant_name}:** {content}")
+    """Send message as the actual assistant bot with their real avatar and username"""
+    assistant_key = assistant_name.lower().split()[0]  # Get first name as key
+    bot_id = ASSISTANT_BOT_IDS.get(assistant_key)
+    
+    if bot_id:
+        try:
+            # Try to use the actual assistant bot's webhook
+            webhooks = await channel.webhooks()
+            webhook = None
+            
+            # Look for existing webhook for this assistant
+            for wh in webhooks:
+                if wh.name == f"{assistant_name}_bot_webhook":
+                    webhook = wh
+                    break
+            
+            # Create webhook if it doesn't exist
+            if not webhook:
+                webhook = await channel.create_webhook(name=f"{assistant_name}_bot_webhook")
+            
+            # Get the actual bot user to get their avatar
+            assistant_bot = bot.get_user(bot_id)
+            if assistant_bot:
+                # Send using the real bot's username and avatar
+                await webhook.send(
+                    content=content,
+                    username=assistant_bot.display_name,
+                    avatar_url=str(assistant_bot.display_avatar.url)
+                )
+                print(f"✅ Sent as {assistant_name} using real bot avatar")
+                return
+            else:
+                print(f"⚠️ Could not find bot user for {assistant_name} (ID: {bot_id})")
+                
+        except discord.Forbidden:
+            print(f"❌ No webhook permissions for {assistant_name}")
+        except Exception as e:
+            print(f"❌ Error using real bot for {assistant_name}: {e}")
+    
+    # Fallback: Send as Rose with clear attribution and emoji
+    emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
+    await channel.send(f"**{emoji} {assistant_name}:** {content}")
+    print(f"📝 Sent as fallback attribution for {assistant_name}")
 
 def get_vivian_report(time_filter=None, brief=False):
     """Generate Vivian's Work Calendar & External Intelligence briefing"""
