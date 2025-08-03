@@ -297,8 +297,8 @@ def get_weather_briefing():
             location = USER_CITY
             print(f"🌍 Fetching weather for {USER_CITY}...")
         
-        # WeatherAPI.com current + forecast
-        url = f"http://api.weatherapi.com/v1/forecast.json?key={WEATHER_API_KEY}&q={location}&days=2&aqi=no&alerts=no"
+        # WeatherAPI.com current + forecast with air quality
+        url = f"http://api.weatherapi.com/v1/forecast.json?key={WEATHER_API_KEY}&q={location}&days=2&aqi=yes&alerts=no"
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -318,6 +318,14 @@ def get_weather_briefing():
         wind_speed = current['wind_kph']
         wind_dir = current['wind_dir']
         uv_index = current['uv']
+        
+        # Air quality data
+        air_quality = current.get('air_quality', {})
+        aqi_us = air_quality.get('us-epa-index', 0)  # US EPA AQI (1-6 scale)
+        pm2_5 = air_quality.get('pm2_5', 0)  # PM2.5 concentration
+        pm10 = air_quality.get('pm10', 0)   # PM10 concentration
+        no2 = air_quality.get('no2', 0)     # Nitrogen dioxide
+        o3 = air_quality.get('o3', 0)       # Ozone
         
         # Today's forecast
         min_temp = today_forecast['mintemp_c']
@@ -348,6 +356,26 @@ def get_weather_briefing():
         uv_level = "Low" if uv_index <= 2 else "Moderate" if uv_index <= 5 else "High" if uv_index <= 7 else "Very High" if uv_index <= 9 else "Extreme"
         uv_advice = uv_guidance.get(int(uv_index), "Protection recommended")
         
+        # Air quality interpretation (US EPA scale: 1-6)
+        aqi_levels = {
+            1: ("Good", "Air quality is excellent 🟢"),
+            2: ("Moderate", "Air quality is acceptable 🟡"),
+            3: ("Unhealthy for Sensitive Groups", "Sensitive people should limit outdoor activity 🟠"),
+            4: ("Unhealthy", "Everyone should limit outdoor activity 🔴"),
+            5: ("Very Unhealthy", "Avoid outdoor activities 🟣"),
+            6: ("Hazardous", "Emergency conditions - stay indoors ⚫")
+        }
+        
+        aqi_level, aqi_advice = aqi_levels.get(aqi_us, ("Unknown", "Air quality data unavailable"))
+        
+        # Health recommendations based on air quality
+        if aqi_us >= 4:
+            health_advice = "Consider wearing a mask outdoors and keep windows closed"
+        elif aqi_us == 3:
+            health_advice = "Sensitive individuals should avoid prolonged outdoor activities"
+        else:
+            health_advice = "Safe for all outdoor activities"
+        
         # Enhanced weather briefing
         now = datetime.now().strftime('%Y-%m-%d %H:%M')
         
@@ -355,11 +383,14 @@ def get_weather_briefing():
 📍 **{location_info['name']}, {location_info['country']}:** {temp_c}°C {condition}
 🌡️ **Current:** Feels like {feels_like}°C | Humidity: {humidity}% | Wind: {wind_speed} km/h {wind_dir}
 🔆 **UV Index:** {uv_index} - {uv_level} - {uv_advice}
+🌬️ **Air Quality:** {aqi_level} (AQI {aqi_us}) - {aqi_advice}
+💨 **Pollutants:** PM2.5: {pm2_5:.1f}μg/m³ | PM10: {pm10:.1f}μg/m³ | O₃: {o3:.1f}μg/m³
+🏃 **Health Advice:** {health_advice}
 📊 **Today's Forecast:** {min_temp}°C to {max_temp}°C - {today_forecast['condition']['text']}
 🌧️ **Rain Chance:** {rain_chance}%
 🔮 **Tomorrow Preview:** {tom_min}°C to {tom_max}°C - {tom_condition} ({tom_rain}% rain)"""
         
-        print(f"✅ Enhanced weather data retrieved: Current {temp_c}°C, High {max_temp}°C")
+        print(f"✅ Enhanced weather data retrieved: Current {temp_c}°C, High {max_temp}°C, AQI {aqi_us}")
         return briefing
         
     except requests.exceptions.Timeout:
@@ -372,6 +403,31 @@ def get_weather_briefing():
     except Exception as e:
         print(f"❌ Weather briefing error: {e}")
         return f"🌤️ **Weather:** Error retrieving conditions - {str(e)[:50]}"
+
+def get_weather_data():
+    """Get raw weather data for other functions (like styling advice)"""
+    if not WEATHER_API_KEY:
+        return None
+    
+    try:
+        # Use coordinates if available, otherwise city name
+        if USER_LAT and USER_LON:
+            location = f"{USER_LAT},{USER_LON}"
+        else:
+            location = USER_CITY
+        
+        # WeatherAPI.com current + forecast with air quality
+        url = f"http://api.weatherapi.com/v1/forecast.json?key={WEATHER_API_KEY}&q={location}&days=1&aqi=yes&alerts=no"
+        
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        return data
+        
+    except Exception as e:
+        print(f"❌ Weather data error: {e}")
+        return None
 
 # ============================================================================
 # GOOGLE CALENDAR FUNCTIONS (ALL PRESERVED)
@@ -2850,10 +2906,13 @@ def get_maeve_report(brief=False):
             if weather_data:
                 temp = weather_data.get('current', {}).get('temp_c', 20)
                 condition = weather_data.get('current', {}).get('condition', {}).get('text', 'Clear')
+                air_quality = weather_data.get('current', {}).get('air_quality', {})
+                aqi_us = air_quality.get('us-epa-index', 0)
                 
                 report += "🌤️ **Weather-Based Style Guidance:**\n"
                 report += f"• **Temperature:** {temp}°C - {get_style_temp_advice(temp)}\n"
-                report += f"• **Conditions:** {condition} - {get_style_weather_advice(condition)}\n\n"
+                report += f"• **Conditions:** {condition} - {get_style_weather_advice(condition)}\n"
+                report += f"• **Air Quality:** {get_style_air_quality_advice(aqi_us)}\n\n"
         except:
             pass
     
@@ -2890,6 +2949,19 @@ def get_style_weather_advice(condition):
         return "Versatile layers for changing conditions"
     else:
         return "Adaptable pieces for weather transitions"
+
+def get_style_air_quality_advice(aqi_us):
+    """Get styling advice based on air quality"""
+    if aqi_us >= 4:  # Unhealthy or worse
+        return "Stylish face masks, indoor aesthetic focus, minimal outdoor fabric exposure"
+    elif aqi_us == 3:  # Unhealthy for sensitive groups
+        return "Light scarves for style & protection, breathable fabrics preferred"
+    elif aqi_us == 2:  # Moderate
+        return "Perfect for outdoor style content, all fabric choices suitable"
+    elif aqi_us == 1:  # Good
+        return "Excellent for outdoor photoshoots and fresh air styling sessions"
+    else:
+        return "Versatile styling recommended"
 
 # ============================================================================
 # AUTOMATED SCHEDULING FUNCTIONS
