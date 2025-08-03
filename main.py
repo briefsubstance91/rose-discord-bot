@@ -2623,9 +2623,11 @@ def get_pippa_report():
         # Get 3 random quotes
         quotes = get_daily_quotes()
         
-        report += "✨ **Today's Motivational Quotes:**\n\n"
+        report += "✨ **Today's Motivational Quotes:**\n"
         for i, quote in enumerate(quotes, 1):
-            report += f"**{i}.** *\"{quote}\"*\n\n"
+            report += f"• *\"{quote}\"*\n"
+        
+        report += "\n💝 **Daily Reminder:** Trust your journey and celebrate every step forward"
         
         return report
         
@@ -2633,15 +2635,14 @@ def get_pippa_report():
         print(f"Error in get_pippa_report: {e}")
         # Emergency fallback
         return """🧠 **Pippa's Daily Inspiration**
-Good morning, beautiful human! 
+Good morning, beautiful human! Here are your daily affirmations:
 
 ✨ **Today's Motivational Quotes:**
+• *"Trust your journey - every step matters"*
+• *"You are capable of amazing things"*
+• *"Progress over perfection, always"*
 
-**1.** *"Trust your journey - every step matters"*
-
-**2.** *"You are capable of amazing things"*
-
-**3.** *"Progress over perfection, always"*"""
+💝 **Daily Reminder:** Trust your journey and celebrate every step forward"""
 
 def get_random_kindness_ideas():
     """Generate 3 random acts of kindness ideas"""
@@ -2682,12 +2683,12 @@ def get_cressida_report():
     # Get 3 random acts of kindness
     kindness_acts = get_random_kindness_ideas()
     
-    report += "🌈 **Today's 3 Random Acts of Kindness:**\n\n"
+    report += "🌈 **Today's Random Acts of Kindness:**\n"
     for i, act in enumerate(kindness_acts, 1):
-        report += f"**{i}.** {act}\n\n"
+        report += f"• {act}\n"
     
-    report += "💫 **Remember:** Small acts of kindness create ripples of positivity that extend far beyond what you can see. Your authentic compassion has the power to transform someone's entire day!\n\n"
-    report += "✨ **Bonus Magic:** Choose the one that feels most aligned with your heart today - that's your intuition guiding you to the perfect moment of connection."
+    report += "\n💫 **Kindness Reminder:** Small acts create ripples of positivity that extend far beyond what you can see. Your authentic compassion has the power to transform someone's entire day.\n\n"
+    report += "✨ **Intuitive Guidance:** Choose the one that feels most aligned with your heart today - that's your intuition guiding you to the perfect moment of connection"
     
     return report
 
@@ -2718,20 +2719,22 @@ def get_flora_report(brief=False):
     report += "• Mars energy: Channel protective instincts into creative projects\n\n"
     
     # Daily cosmic forecast
-    report += "🌙 **Today's Cosmic Forecast for You:**\n"
-    report += "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. "
-    report += "The planetary transits are activating your 4th house of home and roots. This is an excellent time for nurturing relationships, "
-    report += "creating beauty in your space, and honoring your intuitive gifts. Your Cancer Sun is being supported by harmonious aspects "
-    report += "that enhance your natural empathy and healing abilities.\n\n"
+    report += "🌙 **Today's Cosmic Forecast:**\n"
+    report += "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. The planetary transits are activating your 4th house of home and roots.\n\n"
+    report += "This is an excellent time for:\n"
+    report += "• Nurturing relationships and family connections\n"
+    report += "• Creating beauty and harmony in your space\n"
+    report += "• Honoring your intuitive gifts and inner wisdom\n"
+    report += "• Enhancing your natural empathy and healing abilities\n\n"
     
     # Mystical practices for today
     report += "🔮 **Recommended Mystical Practices:**\n"
-    report += "• Tarot: Pull a card for family/home guidance\n"
-    report += "• Crystal work: Moonstone or Rose Quartz for emotional clarity\n"
-    report += "• Meditation: Focus on heart chakra healing\n"
-    report += "• Journal: Record intuitive insights and dreams\n\n"
+    report += "• **Tarot:** Pull a card for family/home guidance\n"
+    report += "• **Crystal work:** Moonstone or Rose Quartz for emotional clarity\n"
+    report += "• **Meditation:** Focus on heart chakra healing\n"
+    report += "• **Journal:** Record intuitive insights and dreams\n\n"
     
-    report += "✨ Remember: Your Cancer intuition is your superpower right now - trust what your heart tells you."
+    report += "🌟 **Cosmic Reminder:** Your Cancer intuition is your superpower - trust what your heart tells you"
     
     return report
 
@@ -2796,11 +2799,6 @@ def get_maeve_report(brief=False):
         report += "• Focus on personal style development\n"
         report += "• Wardrobe organization and inspiration\n\n"
     
-    # Daily style inspiration
-    report += "🌟 **Daily Style Inspiration:**\n"
-    report += "Check my latest aesthetic updates and trend insights:\n"
-    report += "📱 Instagram: https://www.instagram.com/?maeve-wyndham=following\n\n"
-    
     # Weather-based styling (if available)
     if WEATHER_API_KEY:
         try:
@@ -2810,12 +2808,17 @@ def get_maeve_report(brief=False):
                 condition = weather_data.get('current', {}).get('condition', {}).get('text', 'Clear')
                 
                 report += "🌤️ **Weather-Based Style Guidance:**\n"
-                report += f"• Temperature: {temp}°C - {get_style_temp_advice(temp)}\n"
-                report += f"• Conditions: {condition} - {get_style_weather_advice(condition)}\n\n"
+                report += f"• **Temperature:** {temp}°C - {get_style_temp_advice(temp)}\n"
+                report += f"• **Conditions:** {condition} - {get_style_weather_advice(condition)}\n\n"
         except:
             pass
     
-    report += "💫 **Today's Aesthetic Mantra:** Authentic style is confidence made visible - wear what makes your soul sparkle!"
+    # Daily style inspiration
+    report += "🌟 **Daily Style Inspiration:**\n"
+    report += "Check my latest aesthetic updates and trend insights:\n"
+    report += "📱 **Instagram:** https://www.instagram.com/?maeve-wyndham=following\n\n"
+    
+    report += "💫 **Style Mantra:** Authentic style is confidence made visible - wear what makes your soul sparkle"
     
     return report
 
