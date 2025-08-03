@@ -2627,8 +2627,6 @@ def get_pippa_report():
         for i, quote in enumerate(quotes, 1):
             report += f"**{i}.** *\"{quote}\"*\n\n"
         
-        report += "💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!"
-        
         return report
         
     except Exception as e:
@@ -2643,9 +2641,7 @@ Good morning, beautiful human!
 
 **2.** *"You are capable of amazing things"*
 
-**3.** *"Progress over perfection, always"*
-
-💙 **Remember:** You've survived 100% of your difficult days so far. Today will be no different - you've got this!"""
+**3.** *"Progress over perfection, always"*"""
 
 def get_random_kindness_ideas():
     """Generate 3 random acts of kindness ideas"""
@@ -3085,13 +3081,7 @@ async def send_as_persona(channel, content, persona_name, avatar_url=None):
 @bot.command(name='am')
 async def morning_briefing_command(ctx):
     """Morning comprehensive briefing - all day ahead"""
-    print(f"🔍 !am command called in channel: '{ctx.channel.name}' (type: {type(ctx.channel).__name__})")
-    print(f"🔍 Allowed channels: {ALLOWED_CHANNELS}")
-    print(f"🔍 Channel check result: {ctx.channel.name in ALLOWED_CHANNELS}")
-    
     if ctx.channel.name not in ALLOWED_CHANNELS:
-        print(f"❌ Channel '{ctx.channel.name}' not in allowed channels, command ignored")
-        await ctx.send(f"❌ Command only available in: {', '.join([f'#{ch}' for ch in ALLOWED_CHANNELS])}")
         return
     
     await ctx.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
