@@ -2329,6 +2329,22 @@ async def send_as_assistant_bot(channel, content, assistant_name):
         await channel.send(f"**{emoji} {assistant_name}:**\n{content}")
         print(f"📝 Sent {assistant_name} as simple message")
 
+async def send_as_rose(channel, content, title="Rose Ashcombe"):
+    """Send Rose's messages using the same embed format as other assistants"""
+    try:
+        embed = discord.Embed(
+            description=content,
+            color=0xE91E63  # Rose's pink color
+        )
+        embed.set_author(name=f"👑 {title}")
+        
+        await channel.send(embed=embed)
+        print(f"✅ Sent Rose message as embed")
+        
+    except Exception as e:
+        print(f"❌ Error sending Rose embed: {e}")
+        await channel.send(f"**👑 {title}:**\n{content}")
+
 def get_vivian_report(time_filter=None, brief=False):
     """Generate Vivian's Work Calendar & External Intelligence briefing"""
     # Check if it's weekend (Saturday=5, Sunday=6)
@@ -2705,9 +2721,6 @@ def get_cressida_report():
     for i, act in enumerate(kindness_acts, 1):
         report += f"• {act}\n"
     
-    report += "\n💫 **Kindness Reminder:** Small acts create ripples of positivity that extend far beyond what you can see. Your authentic compassion has the power to transform someone's entire day.\n\n"
-    report += "✨ **Intuitive Guidance:** Choose the one that feels most aligned with your heart today - that's your intuition guiding you to the perfect moment of connection"
-    
     return report
 
 def get_flora_report(brief=False):
@@ -2905,7 +2918,7 @@ async def send_automated_am():
                     rose_briefing += "📧 **Email Status:** Service unavailable\n\n"
             
             rose_briefing += "🎯 **Executive Focus:** Ready to optimize your productivity and strategic priorities today."
-            await target_channel.send(rose_briefing)
+            await send_as_rose(target_channel, rose_briefing, "Rose's Strategic Overview")
             
         else:
             print(f"⚠️ Target channel {target_channel_id} not found for automated morning briefing")
@@ -2936,7 +2949,7 @@ async def send_automated_noon():
             rose_midday += f"{personal_schedule}\n"
             rose_midday += "\n🌟 **Afternoon Focus:** Optimizing productivity for remaining day priorities"
             
-            await target_channel.send(rose_midday)
+            await send_as_rose(target_channel, rose_midday, "Rose's Midday Coordination")
             
         else:
             print(f"⚠️ Target channel {target_channel_id} not found for automated midday briefing")
@@ -2967,7 +2980,7 @@ async def send_automated_pm():
             rose_afternoon += f"{personal_schedule}\n"
             rose_afternoon += "\n🎯 **Evening Prep:** Review day's progress & tomorrow setup"
             
-            await target_channel.send(rose_afternoon)
+            await send_as_rose(target_channel, rose_afternoon, "Rose's Afternoon Priorities")
             
         else:
             print(f"⚠️ Target channel {target_channel_id} not found for automated afternoon briefing")
@@ -3112,27 +3125,27 @@ async def morning_briefing_command(ctx):
     toronto_tz = pytz.timezone('America/Toronto')
     current_time = datetime.now(toronto_tz).strftime('%A, %B %d')
     
-    rose_briefing = f"👑 **Rose's Morning Brief** ({current_time})\n"
+    rose_content = f"**Morning Brief** ({current_time})\n"
     
     # Weather briefing (Rose now handles weather)
     weather = get_weather_briefing()
-    rose_briefing += f"{weather}\n\n"
+    rose_content += f"{weather}\n\n"
     
     # Personal/Other calendars (Rose's primary responsibility)
     personal_schedule = get_personal_schedule()
-    rose_briefing += f"{personal_schedule}\n"
+    rose_content += f"{personal_schedule}\n"
     
     # Email overview (Rose's primary responsibility)
     if gmail_service:
         try:
             stats = get_email_stats(1)
             unread_count = stats.count('unread') if 'unread' in stats.lower() else 0
-            rose_briefing += f"\n📧 **Email Status:** {unread_count} items pending\n"
+            rose_content += f"\n📧 **Email Status:** {unread_count} items pending\n"
         except:
-            rose_briefing += "\n📧 **Email:** Assessment pending\n"
+            rose_content += "\n📧 **Email:** Assessment pending\n"
     
-    rose_briefing += "🚀 **Team reports incoming...**"
-    await ctx.send(rose_briefing)
+    rose_content += "🚀 **Team reports incoming...**"
+    await send_as_rose(ctx.channel, rose_content, "Rose's Morning Brief")
     await asyncio.sleep(2)
     
     # Vivian's work calendar (brief version)
@@ -3181,7 +3194,7 @@ async def morning_briefing_command(ctx):
     rose_closing += "🎯 **Strategic focus:** Work calendar (Vivian) + Personal schedule (Rose) + Full support stack\n"
     rose_closing += "🚀 **Executive status:** Ready for exceptional productivity 👑"
     
-    await ctx.send(rose_closing)
+    await send_as_rose(ctx.channel, rose_closing, "Rose's Synthesis")
 
 @bot.command(name='noon')
 async def midday_briefing_command(ctx):
@@ -3208,7 +3221,7 @@ async def midday_briefing_command(ctx):
         except:
             pass
     
-    await ctx.send(rose_midday)
+    await send_as_rose(ctx.channel, rose_midday, "Rose's Midday Coordination")
     await asyncio.sleep(1)
     
     # Vivian's work focus
@@ -3243,7 +3256,7 @@ async def afternoon_briefing_command(ctx):
     rose_afternoon += f"{personal_schedule}\n"
     rose_afternoon += "\n🎯 **Evening Prep:** Review day's progress & tomorrow setup"
     
-    await ctx.send(rose_afternoon)
+    await send_as_rose(ctx.channel, rose_afternoon, "Rose's Afternoon Priorities")
     await asyncio.sleep(1)
     
     # Vivian's remaining work items
@@ -3285,19 +3298,19 @@ async def full_team_briefing_command(ctx):
         await asyncio.sleep(2)
     
     # Rose's comprehensive synthesis
-    rose_synthesis = "👑 **Rose's Complete Team Synthesis**\n\n"
-    rose_synthesis += "All departments have provided full detailed reports. Complete situational awareness achieved across all domains:\n"
-    rose_synthesis += "• External & work coordination fully briefed (Vivian)\n"
-    rose_synthesis += "• Mystical & astrological guidance complete (Flora)\n"
-    rose_synthesis += "• Style & aesthetic coordination detailed (Maeve)\n"
-    rose_synthesis += "• Content & knowledge systems reported (Celeste)\n"
-    rose_synthesis += "• Technical infrastructure fully analyzed (Charlotte)\n"
-    rose_synthesis += "• Home & wellness priorities comprehensive (Alice)\n"
-    rose_synthesis += "• Mental resilience & coaching complete (Pippa)\n"
-    rose_synthesis += "• Joy & magic elevation fully engaged (Cressida)\n\n"
-    rose_synthesis += "**🚀 Executive Status: Complete team coordination achieved across all 8 departments**"
+    synthesis_content = "**Complete Team Synthesis**\n\n"
+    synthesis_content += "All departments have provided full detailed reports. Complete situational awareness achieved across all domains:\n"
+    synthesis_content += "• External & work coordination fully briefed (Vivian)\n"
+    synthesis_content += "• Mystical & astrological guidance complete (Flora)\n"
+    synthesis_content += "• Style & aesthetic coordination detailed (Maeve)\n"
+    synthesis_content += "• Content & knowledge systems reported (Celeste)\n"
+    synthesis_content += "• Technical infrastructure fully analyzed (Charlotte)\n"
+    synthesis_content += "• Home & wellness priorities comprehensive (Alice)\n"
+    synthesis_content += "• Mental resilience & coaching complete (Pippa)\n"
+    synthesis_content += "• Joy & magic elevation fully engaged (Cressida)\n\n"
+    synthesis_content += "**🚀 Executive Status: Complete team coordination achieved across all 8 departments**"
     
-    await ctx.send(rose_synthesis)
+    await send_as_rose(ctx.channel, synthesis_content, "Rose's Team Synthesis")
 
 @bot.command(name='quickbriefing')
 async def quickbriefing_command(ctx):
