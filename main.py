@@ -2305,16 +2305,29 @@ ASSISTANT_EMOJIS = {
     'cressida frost': '✨'
 }
 
+# Assistant colors for embed personalization
+ASSISTANT_COLORS = {
+    'vivian spencer': 0x3498DB,    # Professional blue
+    'flora penrose': 0x9B59B6,     # Mystical purple
+    'maeve windham': 0xE67E22,     # Stylish orange
+    'celeste marchmont': 0x1ABC9C, # Teal for content/research
+    'charlotte astor': 0x95A5A6,   # Gray for technical systems
+    'alice fortescue': 0x27AE60,   # Green for home/wellness
+    'pippa blackwood': 0xF39C12,   # Warm yellow for motivation
+    'cressida frost': 0xE91E63     # Pink for joy/magic (matches Rose)
+}
+
 async def send_as_assistant_bot(channel, content, assistant_name):
     """Send message with clear assistant identity using Discord embeds for better visual distinction"""
     try:
-        # Get emoji for this assistant
+        # Get emoji and color for this assistant
         emoji = ASSISTANT_EMOJIS.get(assistant_name.lower(), '🤖')
+        color = ASSISTANT_COLORS.get(assistant_name.lower(), 0x5865F2)  # Default to Discord blurple
         
         # Create an embed for better visual distinction
         embed = discord.Embed(
             description=content,
-            color=0x5865F2  # Discord blurple for consistency
+            color=color
         )
         embed.set_author(name=f"{emoji} {assistant_name}")
         
