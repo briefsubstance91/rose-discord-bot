@@ -2978,19 +2978,21 @@ async def send_automated_am():
             print(f"🕖 Automated morning briefing - sending to #{target_channel.name}")
             
             # Execute the same logic as the !am command
-            await target_channel.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
+            await target_channel.send("🌅 **Morning Briefing**")
             await asyncio.sleep(1)
             
             # Rose's strategic overview (goes first)
             toronto_tz = pytz.timezone('America/Toronto')
             current_time = datetime.now(toronto_tz).strftime('%A, %B %d - %-I:%M %p')
             
-            rose_briefing = f"👑 **Rose's Strategic Overview** ({current_time})\n\n"
+            rose_briefing = f"📅 **Today's Calendar:**\n"
             
             # Today's calendar
             if calendar_service:
                 schedule = get_today_schedule()
-                rose_briefing += f"📅 **Today's Calendar:**\n{schedule}\n\n"
+                rose_briefing += f"{schedule}\n\n"
+            else:
+                rose_briefing += "Calendar service unavailable\n\n"
             
             # Quick email status
             if gmail_service:
@@ -3003,7 +3005,7 @@ async def send_automated_am():
                     rose_briefing += "📧 **Email Status:** Service unavailable\n\n"
             
             rose_briefing += "🎯 **Executive Focus:** Ready to optimize your productivity and strategic priorities today."
-            await send_as_rose(target_channel, rose_briefing, "Rose's Strategic Overview")
+            await send_as_rose(target_channel, rose_briefing, f"Strategic Overview ({current_time})")
             
         else:
             print(f"⚠️ Target channel {target_channel_id} not found for automated morning briefing")
@@ -3203,7 +3205,7 @@ async def morning_briefing_command(ctx):
     if ctx.channel.name not in ALLOWED_CHANNELS:
         return
     
-    await ctx.send("🌅 **Executive Team Morning Briefing** - Rose initiating comprehensive status...")
+    await ctx.send("🌅 **Morning Briefing**")
     await asyncio.sleep(1)
     
     # Rose's strategic overview (goes first)
@@ -3271,15 +3273,6 @@ async def morning_briefing_command(ctx):
     # Cressida's random acts of kindness
     cressida_brief = get_cressida_report()
     await send_as_assistant_bot(ctx.channel, cressida_brief, "Cressida Frost")
-    await asyncio.sleep(1)
-    
-    # Rose's concise synthesis
-    rose_closing = "👑 **Rose's Synthesis**\n"
-    rose_closing += "✅ **All departments ready** | Full team coordination achieved\n"
-    rose_closing += "🎯 **Strategic focus:** Work calendar (Vivian) + Personal schedule (Rose) + Full support stack\n"
-    rose_closing += "🚀 **Executive status:** Ready for exceptional productivity 👑"
-    
-    await send_as_rose(ctx.channel, rose_closing, "Rose's Synthesis")
 
 @bot.command(name='noon')
 async def midday_briefing_command(ctx):
