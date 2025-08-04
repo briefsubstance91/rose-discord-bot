@@ -2548,15 +2548,6 @@ def get_charlotte_report():
     report += f"• Brave Search API: {'✅ Active' if BRAVE_API_KEY else '❌ Limited functionality'}\n"
     report += f"• OpenAI API: {'✅ Operational' if OPENAI_API_KEY else '❌ Critical issue'}\n"
     
-    # Assistant Team API Health
-    report += "\n🤖 **Assistant Team APIs:**\n"
-    report += f"• Rose (Executive): {'✅ Fully operational' if ASSISTANT_ID and OPENAI_API_KEY else '❌ Issues detected'}\n"
-    report += f"• Vivian (PR/Work): {'✅ Ready' if os.getenv('VIVIAN_ASSISTANT_ID') else '⚠️ Standby mode'}\n"
-    report += f"• Flora (Mystical): {'✅ Active' if os.getenv('FLORA_ASSISTANT_ID') else '⚠️ Limited'}\n"
-    report += f"• Maeve (Style): {'✅ Connected' if os.getenv('MAEVE_ASSISTANT_ID') else '⚠️ Offline'}\n"
-    report += f"• Pippa (Coach): {'✅ Available' if os.getenv('PIPPA_ASSISTANT_ID') else '⚠️ Unavailable'}\n"
-    report += f"• Cressida (Magic): {'✅ Online' if os.getenv('CRESSIDA_ASSISTANT_ID') else '⚠️ Offline'}\n"
-    
     # Calendar System Status
     if accessible_calendars:
         report += f"\n📅 **Calendar Integration:**\n"
@@ -2599,13 +2590,6 @@ def get_charlotte_report():
     for service_name, is_active in external_apis:
         status = "✅ Active" if is_active else "❌ Inactive"
         report += f"• {service_name}: {status}\n"
-    
-    # System Performance Metrics
-    report += "\n📊 **Performance Status:**\n"
-    report += f"• Bot Latency: {round(bot.latency * 1000) if bot.is_ready() else 'N/A'}ms\n"
-    report += f"• Active Conversations: {len(user_conversations)}\n"
-    report += f"• Memory Usage: Monitoring active\n"
-    report += "• Error Rate: Within acceptable limits\n"
     
     # Technical Priorities & Alerts
     report += "\n🚨 **Priority Alerts:**\n"
