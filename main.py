@@ -2848,13 +2848,13 @@ def get_maeve_report(brief=False):
                 event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
                 event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
                 report += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
-                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/maeve.wyndham/)"
+                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
             except:
                 report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
-                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/maeve.wyndham/)"
+                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
         else:
             report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
-            report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/maeve.wyndham/)"
+            report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
         return report
     
     # Full detailed version for !briefing command
@@ -2919,7 +2919,7 @@ def get_maeve_report(brief=False):
     # Daily style inspiration
     report += "🌟 **Daily Style Inspiration:**\n"
     report += "Check my latest aesthetic updates and trend insights:\n"
-    report += "📱 **Instagram:** [Follow for style inspiration](https://www.instagram.com/maeve.wyndham/)\n\n"
+    report += "📱 **Instagram:** [Follow for style inspiration](https://www.instagram.com/?maeve-wyndham=following)\n\n"
     
     report += "💫 **Style Mantra:** Authentic style is confidence made visible - wear what makes your soul sparkle"
     
