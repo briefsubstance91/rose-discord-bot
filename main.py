@@ -2776,18 +2776,43 @@ def get_cressida_report():
     
     return report
 
-def get_flora_report(brief=False):
-    """Generate Flora's Personalized Astrological Guidance briefing"""
+async def get_flora_report(brief=False):
+    """Generate Flora's Enhanced Astrological Guidance using OpenAI Assistant"""
+    try:
+        # Prepare prompt based on brief/full request
+        toronto_tz = pytz.timezone('America/Toronto')
+        current_time = datetime.now(toronto_tz).strftime('%A, %B %d at %I:%M %p')
+        
+        if brief:
+            prompt = f"Provide a brief personalized astrological guidance for {current_time}. Focus on my Cancer Sun, Capricorn Moon, Aries Rising combination and current cosmic influences. Keep it concise for morning briefing."
+        else:
+            prompt = f"Provide a comprehensive personalized astrological reading for {current_time}. Include detailed analysis of my corrected natal chart (Cancer Sun, Capricorn Moon, Aries Rising), current transits, and practical guidance. Use my accurate birth data: June 25, 1983, 1:20 AM EDT, Ottawa."
+        
+        # Call Flora's enhanced OpenAI assistant
+        flora_response = await call_team_assistant('flora', prompt)
+        
+        if flora_response and not flora_response.startswith('❌'):
+            return flora_response
+        else:
+            # Fallback to basic response if assistant call fails
+            return get_flora_fallback_report(brief)
+            
+    except Exception as e:
+        print(f"❌ Flora assistant error: {e}")
+        return get_flora_fallback_report(brief)
+
+def get_flora_fallback_report(brief=False):
+    """Fallback Flora report with correct natal chart if OpenAI fails"""
     if brief:
-        # Brief version for !am command
+        # Brief version with CORRECTED natal chart
         current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
-        report = f"**Astrological Guidance** ({current_time})\n"
-        report += "✨ **Your Personalized Reading:**\n"
-        report += "• Cancer Sun: Emotional intuition heightened today\n"
-        report += "• Birth chart focus: Trust your nurturing instincts\n"
-        report += "• Current lunar phase energy supports inner reflection\n"
-        report += "• Planetary transits: Favor home and family connections\n\n"
-        report += "🌙 **Today's Cosmic Guidance:** Your natural empathic abilities are especially strong. Use this intuitive clarity to guide important decisions."
+        report = f"🔮 **Astrological Guidance** ({current_time})\n"
+        report += "✨ **Your Corrected Personal Reading:**\n"
+        report += "• Cancer Sun: Emotional intuition and nurturing energy active\n"
+        report += "• Capricorn Moon: Structure your emotional responses practically\n" 
+        report += "• Aries Rising: Lead with pioneering confidence today\n"
+        report += "• Current cosmic influences support your cardinal sign combination\n\n"
+        report += "🌙 **Today's Guidance:** Your Cancer-Capricorn-Aries blend gives you emotional wisdom, practical action, and pioneering courage."
         return report
     
     # Full detailed version for !briefing command
@@ -3224,8 +3249,8 @@ async def morning_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, vivian_report, "Vivian Spencer")
     await asyncio.sleep(1)
     
-    # Flora's personalized astrological guidance
-    flora_briefing = get_flora_report(brief=True)
+    # Flora's enhanced personalized astrological guidance
+    flora_briefing = await get_flora_report(brief=True)
     await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
     await asyncio.sleep(1)
     
@@ -3346,7 +3371,7 @@ async def full_team_briefing_command(ctx):
     # All team members give their full detailed reports
     team_reports = [
         (get_vivian_report(), "Vivian Spencer"),
-        (get_flora_report(), "Flora Penrose"),
+        (await get_flora_report(), "Flora Penrose"),
         (get_maeve_report(), "Maeve Windham"),
         (get_celeste_report(), "Celeste Marchmont"),
         (get_charlotte_report(), "Charlotte Astor"),
@@ -3439,7 +3464,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         report = get_vivian_report()
         await send_as_assistant_bot(ctx.channel, report, "Vivian Spencer")
     elif assistant_name in ['flora', 'flora penrose']:
-        flora_brief = get_flora_report()
+        flora_brief = await get_flora_report()
         await send_as_assistant_bot(ctx.channel, flora_brief, "Flora Penrose")
     elif assistant_name in ['maeve', 'maeve windham']:
         maeve_brief = get_maeve_report()
