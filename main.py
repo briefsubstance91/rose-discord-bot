@@ -2421,10 +2421,39 @@ async def call_team_assistant(assistant_name, briefing_prompt):
             wait_time += 1
             run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
         
-        # Handle function calls specially - they're complex for team briefings
+        # Handle function calls specially - allow Flora to use them for astrological data
         if run.status == 'requires_action':
-            print(f"⚠️ {assistant_name.title()} requires functions - using fallback for team briefing")
-            return f"❌ {assistant_name.title()} requires function calls - using fallback response"
+            if assistant_name == 'flora':
+                print(f"🔮 Flora requires astrological functions - allowing for enhanced briefing")
+                # Handle Flora's function calls for astrological data
+                try:
+                    # Flora needs more time for astrological calculations
+                    max_function_wait = 30
+                    function_wait_time = 0
+                    
+                    while run.status == 'requires_action' and function_wait_time < max_function_wait:
+                        # For Flora, we can skip complex function handling and let her assistant handle it
+                        await asyncio.sleep(2)
+                        function_wait_time += 2
+                        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+                    
+                    if run.status == 'completed':
+                        messages = client.beta.threads.messages.list(thread_id=thread_id)
+                        assistant_message = messages.data[0]
+                        if assistant_message.content:
+                            response_text = assistant_message.content[0].text.value
+                            print(f"✅ Flora enhanced briefing completed ({len(response_text)} chars)")
+                            return response_text
+                    
+                    print(f"⚠️ Flora function calls timed out after {function_wait_time}s")
+                    return f"🔮 Flora's astrological calculations are taking longer than expected - using enhanced fallback"
+                    
+                except Exception as e:
+                    print(f"❌ Flora function call error: {e}")
+                    return f"🔮 Flora's mystical energies encountered interference - using enhanced fallback"
+            else:
+                print(f"⚠️ {assistant_name.title()} requires functions - using fallback for team briefing")
+                return f"❌ {assistant_name.title()} requires function calls - using fallback response"
         
         if run.status == 'completed':
             # Get the assistant's response
@@ -3322,7 +3351,7 @@ async def morning_briefing_command(ctx):
         except:
             rose_content += "\n📧 **Email:** Assessment pending\n"
     
-    rose_content += "🚀 **Team reports incoming...**"
+    rose_content += "🚀 **Team reports incoming...**\n\n@Flora Penrose - please provide your morning astrological briefing with current transits and lunar guidance for today's cosmic influences."
     await send_as_rose(ctx.channel, rose_content, "Rose's Morning Brief")
     await asyncio.sleep(2)
     
@@ -3331,10 +3360,8 @@ async def morning_briefing_command(ctx):
     await send_as_assistant_bot(ctx.channel, vivian_report, "Vivian Spencer")
     await asyncio.sleep(1)
     
-    # Flora's enhanced personalized astrological guidance
-    flora_briefing = await get_flora_report(brief=True)
-    await send_as_assistant_bot(ctx.channel, flora_briefing, "Flora Penrose")
-    await asyncio.sleep(1)
+    # Flora will respond directly to the @mention above with her full astrological capabilities
+    await asyncio.sleep(2)  # Give Flora time to see the mention and respond
     
     # Maeve's style coordination (essential)
     maeve_briefing = get_maeve_report(brief=True)
@@ -3450,10 +3477,13 @@ async def full_team_briefing_command(ctx):
     await ctx.send("📋 **Full Team Reports** - Comprehensive individual briefings...")
     await asyncio.sleep(1)
     
-    # All team members give their full detailed reports
+    # Tag Flora for her detailed astrological report
+    await ctx.send("@Flora Penrose - please provide your comprehensive astrological briefing with detailed natal chart insights, current transits, lunar guidance, and personalized cosmic influences for today.")
+    await asyncio.sleep(1)
+    
+    # All other team members give their full detailed reports
     team_reports = [
         (get_vivian_report(), "Vivian Spencer"),
-        (await get_flora_report(), "Flora Penrose"),
         (get_maeve_report(), "Maeve Windham"),
         (get_celeste_report(), "Celeste Marchmont"),
         (get_charlotte_report(), "Charlotte Astor"),
@@ -3546,8 +3576,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         report = get_vivian_report()
         await send_as_assistant_bot(ctx.channel, report, "Vivian Spencer")
     elif assistant_name in ['flora', 'flora penrose']:
-        flora_brief = await get_flora_report()
-        await send_as_assistant_bot(ctx.channel, flora_brief, "Flora Penrose")
+        await ctx.send("@Flora Penrose - please provide your comprehensive astrological briefing with detailed natal chart insights, current transits, lunar guidance, and personalized cosmic influences.")
     elif assistant_name in ['maeve', 'maeve windham']:
         maeve_brief = get_maeve_report()
         await send_as_assistant_bot(ctx.channel, maeve_brief, "Maeve Windham")
