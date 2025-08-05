@@ -2791,10 +2791,19 @@ async def get_flora_report(brief=False):
         # Call Flora's enhanced OpenAI assistant
         flora_response = await call_team_assistant('flora', prompt)
         
-        if flora_response and not flora_response.startswith('❌'):
+        # Check if assistant call was successful
+        if flora_response and not flora_response.startswith('❌') and len(flora_response) > 50:
             return flora_response
         else:
-            # Fallback to basic response if assistant call fails
+            # Log why fallback was used
+            if not flora_response:
+                print(f"❌ Flora assistant: No response received")
+            elif flora_response.startswith('❌'):
+                print(f"❌ Flora assistant error: {flora_response}")
+            else:
+                print(f"❌ Flora assistant: Response too short ({len(flora_response) if flora_response else 0} chars)")
+            
+            # Fallback to enhanced response that still provides value
             return get_flora_fallback_report(brief)
             
     except Exception as e:
@@ -2815,35 +2824,27 @@ def get_flora_fallback_report(brief=False):
         report += "⚠️ **Note:** OpenAI assistant unavailable - specific current transits and planetary positions require assistant connection."
         return report
     
-    # Full detailed version for !briefing command
-    report = "**Complete Astrological Guidance**\n"
-    report += "Greetings, beautiful soul! Your personalized cosmic guidance:\n\n"
+    # Full detailed version for !briefing command  
+    report = f"🔮 **Factual Astrological Report** ({current_time})\n\n"
     
-    # User's natal chart analysis (Cancer Sun, June 25, 1983)
-    report += "✨ **Your Personalized Natal Chart Reading:**\n"
-    report += "• Cancer Sun (June 25, 1983): Your emotional intelligence peaks today\n"
-    report += "• Moon in current phase: Amplifies your natural psychic sensitivity\n"
-    report += "• Mercury aspects: Favor intuitive communication over logical analysis\n"
-    report += "• Venus influences: Strengthen bonds with family and close friends\n"
-    report += "• Mars energy: Channel protective instincts into creative projects\n\n"
+    # Accurate natal chart information
+    report += "✨ **Your Natal Chart (June 25, 1983, 1:20 AM EDT, Ottawa):**\n"
+    report += "• Cancer Sun 3.1° in 4th House - Core identity in home/security sector\n"
+    report += "• Capricorn Moon 1.6° in 10th House - Emotional nature in career/reputation sector\n"
+    report += "• Aries Rising 13.7° - Outward personality projects pioneering energy\n"
+    report += "• Cardinal Sign Dominance - Natural leadership across emotional, practical, and social spheres\n\n"
     
-    # Daily cosmic forecast
-    report += "🌙 **Today's Cosmic Forecast:**\n"
-    report += "Your birth chart shows strong Water element dominance today. Trust your emotional responses - they're more accurate than usual. The planetary transits are activating your 4th house of home and roots.\n\n"
-    report += "This is an excellent time for:\n"
-    report += "• Nurturing relationships and family connections\n"
-    report += "• Creating beauty and harmony in your space\n"
-    report += "• Honoring your intuitive gifts and inner wisdom\n"
-    report += "• Enhancing your natural empathy and healing abilities\n\n"
+    # Current astronomical data would require API
+    report += "🌙 **Current Astronomical Status:**\n"
+    report += "⚠️ **OpenAI Assistant Connection Required** - For real-time planetary positions, current transits, exact lunar phase data, and specific aspects affecting your chart, the enhanced Flora assistant needs to be properly connected.\n\n"
     
-    # Mystical practices for today
-    report += "🔮 **Recommended Mystical Practices:**\n"
-    report += "• **Tarot:** Pull a card for family/home guidance\n"
-    report += "• **Crystal work:** Moonstone or Rose Quartz for emotional clarity\n"
-    report += "• **Meditation:** Focus on heart chakra healing\n"
-    report += "• **Journal:** Record intuitive insights and dreams\n\n"
+    report += "📊 **Your Chart Analysis:**\n"
+    report += "• **Sun-Moon Polarity:** Cancer emotional nature balanced by Capricorn practical approach\n"
+    report += "• **Rising Influence:** Aries energy creates dynamic, pioneering first impression\n"
+    report += "• **Angular Houses:** Both luminaries in angular houses (4th & 10th) = strong chart foundation\n"
+    report += "• **Cardinal Quality:** Natural leadership abilities across all life sectors\n\n"
     
-    report += "🌟 **Cosmic Reminder:** Your Cancer intuition is your superpower - trust what your heart tells you"
+    report += "🔧 **Technical Note:** Full transit analysis and current planetary data requires OpenAI assistant connection with proper environment variables."
     
     return report
 
