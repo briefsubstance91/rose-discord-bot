@@ -2784,9 +2784,9 @@ async def get_flora_report(brief=False):
         current_time = datetime.now(toronto_tz).strftime('%A, %B %d at %I:%M %p')
         
         if brief:
-            prompt = f"Provide a brief personalized astrological guidance for {current_time}. Focus on my Cancer Sun, Capricorn Moon, Aries Rising combination and current cosmic influences. Keep it concise for morning briefing."
+            prompt = f"Provide a brief factual astrological report for {current_time}. Include SPECIFIC current planetary positions, exact lunar phase, and factual transit data. Connect these to my Cancer Sun 3.1°, Capricorn Moon 1.6°, Aries Rising 13.7° (June 25, 1983, 1:20 AM EDT, Ottawa). Use real astronomical data, not general guidance."
         else:
-            prompt = f"Provide a comprehensive personalized astrological reading for {current_time}. Include detailed analysis of my corrected natal chart (Cancer Sun, Capricorn Moon, Aries Rising), current transits, and practical guidance. Use my accurate birth data: June 25, 1983, 1:20 AM EDT, Ottawa."
+            prompt = f"Provide a comprehensive factual astrological report for {current_time}. Include: 1) Current exact planetary positions and degrees, 2) Specific transits affecting my natal chart, 3) Exact lunar phase and meaning, 4) Real astronomical aspects happening now. Connect these factual details to my specific placements: Cancer Sun 3.1° in 4th House, Capricorn Moon 1.6° in 10th House, Aries Rising 13.7°. Birth data: June 25, 1983, 1:20 AM EDT, Ottawa. Give me a real astrology report with specific data, not general guidance."
         
         # Call Flora's enhanced OpenAI assistant
         flora_response = await call_team_assistant('flora', prompt)
@@ -2802,17 +2802,17 @@ async def get_flora_report(brief=False):
         return get_flora_fallback_report(brief)
 
 def get_flora_fallback_report(brief=False):
-    """Fallback Flora report with correct natal chart if OpenAI fails"""
+    """Fallback Flora report with factual natal chart data if OpenAI fails"""
     if brief:
-        # Brief version with CORRECTED natal chart
+        # Brief version with FACTUAL natal chart data
         current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
-        report = f"🔮 **Astrological Guidance** ({current_time})\n"
-        report += "✨ **Your Corrected Personal Reading:**\n"
-        report += "• Cancer Sun: Emotional intuition and nurturing energy active\n"
-        report += "• Capricorn Moon: Structure your emotional responses practically\n" 
-        report += "• Aries Rising: Lead with pioneering confidence today\n"
-        report += "• Current cosmic influences support your cardinal sign combination\n\n"
-        report += "🌙 **Today's Guidance:** Your Cancer-Capricorn-Aries blend gives you emotional wisdom, practical action, and pioneering courage."
+        report = f"🔮 **Astrological Report** ({current_time})\n"
+        report += "✨ **Your Natal Chart (June 25, 1983, 1:20 AM EDT, Ottawa):**\n"
+        report += "• Cancer Sun 3.1° in 4th House - Core identity in home/security sector\n"
+        report += "• Capricorn Moon 1.6° in 10th House - Emotional nature in career/reputation sector\n" 
+        report += "• Aries Rising 13.7° - Outward personality projects pioneering energy\n"
+        report += "• Cardinal Sign Dominance - Natural leadership across emotional, practical, and social spheres\n\n"
+        report += "⚠️ **Note:** OpenAI assistant unavailable - specific current transits and planetary positions require assistant connection."
         return report
     
     # Full detailed version for !briefing command
