@@ -17,3 +17,4 @@ gmail_token_for_railway.json
 .env_oauth_fixed
 client_secret_2_813579324432-vdedae0u0olk6sacjqbhscfa23k69mmu.apps.googleusercontent.com.json
 gmail_token_backup.json
+.env.template
