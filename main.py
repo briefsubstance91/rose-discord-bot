@@ -2373,6 +2373,69 @@ ASSISTANT_COLORS = {
     'cressida frost': 0xFF6B9D     # Pink (from Cressida's bot)
 }
 
+async def call_team_assistant(assistant_name, briefing_prompt):
+    """Call a specific team assistant's OpenAI assistant for their briefing"""
+    try:
+        assistant_id = TEAM_ASSISTANT_IDS.get(assistant_name.lower())
+        print(f"🔍 DEBUG: Looking for '{assistant_name.lower()}', found ID: {assistant_id}")
+        print(f"🔍 DEBUG: Available keys: {list(TEAM_ASSISTANT_IDS.keys())}")
+        if not assistant_id:
+            print(f"🔍 DEBUG: TEAM_ASSISTANT_IDS = {TEAM_ASSISTANT_IDS}")
+            return f"❌ {assistant_name.title()} assistant not configured"
+        
+        # Create a new thread for this briefing request
+        thread = client.beta.threads.create()
+        thread_id = thread.id
+        
+        # Add the briefing prompt to the thread
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=briefing_prompt
+        )
+        
+        # Run the assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=assistant_id
+        )
+        
+        # Wait for completion with timeout
+        max_wait = 30  # 30 second timeout
+        wait_time = 0
+        
+        while run.status in ['queued', 'in_progress'] and wait_time < max_wait:
+            await asyncio.sleep(1)
+            wait_time += 1
+            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+        
+        if run.status == 'completed':
+            # Get the assistant's response
+            messages = client.beta.threads.messages.list(thread_id=thread_id)
+            assistant_message = messages.data[0]
+            
+            if assistant_message.content:
+                response_text = assistant_message.content[0].text.value
+                print(f"✅ {assistant_name.title()} assistant responded ({len(response_text)} chars)")
+                return response_text
+            else:
+                return f"❌ {assistant_name.title()} assistant returned empty response"
+        
+        elif run.status == 'failed':
+            error_msg = f"Assistant run failed"
+            if hasattr(run, 'last_error') and run.last_error:
+                error_msg += f": {run.last_error}"
+            print(f"❌ {assistant_name.title()} {error_msg}")
+            return f"❌ {assistant_name.title()} assistant failed"
+        
+        else:
+            print(f"❌ {assistant_name.title()} assistant timeout (status: {run.status})")
+            return f"❌ {assistant_name.title()} assistant timeout"
+        
+    except Exception as e:
+        print(f"❌ {assistant_name.title()} assistant error: {str(e)}")
+        return f"❌ Error processing request: {str(e)[:100]}"
+
 async def send_as_assistant_bot(channel, content, assistant_name):
     """Send message with clear assistant identity using Discord embeds for better visual distinction"""
     try:
