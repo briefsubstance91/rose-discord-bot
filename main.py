@@ -109,6 +109,18 @@ USER_CITY = os.getenv('USER_CITY', 'Toronto')
 USER_LAT = os.getenv('USER_LAT')
 USER_LON = os.getenv('USER_LON')
 
+# Team Assistant IDs for Dynamic Calling
+TEAM_ASSISTANT_IDS = {
+    'flora': os.getenv('FLORA_ASSISTANT_ID'),
+    'pippa': os.getenv('PIPPA_ASSISTANT_ID'),
+    'cressida': os.getenv('CRESSIDA_ASSISTANT_ID'),
+    'vivian': os.getenv('VIVIAN_ASSISTANT_ID'),
+    'maeve': os.getenv('MAEVE_ASSISTANT_ID'),
+    'celeste': os.getenv('CELESTE_ASSISTANT_ID'),
+    'alice': os.getenv('ALICE_ASSISTANT_ID'),  # If exists
+    'charlotte': ASSISTANT_ID  # Charlotte is integrated into Rose
+}
+
 # Gmail OAuth setup (ORIGINAL VARIABLE NAMES)
 GMAIL_OAUTH_JSON = os.getenv('GMAIL_OAUTH_JSON')
 GMAIL_TOKEN_JSON = os.getenv('GMAIL_TOKEN_JSON')
