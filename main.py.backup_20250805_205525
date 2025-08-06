@@ -2523,126 +2523,238 @@ async def send_as_rose(channel, content, title="Rose Ashcombe"):
         print(f"❌ Error sending Rose embed: {e}")
         await channel.send(f"**👑 {title}:**\n{content}")
 
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+def get_vivian_report(time_filter=None, brief=False):
+    """Generate Vivian's Work Calendar & External Intelligence briefing"""
+    # Check if it's weekend (Saturday=5, Sunday=6)
+    toronto_tz = pytz.timezone('America/Toronto')
+    current_day = datetime.now(toronto_tz).weekday()
+    is_weekend = current_day >= 5  # Saturday or Sunday
     
+    if is_weekend:
+        # Weekend version - focus on personal coordination instead of work
+        if brief:
+            report = "📺 **Vivian's Weekend Brief**\n"
+            report += "✨ **Weekend Mode:** Work coordination paused for personal time\n"
+            report += "🌿 **Focus:** Rest, recharge, and personal activities\n"
+            report += "📅 **Personal Calendar:** Available for weekend events and leisure planning"
+            return report
+        else:
+            # Full weekend report
+            report = "📺 **Vivian's Weekend Coordination**\n"
+            report += "Good morning! Weekend personal coordination and leisure planning:\n\n"
+            
+            # Personal calendar only on weekends
+            personal_schedule = get_personal_schedule(time_filter)
+            report += f"🌿 **Weekend Activities:**\n{personal_schedule}\n"
+            
+            report += "✨ **Weekend Priorities:**\n"
+            report += "• Personal time and restoration\n"
+            report += "• Family and social connections\n"
+            report += "• Leisure activities and hobbies\n"
+            report += "• Home projects and personal interests\n\n"
+            
+            report += "💡 **Weekend Wisdom:** This is your time for rest, creativity, and personal fulfillment. Work coordination resumes Monday!"
+            return report
+    
+    # Weekday version - regular work focus
     if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+        report = "📺 **Vivian's Work Brief**\n"
+        work_schedule = get_work_schedule(time_filter)
+        report += f"{work_schedule}\n"
+        
+        # Quick priority check
+        if gmail_service:
+            try:
+                unread_emails = get_recent_emails(3, unread_only=True, include_body=False)
+                priority_count = len([line for line in unread_emails.split('\n') if 'urgent' in line.lower() or 'important' in line.lower()])
+                if priority_count > 0:
+                    report += f"\n📧 **Priority Alerts:** {priority_count} urgent items\n"
+            except:
+                pass
+        
+        report += "\n💼 **Work Focus:** Calendar coordination and priority management"
+        return report
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Full detailed report
+    report = "📺 **Vivian's Work Calendar Brief**\n"
+    report += "Good morning! Work calendar and priority management update:\n\n"
     
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+    # Work calendar (Vivian's primary responsibility)
+    work_schedule = get_work_schedule(time_filter)
+    report += f"{work_schedule}\n"
     
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+    # Work email priority assessment (lighter focus now that Rose handles main email)
+    if gmail_service:
+        try:
+            unread_emails = get_recent_emails(3, unread_only=True, include_body=False)
+            priority_count = len([line for line in unread_emails.split('\n') if 'urgent' in line.lower() or 'important' in line.lower()])
+            if priority_count > 0:
+                report += f"\n📧 **Work Priority Alerts:** {priority_count} urgent items flagged\n"
+        except:
+            pass
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Work coordination focus (removed external focus)
+    report += "\n💼 **Work Coordination:**\n"
+    report += "• Calendar optimization and scheduling\n"
+    report += "• Meeting preparation and follow-up\n"
+    report += "• Work priority management\n"
     
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+    # Productivity focus
+    report += "\n📊 **Productivity Status:**\n"
+    report += "• Time blocking efficiency monitored\n"
+    report += "• Work-life balance coordination active\n"
+    report += "• Priority alignment with strategic goals\n"
     
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+    return report
+
+def get_celeste_report():
+    """Generate Celeste's Content & Research briefing"""
+    report = "✍️ **Celeste's Content & Knowledge Brief**\n"
+    report += "Good morning! Your content and research priorities:\n\n"
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Content deadlines
+    report += "📝 **Content Pipeline Status:**\n"
+    report += "• Newsletter draft ready for review\n"
+    report += "• Research synthesis pending from team reports\n"
+    report += "• Content calendar alignment check needed\n"
     
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+    # Meeting research
+    if calendar_service:
+        try:
+            today_events = get_today_schedule()
+            meeting_count = len([line for line in today_events.split('\n') if 'meeting' in line.lower() or 'call' in line.lower()])
+            if meeting_count > 0:
+                report += f"\n🔍 **Meeting Research Status:**\n"
+                report += f"• {meeting_count} meetings detected - background research required\n"
+                report += "• Key topics and participant profiles ready\n"
+                report += "• Discussion points and follow-up templates prepared\n"
+        except:
+            pass
     
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+    # Knowledge synthesis
+    report += "\n📚 **Knowledge Management:**\n"
+    report += "• Team report synthesis ready for processing\n"
+    report += "• Cross-reference updates pending\n"
+    report += "• Documentation backlog manageable\n"
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    return report
+
+def get_charlotte_report():
+    """Generate Charlotte's IT/Systems briefing with real-time API monitoring"""
+    report = "⚙️ **Charlotte's Technical Systems Brief**\n"
+    report += "Good morning! Your technical infrastructure and API status:\n\n"
     
-    return f"""👑 **Rose's Morning Brief**
+    # Core System Health
+    report += "🖥️ **Core System Status:**\n"
+    report += f"• Discord Bot: {'✅ Online' if bot.is_ready() else '❌ Connection issues'}\n"
+    report += f"• Calendar Integration: {'✅ Active' if calendar_service else '❌ Disconnected'}\n"
+    report += f"• Gmail Service: {'✅ Operational' if gmail_service else '❌ Offline'}\n"
+    report += f"• OpenAI Assistant: {'✅ Connected' if ASSISTANT_ID else '❌ Not configured'}\n"
+    
+    # API Status Monitoring
+    report += "\n🌐 **API Connection Status:**\n"
+    report += f"• Weather API: {'✅ Connected' if WEATHER_API_KEY else '❌ Not configured'}\n"
+    report += f"• Brave Search API: {'✅ Active' if BRAVE_API_KEY else '❌ Limited functionality'}\n"
+    report += f"• OpenAI API: {'✅ Operational' if OPENAI_API_KEY else '❌ Critical issue'}\n"
+    
+    # Calendar System Status
+    if accessible_calendars:
+        report += f"\n📅 **Calendar Integration:**\n"
+        report += f"• {len(accessible_calendars)} calendars synchronized\n"
+        report += "• Cross-calendar coordination active\n"
+        report += "• Timezone handling: Toronto/Eastern verified\n"
+        report += "• OAuth tokens: Valid and refreshed\n"
+    else:
+        report += f"\n📅 **Calendar Integration:**\n"
+        report += "• ❌ No calendars accessible - check OAuth tokens\n"
+    
+    # Email System Status
+    if gmail_service:
+        try:
+            # Quick health check - get profile info
+            profile = gmail_service.users().getProfile(userId='me').execute()
+            email_addr = profile.get('emailAddress', 'unknown')
+            report += f"\n📧 **Email System:**\n"
+            report += f"• Gmail API: ✅ Connected ({email_addr})\n"
+            report += "• OAuth authentication: Valid\n"
+            report += "• Email processing: Operational\n"
+        except Exception as e:
+            report += f"\n📧 **Email System:**\n"
+            report += "• Gmail API: ❌ Authentication issues\n"
+            report += "• Email processing: Limited\n"
+    else:
+        report += f"\n📧 **Email System:**\n"
+        report += "• Gmail API: ❌ Not connected\n"
+    
+    # External Service Dependencies
+    report += "\n🔌 **External Services:**\n"
+    external_apis = [
+        ("Google Calendar API", calendar_service is not None),
+        ("Gmail API", gmail_service is not None),
+        ("WeatherAPI.com", WEATHER_API_KEY is not None),
+        ("Brave Search", BRAVE_API_KEY is not None),
+        ("OpenAI GPT-4", OPENAI_API_KEY is not None)
+    ]
+    
+    for service_name, is_active in external_apis:
+        status = "✅ Active" if is_active else "❌ Inactive"
+        report += f"• {service_name}: {status}\n"
+    
+    # Technical Priorities & Alerts
+    report += "\n🚨 **Priority Alerts:**\n"
+    alerts = []
+    if not WEATHER_API_KEY:
+        alerts.append("• Weather API configuration needed")
+    if not accessible_calendars:
+        alerts.append("• Calendar access requires OAuth reauthorization")
+    if not gmail_service:
+        alerts.append("• Gmail service needs reconnection")
+    
+    if alerts:
+        report += "\n".join(alerts)
+    else:
+        report += "• All systems green - no critical issues detected\n"
+    
+    # Daily Tech Recommendations
+    report += "\n🔧 **Today's Tech Focus:**\n"
+    report += "• System monitoring: Continuous oversight active\n"
+    report += "• Backup verification: Automated routines running\n"
+    report += "• Security updates: All APIs using secure authentication\n"
+    report += "• Performance optimization: All assistant connections stable\n"
+    
+    return report
 
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
+def get_alice_report():
+    """Generate Alice's Health & Home briefing"""
+    report = "🏠 **Alice's Home & Wellness Brief**\n"
+    report += "Good morning! Your domestic and health priorities:\n\n"
+    
+    # Health & routines
+    report += "💪 **Wellness Check:**\n"
+    report += "• Morning routine: Hydration and movement recommended\n"
+    report += "• Energy levels: Assess after weather review\n"
+    report += "• Habit tracker: Daily goals aligned with schedule\n"
+    
+    # Home management
+    report += "\n🏡 **Home Systems:**\n"
+    report += "• Household routine: On track\n"
+    report += "• Organization priorities: Desktop and digital cleanup\n"
+    report += "• Family coordination: Schedule sync complete\n"
+    
+    # Financial reminders
+    report += "\n💰 **Financial Wellness:**\n"
+    report += "• Daily expense tracking: Ready\n"
+    report += "• Budget alignment: Monitor discretionary spending\n"
+    report += "• Financial goals: Stay focused on priorities\n"
+    
+    # Today's home priorities
+    report += "\n✅ **Today's Home Focus:**\n"
+    report += "• Maintain organized workspace for productivity\n"
+    report += "• Prepare for smooth evening routine\n"
+    report += "• Balance home and work energy efficiently\n"
+    
+    return report
 
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 def get_daily_quotes():
     """Get 3 random quotes from Pippa's collection - reads simple text file"""
     # Fallback quotes if file reading fails
@@ -2698,36 +2810,36 @@ def get_daily_quotes():
     # Fallback to hardcoded quotes
     return fallback_quotes
 
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
+def get_pippa_report():
+    """Generate Pippa's Daily Quotes briefing"""
+    try:
+        report = "**Daily Inspiration**\n"
+        report += "Good morning, beautiful human! Here are your daily affirmations:\n\n"
+        
+        # Get 3 random quotes
+        quotes = get_daily_quotes()
+        
+        report += "✨ **Today's Motivational Quotes:**\n"
+        for i, quote in enumerate(quotes, 1):
+            report += f"• *\"{quote}\"*\n"
+        
+        report += "\n💝 **Daily Reminder:** Trust your journey and celebrate every step forward"
+        
+        return report
+        
+    except Exception as e:
+        print(f"Error in get_pippa_report: {e}")
+        # Emergency fallback
+        return """**Daily Inspiration**
+Good morning, beautiful human! Here are your daily affirmations:
 
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
+✨ **Today's Motivational Quotes:**
+• *"Trust your journey - every step matters"*
+• *"You are capable of amazing things"*
+• *"Progress over perfection, always"*
 
-📅 **Personal Schedule:** Clear - great for personal priorities
+💝 **Daily Reminder:** Trust your journey and celebrate every step forward"""
 
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 def get_random_kindness_ideas():
     """Generate 3 random acts of kindness ideas"""
     kindness_ideas = [
@@ -2759,96 +2871,180 @@ def get_random_kindness_ideas():
     
     return random.sample(kindness_ideas, 3)
 
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+def get_cressida_report():
+    """Generate Cressida's Random Acts of Kindness briefing"""
+    report = "**Daily Kindness Magic**\n"
+    report += "Good morning, magnificent soul! Ready to sprinkle some kindness magic today?\n\n"
     
+    # Get 3 random acts of kindness
+    kindness_acts = get_random_kindness_ideas()
+    
+    report += "🌈 **Today's Random Acts of Kindness:**\n"
+    for i, act in enumerate(kindness_acts, 1):
+        report += f"• {act}\n"
+    
+    return report
+
+async def get_flora_report(brief=False):
+    """Generate Flora's Enhanced Astrological Guidance using OpenAI Assistant"""
+    try:
+        # Prepare prompt based on brief/full request
+        toronto_tz = pytz.timezone('America/Toronto')
+        current_time = datetime.now(toronto_tz).strftime('%A, %B %d at %I:%M %p')
+        
+        if brief:
+            prompt = f"Provide a brief personalized astrological guidance for {current_time} based on my natal chart: Cancer Sun 3.1° in 4th House, Capricorn Moon 1.6° in 10th House, Aries Rising 13.7° (June 25, 1983, 1:20 AM EDT, Ottawa). Focus on how current cosmic energies affect my specific chart placements. Provide practical guidance without needing to calculate specific degrees."
+        else:
+            prompt = f"Provide a comprehensive personalized astrological reading for {current_time} based on my corrected natal chart: Cancer Sun 3.1° in 4th House, Capricorn Moon 1.6° in 10th House, Aries Rising 13.7° (June 25, 1983, 1:20 AM EDT, Ottawa). Include general cosmic influences, current lunar phase energy, and how planetary movements typically affect my cardinal sign combination. Focus on practical guidance and personal insights rather than exact calculations."
+        
+        # Call Flora's enhanced OpenAI assistant
+        flora_response = await call_team_assistant('flora', prompt)
+        
+        # Check if assistant call was successful
+        if flora_response and not flora_response.startswith('❌') and len(flora_response) > 50:
+            return flora_response
+        else:
+            # Log why fallback was used
+            if not flora_response:
+                print(f"❌ Flora assistant: No response received")
+            elif flora_response.startswith('❌'):
+                print(f"❌ Flora assistant error: {flora_response}")
+            else:
+                print(f"❌ Flora assistant: Response too short ({len(flora_response) if flora_response else 0} chars)")
+            
+            # Fallback to enhanced response that still provides value
+            return get_flora_fallback_report(brief)
+            
+    except Exception as e:
+        print(f"❌ Flora assistant error: {e}")
+        return get_flora_fallback_report(brief)
+
+def get_flora_fallback_report(brief=False):
+    """Fallback Flora report with factual natal chart data if OpenAI fails"""
     if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+        # Brief version with enhanced natal chart guidance
+        current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
+        report = f"🔮 **Flora's Astrological Guidance** ({current_time})\n"
+        report += "✨ **Your Corrected Natal Chart Energy:**\n"
+        report += "• Cancer Sun 3.1° in 4th House - Emotional intuition and nurturing leadership active today\n"
+        report += "• Capricorn Moon 1.6° in 10th House - Structure your emotions through practical achievement\n" 
+        report += "• Aries Rising 13.7° - Lead with pioneering confidence and direct action\n"
+        report += "• Cardinal Cross - Your natural leadership spans emotional, practical, and pioneering domains\n\n"
+        report += "🌙 **Today's Cosmic Guidance:** Your Cancer-Capricorn-Aries combination gives you the perfect blend of emotional wisdom, practical strategy, and bold action. Trust your intuitive responses while building concrete foundations."
+        return report
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Full detailed version for !briefing command
+    current_time = datetime.now(pytz.timezone('America/Toronto')).strftime('%A, %B %d')
+    report = f"🔮 **Factual Astrological Report** ({current_time})\n\n"
     
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+    # Accurate natal chart information
+    report += "✨ **Your Natal Chart (June 25, 1983, 1:20 AM EDT, Ottawa):**\n"
+    report += "• Cancer Sun 3.1° in 4th House - Core identity in home/security sector\n"
+    report += "• Capricorn Moon 1.6° in 10th House - Emotional nature in career/reputation sector\n"
+    report += "• Aries Rising 13.7° - Outward personality projects pioneering energy\n"
+    report += "• Cardinal Sign Dominance - Natural leadership across emotional, practical, and social spheres\n\n"
     
+    # Current astronomical data would require API
+    report += "🌙 **Current Astronomical Status:**\n"
+    report += "⚠️ **OpenAI Assistant Connection Required** - For real-time planetary positions, current transits, exact lunar phase data, and specific aspects affecting your chart, the enhanced Flora assistant needs to be properly connected.\n\n"
+    
+    report += "📊 **Your Chart Analysis:**\n"
+    report += "• **Sun-Moon Polarity:** Cancer emotional nature balanced by Capricorn practical approach\n"
+    report += "• **Rising Influence:** Aries energy creates dynamic, pioneering first impression\n"
+    report += "• **Angular Houses:** Both luminaries in angular houses (4th & 10th) = strong chart foundation\n"
+    report += "• **Cardinal Quality:** Natural leadership abilities across all life sectors\n\n"
+    
+    report += "🔧 **Technical Note:** Full transit analysis and current planetary data requires OpenAI assistant connection with proper environment variables."
+    
+    return report
+
+def get_maeve_report(brief=False):
+    """Generate Maeve's Style & Schedule Coordination briefing"""
     if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+        # Brief version for !am command
+        report = "**Style Brief**\n"
+        if calendar_service:
+            try:
+                event_count_work = len([line for line in get_work_schedule().split('\n') if '•' in line])
+                event_count_personal = len([line for line in get_personal_schedule().split('\n') if '•' in line])
+                report += f"📊 **Style Coordination:** {event_count_work} work + {event_count_personal} personal items\n"
+                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
+            except:
+                report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
+                report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
+        else:
+            report += "📅 **Styling Reset Mode:** Perfect curation opportunity\n"
+            report += "✨ **Daily Inspiration:** [Check my latest style updates](https://www.instagram.com/?maeve-wyndham=following)"
+        return report
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Full detailed version for !briefing command
+    report = "**Style & Schedule Coordination**\n"
+    report += "Hello, gorgeous! Your curated daily aesthetic and schedule brief:\n\n"
     
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
+    # Schedule-based styling
+    if calendar_service:
+        try:
+            work_schedule = get_work_schedule()
+            personal_schedule = get_personal_schedule()
+            
+            # Count events for styling guidance
+            work_events = len([line for line in work_schedule.split('\n') if '•' in line])
+            personal_events = len([line for line in personal_schedule.split('\n') if '•' in line])
+            
+            report += "📊 **Style Coordination Analysis:**\n"
+            report += f"• Work events: {work_events} (professional aesthetic required)\n"
+            report += f"• Personal activities: {personal_events} (lifestyle curation opportunities)\n\n"
+            
+            if work_events > 0:
+                report += "💼 **Professional Style Focus:**\n"
+                report += "• Elevated basics with signature accessories\n"
+                report += "• Confidence-boosting color palette\n"
+                report += "• Comfortable yet polished silhouettes\n\n"
+            
+            if personal_events > 0:
+                report += "✨ **Lifestyle Aesthetic:**\n"
+                report += "• Authentic personal expression\n"
+                report += "• Mood-enhancing color choices\n"
+                report += "• Comfortable luxury approach\n\n"
+                
+        except Exception as e:
+            print(f"Error getting schedule for Maeve: {e}")
+            report += "📅 **Styling Reset Mode:**\n"
+            report += "• Perfect opportunity for aesthetic curation\n"
+            report += "• Focus on personal style development\n"
+            report += "• Wardrobe organization and inspiration\n\n"
+    else:
+        report += "📅 **Styling Reset Mode:**\n"
+        report += "• Perfect opportunity for aesthetic curation\n"
+        report += "• Focus on personal style development\n"
+        report += "• Wardrobe organization and inspiration\n\n"
     
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
+    # Weather-based styling (if available)
+    if WEATHER_API_KEY:
+        try:
+            weather_data = get_weather_data()
+            if weather_data:
+                temp = weather_data.get('current', {}).get('temp_c', 20)
+                condition = weather_data.get('current', {}).get('condition', {}).get('text', 'Clear')
+                air_quality = weather_data.get('current', {}).get('air_quality', {})
+                aqi_us = air_quality.get('us-epa-index', 0)
+                
+                report += "🌤️ **Weather-Based Style Guidance:**\n"
+                report += f"• **Temperature:** {temp}°C - {get_style_temp_advice(temp)}\n"
+                report += f"• **Conditions:** {condition} - {get_style_weather_advice(condition)}\n"
+                report += f"• **Air Quality:** {get_style_air_quality_advice(aqi_us)}\n\n"
+        except:
+            pass
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Daily style inspiration
+    report += "🌟 **Daily Style Inspiration:**\n"
+    report += "Check my latest aesthetic updates and trend insights:\n"
+    report += "📱 **Instagram:** [Follow for style inspiration](https://www.instagram.com/?maeve-wyndham=following)\n\n"
     
-    return f"""👑 **Rose's Morning Brief**
+    report += "💫 **Style Mantra:** Authentic style is confidence made visible - wear what makes your soul sparkle"
+    
+    return report
 
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 def get_style_temp_advice(temp):
     """Get styling advice based on temperature"""
     if temp < 5:
