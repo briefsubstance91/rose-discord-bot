@@ -2733,8 +2733,8 @@ def get_charlotte_report():
     """Generate Charlotte's Systems Check briefing"""
     return """⚙️ **Charlotte Astor**
 
-⚙️ **Charlotte's Systems Check**
-Good morning! Running startup diagnostics...
+⚙️ **Systems Check**
+Nice to see you! Running startup diagnostics...
 
 🤖 **Discord Bot - Online** ✅
 📧 **Gmail Service - Connected** (bgelineau@gmail.com) ✅
@@ -2754,7 +2754,7 @@ def get_alice_report(brief=False):
     """Generate Alice's Health & Home briefing"""
     return """🏠 **Alice Fortescue**
 
-🏠 **Alice's Wellness Brief**
+🏠 **Wellness Brief**
 • Morning routine: Hydration & movement
 • Workspace organized for productivity
 • Home systems on track
@@ -2797,7 +2797,7 @@ def get_rose_report(events=None, brief=False):
     
     if brief:
         return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
+📅 **Schedule:** Clear
 💌 **Email:** 0 items pending"""
     
     # Full comprehensive briefing
@@ -2817,7 +2817,7 @@ def get_rose_report(events=None, brief=False):
 **Morning Brief** ({current_time.strftime('%A, %B %d')})
 {weather_section}
 
-📅 **Personal Schedule:** Clear - great for personal priorities
+📅 **Personal Schedule:** Clear
 
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
@@ -2827,7 +2827,7 @@ def get_rose_report(events=None, brief=False):
     
     if brief:
         return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
+📅 **Schedule:** Clear
 💌 **Email:** 0 items pending"""
     
     # Full comprehensive briefing
@@ -2847,7 +2847,7 @@ def get_rose_report(events=None, brief=False):
 **Morning Brief** ({current_time.strftime('%A, %B %d')})
 {weather_section}
 
-📅 **Personal Schedule:** Clear - great for personal priorities
+📅 **Personal Schedule:** Clear
 
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
@@ -2857,7 +2857,7 @@ def get_rose_report(events=None, brief=False):
     
     if brief:
         return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
+📅 **Schedule:** Clear
 💌 **Email:** 0 items pending"""
     
     # Full comprehensive briefing
@@ -2877,7 +2877,7 @@ def get_rose_report(events=None, brief=False):
 **Morning Brief** ({current_time.strftime('%A, %B %d')})
 {weather_section}
 
-📅 **Personal Schedule:** Clear - great for personal priorities
+📅 **Personal Schedule:** Clear
 
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
@@ -2960,7 +2960,7 @@ async def send_automated_am():
                 except:
                     rose_briefing += "📧 **Email Status:** Service unavailable\n\n"
             
-            rose_briefing += "🎯 **Executive Focus:** Ready to optimize your productivity and strategic priorities today."
+            rose_briefing += "🎯 Ready to optimize your productivity and strategic priorities today."
             await send_as_rose(target_channel, rose_briefing, f"Strategic Overview ({current_time})")
             
         else:
