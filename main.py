@@ -2731,8 +2731,7 @@ def get_rose_report(events=None, brief=False):
 
 def get_charlotte_report():
     """Generate Charlotte's Systems Check briefing"""
-    return """⚙️ **Charlotte Astor**
-
+    return """
 ⚙️ **Systems Check**
 Nice to see you! Running startup diagnostics...
 
@@ -2752,8 +2751,7 @@ Nice to see you! Running startup diagnostics...
 
 def get_alice_report(brief=False):
     """Generate Alice's Health & Home briefing"""
-    return """🏠 **Alice Fortescue**
-
+    return """
 🏠 **Wellness Brief**
 • Morning routine: Hydration & movement
 • Workspace organized for productivity
