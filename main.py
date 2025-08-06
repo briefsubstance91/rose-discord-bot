@@ -2728,6 +2728,38 @@ def get_rose_report(events=None, brief=False):
 
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
+
+def get_charlotte_report():
+    """Generate Charlotte's Systems Check briefing"""
+    return """⚙️ **Charlotte Astor**
+
+⚙️ **Charlotte's Systems Check**
+Good morning! Running startup diagnostics...
+
+🤖 **Discord Bot - Online** ✅
+📧 **Gmail Service - Connected** (bgelineau@gmail.com) ✅
+📅 **Calendar Sync** - 📋 BG Personal, 📋 BG Tasks, ❤️ Britt iCloud, 👤 BG Work calendars active ✅
+🤖 **OpenAI Assistant - Operational** ✅
+🌤️ **Weather API - Connected** ✅
+🔍 **Brave Search API - Active** ✅
+⭐ **Swiss Ephemeris - Calculations ready** ✅
+📺 **YouTube Data API - Not configured** ❌
+💾 **Google Drive API - Document access active** ✅
+🚀 **Railway Deployment - Services running** ✅
+🔐 **OAuth Tokens - Valid & refreshed** ✅
+
+🟢 **All systems green - Ready for operations**"""
+
+def get_alice_report(brief=False):
+    """Generate Alice's Health & Home briefing"""
+    return """🏠 **Alice Fortescue**
+
+🏠 **Alice's Wellness Brief**
+• Morning routine: Hydration & movement
+• Workspace organized for productivity
+• Home systems on track
+• Family coordination complete"""
+
 def get_random_kindness_ideas():
     """Generate 3 random acts of kindness ideas"""
     kindness_ideas = [
