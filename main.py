@@ -2754,14 +2754,47 @@ async def get_charlotte_report():
         report += f"📧 **Gmail Service - Error** ❌\n"
         issues.append(f"Gmail error: {str(e)[:50]}")
     
-    # Calendar Service Check
+    # Calendar Service Check with individual calendar status
     try:
         if calendar_service:
             # Test with calendar list query
-            calendar_list = calendar_service.calendarList().list(maxResults=5).execute()
-            cal_count = len(calendar_list.get('items', []))
-            accessible_count = len(accessible_calendars)
-            report += f"📅 **Calendar Service - Active** ({accessible_count}/{cal_count} calendars) ✅\n"
+            calendar_list = calendar_service.calendarList().list(maxResults=20).execute()
+            calendars = calendar_list.get('items', [])
+            
+            report += "📅 **Calendar Service - Active** ✅\n"
+            
+            # Show detailed calendar status
+            if calendars:
+                report += "📋 **Individual Calendar Status:**\n"
+                for cal in calendars:
+                    cal_name = cal.get('summary', 'Unknown Calendar')[:30]  # Limit length
+                    cal_id = cal.get('id', '')
+                    access_role = cal.get('accessRole', 'none')
+                    is_primary = cal.get('primary', False)
+                    
+                    # Determine status based on access role
+                    if access_role in ['owner', 'writer']:
+                        status = "✅ Full Access"
+                    elif access_role == 'reader':
+                        status = "👁️ Read Only"
+                    elif access_role in ['freeBusyReader', 'none']:
+                        status = "⚠️ Limited Access"
+                    else:
+                        status = f"❓ {access_role}"
+                    
+                    # Add primary indicator
+                    primary_indicator = " (Primary)" if is_primary else ""
+                    
+                    # Format calendar line
+                    report += f"  • **{cal_name}**{primary_indicator}: {status}\n"
+                
+                # Count accessible calendars
+                full_access_count = sum(1 for cal in calendars if cal.get('accessRole') in ['owner', 'writer'])
+                total_count = len(calendars)
+                report += f"📊 **Summary:** {full_access_count} writable / {total_count} total calendars\n"
+            else:
+                report += "📋 **No calendars found** ❌\n"
+                issues.append("No calendars accessible")
         else:
             report += "📅 **Calendar Service - Not initialized** ❌\n"
             issues.append("Calendar service offline")
