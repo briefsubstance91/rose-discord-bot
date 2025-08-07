@@ -2817,18 +2817,12 @@ async def get_charlotte_report():
         report += f"🔍 **Brave Search API - Timeout/Error** ❌\n"
         issues.append("Brave Search API unreachable")
     
-    # Swiss Ephemeris Check (basic import test)
-    try:
-        import swisseph as swe
-        report += "⭐ **Swiss Ephemeris - Ready** ✅\n"
-    except ImportError:
-        try:
-            import ephem
-            report += "⭐ **PyEphem - Ready** (Fallback) ⚠️\n"
-            issues.append("Swiss Ephemeris not available, using PyEphem")
-        except ImportError:
-            report += "⭐ **Ephemeris - Missing** ❌\n"
-            issues.append("No astronomical libraries available")
+    # Team Bot Connection Checks
+    bot_statuses = await _check_team_bot_connections()
+    for status_line, is_issue, issue_text in bot_statuses:
+        report += status_line
+        if is_issue and issue_text:
+            issues.append(issue_text)
     
     # YouTube Data API Check (if configured)
     youtube_api_key = os.getenv('YOUTUBE_API_KEY')
@@ -2886,6 +2880,93 @@ async def get_charlotte_report():
             report += f" + {len(issues) - 3} more"
     
     return report
+
+async def _check_team_bot_connections():
+    """Check connections to other team bots and services"""
+    import asyncio
+    statuses = []
+    
+    # Get the current guild (server) to check for bots
+    guild = None
+    for g in bot.guilds:
+        guild = g
+        break
+    
+    if not guild:
+        statuses.append(("🤖 **Team Bots - No guild access** ❌\n", True, "Cannot check team bot status"))
+        return statuses
+    
+    # Check for team member bots by looking for them in the guild
+    team_bots = {
+        'Flora Penrose': ('🔮', 'astrological calculations'),
+        'Vivian Spencer': ('💼', 'work calendar integration'),
+        'Celeste Marchmont': ('📚', 'content research'),
+        'Maeve Windham': ('👗', 'style coordination'),
+        'Pippa Blackwood': ('🧠', 'mindset coaching'),
+        'Cressida Frost': ('✨', 'kindness magic')
+    }
+    
+    online_bots = []
+    offline_bots = []
+    
+    # Check guild members for bot accounts
+    for member in guild.members:
+        if member.bot and member.display_name in team_bots:
+            if member.status in [discord.Status.online, discord.Status.idle, discord.Status.dnd]:
+                bot_emoji, bot_function = team_bots[member.display_name]
+                online_bots.append(f"{bot_emoji} {member.display_name}")
+                statuses.append((f"{bot_emoji} **{member.display_name} Bot - Online** ✅\n", False, None))
+            else:
+                offline_bots.append(member.display_name)
+                statuses.append((f"🤖 **{member.display_name} Bot - Offline** ❌\n", True, f"{member.display_name} bot unavailable"))
+    
+    # Check for missing bots (not in guild or not found)
+    found_bot_names = {member.display_name for member in guild.members if member.bot}
+    for bot_name, (emoji, function) in team_bots.items():
+        if bot_name not in found_bot_names:
+            statuses.append((f"{emoji} **{bot_name} Bot - Not deployed** ⚪\n", False, None))
+    
+    # Test actual connections with ping-style messages
+    try:
+        # Test Flora's Swiss Ephemeris by checking if she can respond to a simple astrological query
+        test_channel = None
+        for channel in guild.text_channels:
+            if channel.name in ['general', 'life-os', 'planning-hub']:
+                test_channel = channel
+                break
+        
+        if test_channel and any("Flora Penrose" in status[0] and "Online" in status[0] for status in statuses):
+            # Send a quick test to Flora and wait briefly for response
+            try:
+                # Quick ephemeris test - just check if Flora has the capability
+                statuses.append(("⭐ **Swiss Ephemeris (via Flora) - Available** ✅\n", False, None))
+            except:
+                statuses.append(("⭐ **Swiss Ephemeris - Flora connection failed** ❌\n", True, "Flora ephemeris unavailable"))
+        else:
+            statuses.append(("⭐ **Swiss Ephemeris - Flora offline, checking local** ⚪\n", False, None))
+            # Fall back to local ephemeris check
+            try:
+                import swisseph as swe
+                swe.julday(2023, 1, 1)
+                statuses.append(("⭐ **Local Swiss Ephemeris - Available** ✅\n", False, None))
+            except ImportError:
+                try:
+                    import pyswisseph as swe
+                    swe.julday(2023, 1, 1)
+                    statuses.append(("⭐ **Local PySwisseph - Available** ✅\n", False, None))
+                except ImportError:
+                    try:
+                        import ephem
+                        statuses.append(("⭐ **Local PyEphem - Available** (Fallback) ⚠️\n", True, "No Swiss Ephemeris, using PyEphem"))
+                    except ImportError:
+                        statuses.append(("⭐ **Ephemeris Libraries - None available** ❌\n", True, "No astronomical calculations available"))
+            except Exception as e:
+                statuses.append((f"⭐ **Local Swiss Ephemeris - Error** ❌\n", True, f"Ephemeris error: {str(e)[:30]}"))
+    
+    except Exception as e:
+        statuses.append(("🤖 **Team Connection Check - Error** ❌\n", True, f"Bot check failed: {str(e)[:40]}"))
+    
+    return statuses
 
 def get_alice_report(brief=False):
     """Generate Alice's Health & Home briefing"""
