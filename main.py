@@ -2729,25 +2729,163 @@ def get_rose_report(events=None, brief=False):
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
 
-def get_charlotte_report():
-    """Generate Charlotte's Systems Check briefing"""
-    return """
-⚙️ **Systems Check**
-Nice to see you! Running startup diagnostics...
-
-🤖 **Discord Bot - Online** ✅
-📧 **Gmail Service - Connected** (bgelineau@gmail.com) ✅
-📅 **Calendar Sync** - 📋 BG Personal, 📋 BG Tasks, ❤️ Britt iCloud, 👤 BG Work calendars active ✅
-🤖 **OpenAI Assistant - Operational** ✅
-🌤️ **Weather API - Connected** ✅
-🔍 **Brave Search API - Active** ✅
-⭐ **Swiss Ephemeris - Calculations ready** ✅
-📺 **YouTube Data API - Not configured** ❌
-💾 **Google Drive API - Document access active** ✅
-🚀 **Railway Deployment - Services running** ✅
-🔐 **OAuth Tokens - Valid & refreshed** ✅
-
-🟢 **All systems green - Ready for operations**"""
+async def get_charlotte_report():
+    """Generate Charlotte's real-time Systems Check briefing"""
+    import aiohttp
+    from datetime import datetime, timedelta
+    
+    report = "⚙️ **Real-Time Systems Check**\nRunning live diagnostics...\n\n"
+    issues = []
+    
+    # Discord Bot Status (always online if we're responding)
+    report += "🤖 **Discord Bot - Online** ✅\n"
+    
+    # Gmail Service Check
+    try:
+        if gmail_service:
+            # Test with a simple profile query
+            profile = gmail_service.users().getProfile(userId='me').execute()
+            email = profile.get('emailAddress', 'Unknown')
+            report += f"📧 **Gmail Service - Connected** ({email}) ✅\n"
+        else:
+            report += "📧 **Gmail Service - Not initialized** ❌\n"
+            issues.append("Gmail service offline")
+    except Exception as e:
+        report += f"📧 **Gmail Service - Error** ❌\n"
+        issues.append(f"Gmail error: {str(e)[:50]}")
+    
+    # Calendar Service Check
+    try:
+        if calendar_service:
+            # Test with calendar list query
+            calendar_list = calendar_service.calendarList().list(maxResults=5).execute()
+            cal_count = len(calendar_list.get('items', []))
+            accessible_count = len(accessible_calendars)
+            report += f"📅 **Calendar Service - Active** ({accessible_count}/{cal_count} calendars) ✅\n"
+        else:
+            report += "📅 **Calendar Service - Not initialized** ❌\n"
+            issues.append("Calendar service offline")
+    except Exception as e:
+        report += f"📅 **Calendar Service - Error** ❌\n"
+        issues.append(f"Calendar error: {str(e)[:50]}")
+    
+    # OpenAI Assistant Check
+    try:
+        if client and ASSISTANT_ID:
+            # Test with assistant retrieve
+            assistant = client.beta.assistants.retrieve(ASSISTANT_ID)
+            report += f"🤖 **OpenAI Assistant - Operational** ({assistant.name}) ✅\n"
+        else:
+            report += "🤖 **OpenAI Assistant - Not configured** ❌\n"
+            issues.append("OpenAI Assistant missing")
+    except Exception as e:
+        report += f"🤖 **OpenAI Assistant - Error** ❌\n"
+        issues.append(f"OpenAI error: {str(e)[:50]}")
+    
+    # Weather API Check
+    try:
+        if WEATHER_API_KEY:
+            async with aiohttp.ClientSession() as session:
+                url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q=Toronto&aqi=no"
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        report += "🌤️ **Weather API - Connected** ✅\n"
+                    else:
+                        report += f"🌤️ **Weather API - Error {response.status}** ❌\n"
+                        issues.append(f"Weather API HTTP {response.status}")
+        else:
+            report += "🌤️ **Weather API - Not configured** ❌\n"
+    except Exception as e:
+        report += f"🌤️ **Weather API - Timeout/Error** ❌\n"
+        issues.append("Weather API unreachable")
+    
+    # Brave Search API Check
+    try:
+        if BRAVE_API_KEY:
+            async with aiohttp.ClientSession() as session:
+                headers = {'X-Subscription-Token': BRAVE_API_KEY}
+                url = "https://api.search.brave.com/res/v1/web/search?q=test&count=1"
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        report += "🔍 **Brave Search API - Active** ✅\n"
+                    else:
+                        report += f"🔍 **Brave Search API - Error {response.status}** ❌\n"
+                        issues.append(f"Brave API HTTP {response.status}")
+        else:
+            report += "🔍 **Brave Search API - Not configured** ❌\n"
+    except Exception as e:
+        report += f"🔍 **Brave Search API - Timeout/Error** ❌\n"
+        issues.append("Brave Search API unreachable")
+    
+    # Swiss Ephemeris Check (basic import test)
+    try:
+        import swisseph as swe
+        report += "⭐ **Swiss Ephemeris - Ready** ✅\n"
+    except ImportError:
+        try:
+            import ephem
+            report += "⭐ **PyEphem - Ready** (Fallback) ⚠️\n"
+            issues.append("Swiss Ephemeris not available, using PyEphem")
+        except ImportError:
+            report += "⭐ **Ephemeris - Missing** ❌\n"
+            issues.append("No astronomical libraries available")
+    
+    # YouTube Data API Check (if configured)
+    youtube_api_key = os.getenv('YOUTUBE_API_KEY')
+    if youtube_api_key:
+        try:
+            async with aiohttp.ClientSession() as session:
+                url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key={youtube_api_key}"
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        report += "📺 **YouTube Data API - Connected** ✅\n"
+                    else:
+                        report += f"📺 **YouTube Data API - Error {response.status}** ❌\n"
+                        issues.append(f"YouTube API HTTP {response.status}")
+        except Exception as e:
+            report += f"📺 **YouTube Data API - Error** ❌\n"
+            issues.append("YouTube API unreachable")
+    else:
+        report += "📺 **YouTube Data API - Not configured** ⚪\n"
+    
+    # System Resource Check (basic)
+    try:
+        import psutil
+        memory_percent = psutil.virtual_memory().percent
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        report += f"💻 **System Resources - {memory_percent:.1f}% RAM, {cpu_percent:.1f}% CPU** "
+        if memory_percent > 90 or cpu_percent > 90:
+            report += "⚠️\n"
+            issues.append("High system resource usage")
+        else:
+            report += "✅\n"
+    except ImportError:
+        report += "💻 **System Resources - Monitoring unavailable** ⚪\n"
+    
+    # Runtime uptime
+    try:
+        import time
+        uptime_seconds = time.time() - bot_start_time if 'bot_start_time' in globals() else 0
+        uptime_hours = uptime_seconds / 3600
+        report += f"⏱️ **Bot Uptime - {uptime_hours:.1f} hours** ✅\n"
+    except:
+        report += "⏱️ **Bot Uptime - Unknown** ⚪\n"
+    
+    report += "\n"
+    
+    # Overall status
+    if not issues:
+        report += "🟢 **All critical systems operational - Ready for full operations**"
+    elif len(issues) <= 2:
+        report += f"🟡 **Minor issues detected ({len(issues)}) - Core functionality available**\n"
+        report += "⚠️ " + " • ".join(issues[:2])
+    else:
+        report += f"🔴 **Multiple system issues ({len(issues)}) - Degraded functionality**\n"
+        report += "❌ " + " • ".join(issues[:3])
+        if len(issues) > 3:
+            report += f" + {len(issues) - 3} more"
+    
+    return report
 
 def get_alice_report(brief=False):
     """Generate Alice's Health & Home briefing"""
@@ -3193,7 +3331,7 @@ async def morning_briefing_command(ctx):
     await asyncio.sleep(3)  # Give all assistant bots time to see mentions and respond
     
     # Charlotte's comprehensive API monitoring (Rose standing in - no bot yet)
-    charlotte_brief = get_charlotte_report()
+    charlotte_brief = await get_charlotte_report()
     await send_as_assistant_bot(ctx.channel, charlotte_brief, "Charlotte Astor")
     await asyncio.sleep(1)
     
@@ -3293,9 +3431,12 @@ async def full_team_briefing_command(ctx):
     await asyncio.sleep(2)  # Give assistant bots time to see the command and respond
     
     # Only Charlotte and Alice need Rose's fallback (no bots yet)
+    charlotte_report = await get_charlotte_report()
+    alice_report = get_alice_report()
+    
     team_reports = [
-        (get_charlotte_report(), "Charlotte Astor"),
-        (get_alice_report(), "Alice Fortescue")
+        (charlotte_report, "Charlotte Astor"),
+        (alice_report, "Alice Fortescue")
     ]
     
     for report, assistant_name in team_reports:
@@ -3383,7 +3524,7 @@ async def teambriefing_command(ctx, assistant_name: str = None):
         await ctx.send(f"📋 **{assistant_name.title()} Team Report** - Individual briefing incoming...")
     elif assistant_name in ['charlotte', 'charlotte astor']:
         # Charlotte has no bot yet - Rose fallback
-        report = get_charlotte_report()
+        report = await get_charlotte_report()
         await send_as_assistant_bot(ctx.channel, report, "Charlotte Astor")
     elif assistant_name in ['alice', 'alice fortescue']:
         # Alice has no bot yet - Rose fallback
@@ -3848,6 +3989,9 @@ async def on_command_error(ctx, error):
 # ============================================================================
 
 if __name__ == "__main__":
+    import time
+    bot_start_time = time.time()  # Track bot start time for uptime monitoring
+    
     try:
         bot.run(DISCORD_TOKEN)
     except Exception as e:
