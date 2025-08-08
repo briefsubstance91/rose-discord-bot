@@ -2237,7 +2237,8 @@ def handle_rose_functions_enhanced(run, thread_id):
                 days = arguments.get('days', 7)
                 result = get_upcoming_events(days)
             elif function_name == "get_morning_briefing":
-                result = "🌅 Morning briefing available via !briefing command"
+                # Return actual briefing data with live weather
+                result = f"🌅 **Morning Briefing**\n{get_weather_briefing()}\n\n📅 **Schedule:** Available via calendar functions\n💌 **Email:** Available via email functions"
             
             # Web search function
             elif function_name == "web_search":
@@ -2681,7 +2682,9 @@ async def get_charlotte_report():
     try:
         if WEATHER_API_KEY:
             async with aiohttp.ClientSession() as session:
-                url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q=Toronto&aqi=no"
+                # Use user's actual location for weather check
+                location = f"{USER_LAT},{USER_LON}" if USER_LAT and USER_LON else USER_CITY
+                url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={location}&aqi=no"
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
                     if response.status == 200:
                         report += "🌤️ **Weather API - Connected** ✅\n"
