@@ -2523,8 +2523,8 @@ async def send_as_rose(channel, content, title="Rose Ashcombe"):
         print(f"❌ Error sending Rose embed: {e}")
         await channel.send(f"**👑 {title}:**\n{content}")
 
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
+async def get_rose_report(events=None, brief=False):
+    """Generate Rose's Executive Morning briefing with live weather data"""
     current_time = datetime.now(pytz.timezone('America/Toronto'))
     
     if brief:
@@ -2532,17 +2532,8 @@ def get_rose_report(events=None, brief=False):
 📅 **Schedule:** Clear - great for personal priorities
 💌 **Email:** 0 items pending"""
     
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
+    # Get live weather data
+    weather_section = get_weather_briefing()
     
     return f"""👑 **Rose's Morning Brief**
 
@@ -2553,96 +2544,7 @@ def get_rose_report(events=None, brief=False):
 
 💌 **Email Status:** 0 items pending
 🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
 
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 def get_daily_quotes():
     """Get 3 random quotes from Pippa's collection - reads simple text file"""
     # Fallback quotes if file reading fails
@@ -2697,37 +2599,6 @@ def get_daily_quotes():
     
     # Fallback to hardcoded quotes
     return fallback_quotes
-
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear - great for personal priorities
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear - great for personal priorities
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 
 async def get_charlotte_report():
     """Generate Charlotte's real-time Systems Check briefing"""
@@ -2971,96 +2842,6 @@ def get_random_kindness_ideas():
     
     return random.sample(kindness_ideas, 3)
 
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
-def get_rose_report(events=None, brief=False):
-    """Generate Rose's Executive Morning briefing"""
-    current_time = datetime.now(pytz.timezone('America/Toronto'))
-    
-    if brief:
-        return f"""👑 **Rose's Brief**
-📅 **Schedule:** Clear
-💌 **Email:** 0 items pending"""
-    
-    # Full comprehensive briefing
-    weather_section = f"""☀️ **Weather Update** ({current_time.strftime('%Y-%m-%d %H:%M')})
-📍 **Toronto, Canada:** 28.2°C Partly cloudy
-🌡️ **Current:** Feels like 28.4°C | Humidity: 40% | Wind: 9.7 km/h S
-☀️ **UV Index:** 3.7 - Moderate - Moderate protection needed
-🌫️ **Air Quality:** Unhealthy for Sensitive Groups (AQI 3) - Sensitive people should limit outdoor activity 🟠
-💨 **Pollutants:** PM2.5: 54.9μg/m³ | PM10: 55.3μg/m³ | O₃: 138.0μg/m³
-⚕️ **Health Advice:** Sensitive individuals should avoid prolonged outdoor activities
-📊 **Today's Forecast:** 18.9°C to 31.3°C - Sunny
-☔ **Rain Chance:** 0%
-🔮 **Tomorrow Preview:** 21.1°C to 28.9°C - Partly Cloudy (0% rain)"""
-    
-    return f"""👑 **Rose's Morning Brief**
-
-**Morning Brief** ({current_time.strftime('%A, %B %d')})
-{weather_section}
-
-📅 **Personal Schedule:** Clear
-
-💌 **Email Status:** 0 items pending
-🚀 **Team reports incoming...**"""
 def get_style_temp_advice(temp):
     """Get styling advice based on temperature"""
     if temp < 5:
