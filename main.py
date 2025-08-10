@@ -3556,6 +3556,43 @@ async def test_pm_command(ctx):
     await ctx.send("🧪 Testing automated afternoon briefing function...")
     await send_automated_pm()
 
+@bot.command(name='links')
+async def links_command(ctx):
+    """Show Rose's resource links and tools"""
+    if ctx.channel.name not in ALLOWED_CHANNELS:
+        return
+    
+    try:
+        embed = discord.Embed(
+            title="🌹 Rose Ashcombe's Resources",
+            description="Quick access to all essential tools and platforms",
+            color=0xE91E63  # Rose color
+        )
+        
+        embed.add_field(
+            name="📧 Gmail & Communication",
+            value="• [Gmail Inbox](https://mail.google.com/mail/u/0/#inbox)\n• [Spinning Playlist](https://music.apple.com/ca/playlist/spinning/pl.u-NpXmWVVFp2q2A5)",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📅 Calendar Management",
+            value="• [BG Calendar](https://calendar.google.com/calendar/ical/bgelineau%40gmail.com/private-b543ebe17f67a562ee7b65919fffab6b/basic.ics)\n• BG Tasks (Calendar)\n• Britt iCloud (Calendar)\n• BG Work (Calendar)",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💿 Google Drive",
+            value="• [Drive Home](https://drive.google.com/drive/u/0/home)",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"❌ Links command error: {e}")
+        await ctx.send("❌ Error displaying resource links. Please try again.")
+
 @bot.command(name='help')
 async def help_command(ctx):
     """Show comprehensive help message"""
