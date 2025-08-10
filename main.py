@@ -2653,8 +2653,8 @@ async def get_charlotte_report():
                     
                     calendar_names.append(f"{emoji} {cal_name}")
                 
-                calendar_list_text = ", ".join(calendar_names)
-                report += f"📅 **Calendar Sync** - {calendar_list_text} calendars active ✅\n"
+                calendar_list_text = "\n• ".join(calendar_names)
+                report += f"📅 **Calendar Sync** - ✅\n• {calendar_list_text}\n"
             else:
                 report += "📅 **Calendar Sync - No calendars found** ❌\n"
                 issues.append("No calendars accessible")
